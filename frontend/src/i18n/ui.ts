@@ -15,8 +15,8 @@ export const ui = {
     'lang.switch': 'English',
     'lang.short': 'EN',
 
-    'hero.title': 'გარდაქმენი შენი ინტერიერი 3D დეკორით.',
-    'hero.lead': 'ხის 3D პანელები და ექსკლუზიური კედლის დეკორი, შექმნილი პარამეტრული დიზაინით და დამზადებული საქართველოში.',
+    'hero.title': 'გარდაქმენი ინტერიერი 3D დეკორით.',
+    'hero.lead': 'ხის 3D პანელები, დამზადებული საქართველოში.',
     'hero.cta.products': 'პროდუქციის ნახვა',
     'hero.cta.contact': 'დაგვიკავშირდით',
 
@@ -150,8 +150,8 @@ export const ui = {
     'lang.switch': 'ქართული',
     'lang.short': 'KA',
 
-    'hero.title': 'Transform your interior with 3D wall art.',
-    'hero.lead': 'Wooden 3D panels and exclusive wall decor, parametrically designed and made in Georgia.',
+    'hero.title': 'Transform your space with 3D wall art.',
+    'hero.lead': 'Wooden 3D panels, made in Georgia.',
     'hero.cta.products': 'View products',
     'hero.cta.contact': 'Contact us',
 

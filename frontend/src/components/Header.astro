@@ -1,5 +1,4 @@
 ---
-import Icon from './Icon.astro';
 import Wordmark from './Wordmark.astro';
 import { type Lang, useT, path, altPath } from '../i18n/ui';
 
@@ -12,7 +11,9 @@ const links = [
   { key: 'about', href: path(lang, '/about/'), label: t('nav.about') },
   { key: 'contact', href: path(lang, '/contact/'), label: t('nav.contact') },
 ];
+const menuLinks = [{ key: 'home', href: path(lang, '/'), label: t('nav.home') }, ...links];
 const switchHref = altPath(Astro.url.pathname, other);
+const SLATS = 8;
 ---
 <header class="site-header" data-header>
   <div class="wrap bar">
@@ -27,47 +28,47 @@ const switchHref = altPath(Astro.url.pathname, other);
     <div class="tools">
       <a class="lang" href={switchHref} hreflang={other} lang={other} aria-label={t('lang.switch')}>
         <span class:list={['opt', { on: lang === 'ka' }]}>KA</span>
-        <span class="sep" aria-hidden="true"></span>
         <span class:list={['opt', { on: lang === 'en' }]}>EN</span>
       </a>
-      <button class="menu-btn" type="button" data-menu-open aria-label={t('nav.menu')} aria-haspopup="dialog">
-        <Icon name="menu" size={22} />
+      <button class="menu-btn" type="button" data-menu-btn aria-expanded="false" aria-controls="site-menu"
+        data-open-label={t('nav.menu')} data-close-label={t('nav.close')} aria-label={t('nav.menu')}>
+        <span class="burger" aria-hidden="true"><i></i><i></i></span>
       </button>
     </div>
   </div>
-
-  <dialog class="sheet" data-menu aria-label={t('nav.menu')}>
-    <div class="sheet-top wrap">
-      <Wordmark />
-      <button class="menu-btn" type="button" data-menu-close aria-label={t('nav.close')}>
-        <Icon name="close" size={22} />
-      </button>
-    </div>
-    <nav class="sheet-nav wrap" aria-label="Mobile">
-      <a href={path(lang, '/')}>{t('nav.home')}</a>
-      {links.map((l) => (
-        <a href={l.href} aria-current={current === l.key ? 'page' : undefined}>{l.label}</a>
-      ))}
-      <a class="sheet-lang" href={switchHref} hreflang={other} lang={other}>{t('lang.switch')}</a>
-    </nav>
-  </dialog>
 </header>
+
+<!-- Mobile menu: opens below the header (the logo is never covered). Slats drop in, links rise. -->
+<div class="menu" id="site-menu" data-menu hidden>
+  <div class="menu-slats" aria-hidden="true">
+    {Array.from({ length: SLATS }, (_, i) => <span style={`--i:${i}`} />)}
+  </div>
+  <nav class="menu-nav wrap" aria-label="Mobile">
+    {menuLinks.map((l, i) => (
+      <a href={l.href} style={`--j:${i}`} aria-current={current === l.key ? 'page' : undefined}>
+        <span class="mi-label">{l.label}</span>
+      </a>
+    ))}
+    <a class="menu-lang" href={switchHref} hreflang={other} lang={other} style={`--j:${menuLinks.length}`}>{t('lang.switch')}</a>
+  </nav>
+</div>
 
 <style>
   .site-header {
-    position: sticky; top: 0; z-index: 40;
+    position: sticky; top: 0; z-index: 60;
     transition: background-color 400ms ease, border-color 400ms ease;
     border-bottom: 1px solid transparent;
   }
-  .site-header[data-scrolled] {
-    background: color-mix(in oklab, var(--ground) 88%, transparent);
+  .site-header[data-scrolled], .site-header[data-menu-open] {
+    background: color-mix(in oklab, var(--ground) 92%, transparent);
     backdrop-filter: blur(14px) saturate(1.1);
     -webkit-backdrop-filter: blur(14px) saturate(1.1);
     border-color: color-mix(in oklab, var(--line) 70%, transparent);
   }
-  .bar { display: flex; align-items: center; gap: var(--s-4); height: 4.75rem; }
+  .site-header[data-menu-open] { background: var(--ground); }
+  .bar { display: flex; align-items: center; gap: clamp(1rem, 0.5rem + 2vw, 2.5rem); height: var(--header-h); }
   .brand { text-decoration: none; display: inline-flex; }
-  .nav { display: flex; gap: var(--s-4); margin-left: auto; }
+  .nav { display: flex; gap: clamp(1.25rem, 0.5rem + 2vw, 2.5rem); margin-left: auto; }
   .nav a {
     position: relative; text-decoration: none; font-size: var(--t-sm); font-weight: 500; letter-spacing: 0.03em;
     color: var(--ink-2); padding-block: 0.5rem; transition: color 200ms ease;
@@ -83,46 +84,75 @@ const switchHref = altPath(Astro.url.pathname, other);
     .nav a:hover::after { transform: scaleX(1); }
   }
   .tools { display: flex; align-items: center; gap: var(--s-2); }
+
+  /* Language switch: the active language sits in a dark oak pill; the other stays a quiet link. */
   .lang {
-    display: inline-flex; align-items: center; gap: 0.55rem; text-decoration: none;
-    font-size: var(--t-xs); font-weight: 600; letter-spacing: 0.14em; padding: 0.6rem 0;
+    display: inline-flex; align-items: center; gap: 2px; padding: 3px; text-decoration: none;
+    border: 1px solid var(--line); border-radius: 999px;
+    font-size: clamp(0.66rem, 0.6rem + 0.2vw, 0.75rem); font-weight: 700; letter-spacing: 0.1em;
   }
-  .lang .opt { color: var(--ink-3); transition: color 200ms ease; }
-  .lang .opt.on { color: var(--ink); }
-  .lang .sep { width: 1px; height: 0.9rem; background: var(--line); }
-  @media (hover: hover) and (pointer: fine) { .lang:hover .opt { color: var(--ink); } }
+  .lang .opt {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 2.1em; padding: 0.42em 0.7em; border-radius: 999px; color: var(--ink-3);
+    transition: color 200ms ease, background-color 200ms ease;
+  }
+  .lang .opt.on { background: var(--accent); color: var(--accent-ink); }
+  @media (hover: hover) and (pointer: fine) {
+    .lang:hover .opt:not(.on) { color: var(--ink); background: color-mix(in oklab, var(--ink) 7%, transparent); }
+  }
+
+  /* Menu button: two lines that turn into an ✕. */
   .menu-btn {
     display: none; width: 2.75rem; height: 2.75rem; align-items: center; justify-content: center;
-    background: none; border: 0; cursor: pointer; border-radius: var(--radius);
-    transition: transform 160ms var(--ease-out);
+    background: none; border: 0; cursor: pointer; border-radius: 8px; transition: transform 160ms var(--ease-out);
   }
   .menu-btn:active { transform: scale(0.94); }
+  .burger { position: relative; width: 22px; height: 12px; }
+  .burger i {
+    position: absolute; left: 0; width: 100%; height: 1.6px; border-radius: 2px; background: var(--ink);
+    transition: transform 360ms var(--ease-in-out), top 360ms var(--ease-in-out);
+  }
+  .burger i:nth-child(1) { top: 0; }
+  .burger i:nth-child(2) { top: calc(100% - 1.6px); }
+  .menu-btn[aria-expanded='true'] .burger i:nth-child(1) { top: calc(50% - 0.8px); transform: rotate(45deg); }
+  .menu-btn[aria-expanded='true'] .burger i:nth-child(2) { top: calc(50% - 0.8px); transform: rotate(-45deg); }
 
-  .sheet {
-    position: fixed; inset: 0; width: 100%; height: 100dvh; max-width: none; max-height: none;
-    border: 0; padding: 0; background: var(--ground); color: var(--ink);
-    opacity: 1; transform: none;
-    transition: opacity 300ms var(--ease-out), transform 420ms var(--ease-drawer), overlay 300ms allow-discrete, display 300ms allow-discrete;
+  /* ---------- Mobile menu ---------- */
+  .menu { position: fixed; inset: var(--header-h) 0 0 0; z-index: 55; }
+  .menu[hidden] { display: none; }
+  .menu-slats { position: absolute; inset: 0; display: flex; }
+  .menu-slats span {
+    flex: 1 1 0; margin-right: -1px; background: var(--ground);
+    box-shadow: inset -1px 0 0 color-mix(in oklab, var(--line) 55%, transparent);
+    transform: scaleY(0); transform-origin: top;
+    transition: transform 420ms var(--ease-out);
+    transition-delay: calc(var(--i) * 35ms);
   }
-  .sheet:not([open]) { opacity: 0; transform: translateY(-2%); }
-  @starting-style { .sheet[open] { opacity: 0; transform: translateY(-2%); } }
-  .sheet::backdrop { background: transparent; }
-  .sheet-top { display: flex; align-items: center; justify-content: space-between; height: 4.75rem; }
-  .sheet-nav { display: flex; flex-direction: column; gap: 0.25rem; padding-top: var(--s-5); }
-  .sheet-nav a {
-    font-family: var(--f-display); font-size: var(--t-3xl); line-height: 1.25; text-decoration: none;
-    border-bottom: 1px solid var(--line); padding-block: 0.6rem;
+  .menu.open .menu-slats span { transform: scaleY(1); }
+  .menu.closing .menu-slats span { transition: transform 340ms var(--ease-in-out); transition-delay: calc((7 - var(--i)) * 30ms + 120ms); }
+
+  .menu-nav { position: relative; display: flex; flex-direction: column; padding-top: clamp(1.5rem, 6vh, 3rem); }
+  .menu-nav a {
+    display: flex; align-items: baseline; gap: 1rem; padding-block: 0.9rem; text-decoration: none; color: var(--ink);
+    border-bottom: 1px solid var(--line);
+    opacity: 0; transform: translateY(14px);
+    transition: opacity 360ms ease, transform 460ms var(--ease-out);
+    transition-delay: calc(260ms + var(--j) * 60ms);
   }
-  .sheet-nav a[aria-current='page'] { color: var(--accent); }
-  .sheet-nav .sheet-lang { font-family: var(--f-text); font-size: var(--t-sm); letter-spacing: 0.14em; border: 0; margin-top: var(--s-3); color: var(--ink-2); }
+  .menu.open .menu-nav a { opacity: 1; transform: none; }
+  .menu.closing .menu-nav a { opacity: 0; transform: translateY(-6px); transition: opacity 160ms ease, transform 200ms ease; transition-delay: 0ms; }
+  .mi-label { font-size: clamp(1.7rem, 1.2rem + 3vw, 2.4rem); font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; }
+  .menu-nav a[aria-current='page'] .mi-label { color: var(--accent); }
+  .menu-nav .menu-lang { border: 0; margin-top: var(--s-2); font-size: var(--t-sm); font-weight: 600; color: var(--ink-2); letter-spacing: 0.06em; }
 
   @media (max-width: 860px) {
     .nav { display: none; }
     .tools { margin-left: auto; }
     .menu-btn { display: inline-flex; }
   }
+  @media (min-width: 861px) { .menu { display: none !important; } }
   @media (prefers-reduced-motion: reduce) {
-    .sheet { transition: opacity 200ms ease, overlay 200ms allow-discrete, display 200ms allow-discrete; transform: none !important; }
+    .menu-slats span, .menu-nav a, .burger i { transition-duration: 1ms !important; transition-delay: 0ms !important; }
   }
 </style>
 
@@ -132,8 +162,73 @@ const switchHref = altPath(Astro.url.pathname, other);
   onScroll();
   addEventListener('scroll', onScroll, { passive: true });
 
-  const sheet = document.querySelector<HTMLDialogElement>('[data-menu]')!;
-  document.querySelector('[data-menu-open]')?.addEventListener('click', () => sheet.showModal());
-  document.querySelector('[data-menu-close]')?.addEventListener('click', () => sheet.close());
-  sheet.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => sheet.close()));
+  const btn = header.querySelector<HTMLButtonElement>('[data-menu-btn]')!;
+  const menu = document.querySelector<HTMLElement>('[data-menu]')!;
+  const lastSlat = menu.querySelector<HTMLElement>('.menu-slats span:first-child')!; // retracts last when closing
+  let state: 'closed' | 'open' | 'closing' = 'closed';
+
+  const lock = (on: boolean) => {
+    document.documentElement.style.overflow = on ? 'hidden' : '';
+    document.querySelectorAll<HTMLElement>('main, footer').forEach((el) => (on ? el.setAttribute('inert', '') : el.removeAttribute('inert')));
+  };
+
+  const open = () => {
+    if (state !== 'closed') return;
+    state = 'open';
+    menu.hidden = false;
+    lock(true);
+    header.setAttribute('data-menu-open', '');
+    btn.setAttribute('aria-expanded', 'true');
+    btn.setAttribute('aria-label', btn.dataset.closeLabel!);
+    requestAnimationFrame(() => requestAnimationFrame(() => menu.classList.add('open')));
+    setTimeout(() => menu.querySelector<HTMLElement>('.menu-nav a')?.focus({ preventScroll: true }), 300);
+  };
+
+  /** Close, and resolve only once the slats have fully retracted. */
+  const close = (): Promise<void> =>
+    new Promise((resolve) => {
+      if (state !== 'open') return resolve();
+      state = 'closing';
+      btn.setAttribute('aria-expanded', 'false');
+      btn.setAttribute('aria-label', btn.dataset.openLabel!);
+      menu.classList.add('closing');
+      menu.classList.remove('open');
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        menu.classList.remove('closing');
+        menu.hidden = true;
+        header.removeAttribute('data-menu-open');
+        lock(false);
+        state = 'closed';
+        resolve();
+      };
+      lastSlat.addEventListener('transitionend', finish, { once: true });
+      setTimeout(finish, 900); // safety net
+    });
+
+  btn.addEventListener('click', () => (state === 'open' ? close().then(() => btn.focus()) : open()));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && state === 'open') close().then(() => btn.focus());
+    // Keep Tab inside the menu while it is open.
+    if (e.key === 'Tab' && state === 'open') {
+      const items = [btn, ...menu.querySelectorAll<HTMLElement>('a')];
+      const i = items.indexOf(document.activeElement as HTMLElement);
+      const next = e.shiftKey ? (i <= 0 ? items.length - 1 : i - 1) : (i + 1) % items.length;
+      e.preventDefault();
+      items[next].focus();
+    }
+  });
+
+  // Navigate only after the closing animation has finished.
+  menu.querySelectorAll<HTMLAnchorElement>('a').forEach((a) =>
+    a.addEventListener('click', (e) => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+      e.preventDefault();
+      close().then(() => { location.href = a.href; });
+    }),
+  );
+  // Leaving mobile width with the menu open: close it instantly.
+  matchMedia('(min-width: 861px)').addEventListener('change', (m) => { if (m.matches && state === 'open') close(); });
 </script>

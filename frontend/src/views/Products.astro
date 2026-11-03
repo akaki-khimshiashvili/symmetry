@@ -8,13 +8,6 @@ interface Props { lang: Lang }
 const { lang } = Astro.props;
 const t = useT(lang);
 const { products } = await loadData();
-// Rows alternate wide/narrow so the catalogue reads as spreads, not a uniform card grid.
-const layout = (i: number) => {
-  const row = Math.floor(i / 2);
-  const first = i % 2 === 0;
-  const wide = row % 2 === 0 ? first : !first;
-  return wide ? { cls: 'w', ratio: 1.25 } : { cls: 'n', ratio: 0.8 };
-};
 ---
 <Base lang={lang} title={t('products.title')} current="products">
   <section class="wrap intro center-stack">
@@ -40,8 +33,12 @@ const layout = (i: number) => {
     ) : (
       <div class="cat" data-cat>
         {products.map((p, i) => {
-          const l = layout(i);
-          return <SpecimenCard product={p} index={i} lang={lang} ratio={p.orientation === 'portrait' ? 0.72 : 1.3} class={l.cls} d={i % 2} heading="h2" />;
+          const r = p.orientation === 'portrait' ? 0.75 : 1.3333;
+          return (
+            <div class="cell" data-type={p.orientation} style={`--r:${r}`}>
+              <SpecimenCard product={p} index={i} lang={lang} ratio={r} d={i % 3} heading="h2" />
+            </div>
+          );
         })}
       </div>
     )}
@@ -62,21 +59,22 @@ const layout = (i: number) => {
   .filter button[aria-pressed='true'] { color: var(--ink); border-color: var(--ink-2); }
   .filter button[aria-pressed='true'] .notch { background: var(--accent); border-color: var(--accent); }
   @media (hover: hover) and (pointer: fine) { .filter button:hover { color: var(--ink); border-color: var(--ink-3); } }
-  .cat :global(.spec[hidden]) { display: none; }
   .catalogue { padding-bottom: var(--s-6); }
-  .cat { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: calc(var(--gutter) * 1.5); row-gap: var(--s-6); align-items: end; }
-  .cat :global(.w) { grid-column: span 7; }
-  .cat :global(.n) { grid-column: span 5; }
-  /* A portrait panel in a wide column stays a slender leaf. */
-  .cat :global(.spec.w[data-type='portrait']) { width: 68%; }
-  .empty { padding-block: var(--s-6); }
-  @media (max-width: 900px) {
-    .cat { row-gap: var(--s-5); }
-    .cat :global(.w), .cat :global(.n) { grid-column: span 6; }
+  /* Justified rows: every picture in a row shares one height and its width follows its shape
+     (flex-grow and flex-basis ∝ aspect ratio). max-width ∝ ratio too, so a short last row keeps
+     the same height instead of ballooning. Rows are centred. */
+  .cat { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: var(--s-5) calc(var(--gutter) * 1.5); }
+  .cell { flex: var(--r) 1 calc(var(--r) * 15rem); max-width: calc(var(--r) * 26rem); min-width: 0; }
+  .cell[hidden] { display: none; }
+  /* Wider screens: one shared picture height for the whole catalogue; widths follow each shape. */
+  @media (min-width: 621px) {
+    .cat { --h: clamp(12rem, 17vw, 18rem); }
+    .cell { flex: 0 0 calc(var(--r) * var(--h)); max-width: none; }
   }
+  .empty { padding-block: var(--s-6); }
   @media (max-width: 620px) {
-    .cat :global(.w), .cat :global(.n) { grid-column: 1 / -1; }
-    .cat :global(.spec.w[data-type='portrait']) { width: 100%; }
+    .cat { gap: var(--s-4) 0.9rem; }
+    .cell { flex-basis: calc(var(--r) * 7.5rem); max-width: calc(var(--r) * 15rem); }
   }
 </style>
 
@@ -84,21 +82,12 @@ const layout = (i: number) => {
   const bar = document.querySelector<HTMLElement>('[data-filter]');
   const cat = document.querySelector<HTMLElement>('[data-cat]');
   if (bar && cat) {
-    const cards = [...cat.querySelectorAll<HTMLElement>('.spec')];
+    const cells = [...cat.querySelectorAll<HTMLElement>('.cell')];
     const apply = (f: string) => {
       bar.querySelectorAll<HTMLButtonElement>('[data-f]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.f === f)));
-      let i = 0;
-      for (const c of cards) {
-        const show = f === 'all' || c.dataset.type === f;
-        c.hidden = !show;
-        if (!show) continue;
-        // Keep the alternating wide / narrow spread rhythm for whatever is visible.
-        const row = Math.floor(i / 2);
-        const wide = row % 2 === 0 ? i % 2 === 0 : i % 2 === 1;
-        c.classList.toggle('w', wide);
-        c.classList.toggle('n', !wide);
-        c.classList.add('is-in');
-        i++;
+      for (const c of cells) {
+        c.hidden = !(f === 'all' || c.dataset.type === f);
+        c.querySelector('.spec')?.classList.add('is-in');
       }
       const url = new URL(location.href);
       if (f === 'all') url.searchParams.delete('type');

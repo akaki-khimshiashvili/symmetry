@@ -6,7 +6,7 @@
  *
  * Opening (≈3.4s): slats rise into place from the centre out, turn from edge-on to face the room,
  * then their depth ripples outward from the middle. Meanwhile the key light sweeps across like
- * morning sun (shadows travel) and the camera glides back to its resting view.
+ * morning sun (shadows travel). The camera starts in its resting view.
  * Scroll: the camera orbits, the wave travels along the wall and the light shifts a little.
  *
  * Performance: one InstancedMesh (single draw call), 1024² soft shadow map, DPR capped,
@@ -95,7 +95,7 @@ export function mountSlatWall(host: HTMLElement, opts: { reduce: boolean; woodCo
   const key = new DirectionalLight(0xffe4c2, 2.6);
   key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024);
-  Object.assign(key.shadow.camera, { left: -8.5, right: 8.5, top: 3.6, bottom: -3.6, near: 1, far: 26 });
+  Object.assign(key.shadow.camera, { left: -12, right: 12, top: 5, bottom: -5, near: 1, far: 30 });
   key.shadow.bias = -0.0006;
   key.shadow.radius = 12;
   key.shadow.blurSamples = 16;
@@ -150,8 +150,9 @@ export function mountSlatWall(host: HTMLElement, opts: { reduce: boolean; woodCo
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     const tanHalf = Math.tan(MathUtils.degToRad(camera.fov / 2));
-    const fit = camera.aspect < 1.1 ? TOTAL * 0.62 : TOTAL * 1.32;
-    dist = Math.max(fit / (2 * tanHalf * camera.aspect), (SLAT_H * 1.25) / (2 * tanHalf));
+    const narrow = camera.aspect < 1.5;
+    const fit = narrow ? TOTAL * 0.72 : TOTAL * 1.32;
+    dist = Math.max(fit / (2 * tanHalf * camera.aspect), (SLAT_H * (narrow ? 1.8 : 1.7)) / (2 * tanHalf));
     camera.updateProjectionMatrix();
   };
 
@@ -199,11 +200,9 @@ export function mountSlatWall(host: HTMLElement, opts: { reduce: boolean; woodCo
     key.intensity = MathUtils.lerp(0.9, 2.6, sweep);
     wallMat.opacity = MathUtils.lerp(0.1, 0.24, sweep);
 
-    // Camera glides back and across, then orbits with the scroll.
-    const glide = easeInOut(t / (INTRO * 0.95));
-    const angle = MathUtils.lerp(0.34, -0.14, glide) + smoothP * 0.34;
-    const k = MathUtils.lerp(0.82, 1, glide);
-    camera.position.set(Math.sin(angle) * dist * k, MathUtils.lerp(0.2, 0.6, glide) + smoothP * 0.6, Math.cos(angle) * dist * k);
+    // Camera starts in its resting, centred view; only the scroll moves it.
+    const angle = -0.14 + smoothP * 0.34;
+    camera.position.set(Math.sin(angle) * dist, 0.6 + smoothP * 0.6, Math.cos(angle) * dist);
     camera.lookAt(0, 0.05, 0.35);
 
     renderer.render(scene, camera);

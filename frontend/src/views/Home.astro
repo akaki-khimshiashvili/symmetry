@@ -99,8 +99,9 @@ const types = (['portrait', 'landscape'] as const).map((key) => {
   }
   @media (max-width: 620px) {
     /* On phones each type sits on its own row; the tall one is kept narrower so it never towers. */
-    .tile { flex: 1 1 100%; }
-    .tile-portrait { flex: 0 1 72%; }
+    /* Phones: both types full width on one left edge; the upright one is cropped to 4:5 so it doesn't tower. */
+    .tile, .tile-portrait { flex: 1 1 100%; }
+    .tile-portrait .tile-img :global(.leaf) { aspect-ratio: 4 / 5 !important; }
     .featured-grid { gap: var(--s-4) 0.9rem; }
     .cell { flex-basis: calc(var(--r) * 7rem); }
     .actions .btn { flex: 1 1 auto; }

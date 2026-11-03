@@ -1,7 +1,7 @@
 ---
 import Leaf from './Leaf.astro';
 import { type Lang, useT, path } from '../i18n/ui';
-import { type Product, loc, minPrice, priceFmt, specimenNo } from '../lib/data';
+import { type Product, loc, minPrice, priceFmt } from '../lib/data';
 
 interface Props { product: Product; index: number; lang: Lang; ratio?: number; d?: number; class?: string; heading?: 'h2' | 'h3'; compact?: boolean }
 const { product: p, index, lang, ratio = 0.8, d = 0, class: cls = '', heading = 'h3', compact = false } = Astro.props;
@@ -21,7 +21,6 @@ const sizes = p.sizes.length;
   ) : (
   <div class="meta">
     <div class="row">
-      <span class="specimen-no">{specimenNo(index)}</span>
       <H class="name">{loc(p.name, lang)}</H>
     </div>
     <div class="row sub">
@@ -46,7 +45,6 @@ const sizes = p.sizes.length;
   @media (max-width: 620px) { .c-meta { flex-direction: column; align-items: flex-start; } }
   .row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.9rem; justify-content: space-between; }
   .row:first-child { justify-content: flex-start; }
-  .specimen-no { color: var(--ink-3); font-size: var(--t-lg); }
   .name { font-size: var(--t-xl); line-height: 1.15; transition: font-style 0ms; }
   .sub { font-size: var(--t-sm); color: var(--ink-2); border-top: 1px solid var(--line); padding-top: 0.6rem; margin-top: 0.3rem; }
   .price { color: var(--ink); font-weight: 600; white-space: nowrap; }
