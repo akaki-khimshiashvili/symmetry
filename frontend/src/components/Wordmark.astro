@@ -1,0 +1,51 @@
+---
+import '@fontsource/montserrat/latin-600.css';
+import '@fontsource/montserrat/latin-800.css';
+
+interface Props { size?: 'sm' | 'lg' }
+const { size = 'sm' } = Astro.props;
+
+// Circular wave mark after the Symmetry logo: flowing wooden ribs inside a round panel.
+const stripes: string[] = [];
+for (let k = -9; k <= 9; k++) {
+  const pts: string[] = [];
+  for (let x = -14; x <= 62; x += 4) {
+    const y = 24 + k * 3.1 + 3.4 * Math.sin(x * 0.12 + k * 0.32);
+    pts.push(`${x},${y.toFixed(2)}`);
+  }
+  stripes.push(`<polyline points="${pts.join(' ')}" class="${k % 2 ? 'a' : 'b'}"/>`);
+}
+const uid = `wm${size}`;
+---
+<span class:list={['wordmark', size]}>
+  <svg class="mark" viewBox="0 0 48 48" aria-hidden="true">
+    <defs><clipPath id={uid}><circle cx="24" cy="24" r="22" /></clipPath></defs>
+    <circle cx="24" cy="24" r="22" class="disc" />
+    <g clip-path={`url(#${uid})`} transform="rotate(-38 24 24)" set:html={stripes.join('')} />
+  </svg>
+  <span class="text">
+    <span class="word">SYMMETRY</span>
+    <span class="sub">3D WALL ART</span>
+  </span>
+</span>
+
+<style>
+  .wordmark { display: inline-flex; align-items: center; gap: 0.65rem; color: var(--ink); }
+  .mark { width: 2.1rem; height: 2.1rem; flex: none; }
+  .mark .disc { fill: var(--wood-lo); }
+  .mark :global(polyline) { fill: none; stroke-width: 1.9; stroke-linecap: round; }
+  .mark :global(.a) { stroke: var(--wood-hi); }
+  .mark :global(.b) { stroke: color-mix(in oklab, var(--wood-hi) 62%, var(--wood-lo)); }
+  .text { display: inline-flex; flex-direction: column; align-items: stretch; line-height: 1; }
+  .word {
+    font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 1.22rem;
+    letter-spacing: 0.01em; color: var(--accent);
+  }
+  .sub {
+    font-family: 'Montserrat', sans-serif; font-weight: 600; font-size: 0.5rem;
+    letter-spacing: 0.34em; margin-top: 0.28rem; color: var(--ink-2); text-align: center; margin-right: -0.34em;
+  }
+  .lg .mark { width: 3rem; height: 3rem; }
+  .lg .word { font-size: 1.9rem; }
+  .lg .sub { font-size: 0.72rem; }
+</style>

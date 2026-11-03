@@ -1,0 +1,77 @@
+---
+import '../styles/global.css';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import PaletteSwitcher from '../components/PaletteSwitcher.astro';
+import { type Lang, useT, altPath, PALETTES } from '../i18n/ui';
+import { loadData } from '../lib/data';
+
+interface Props { lang: Lang; title?: string; description?: string; current?: string }
+const { lang, title, description, current = '' } = Astro.props;
+const t = useT(lang);
+const { settings } = await loadData();
+const defaultPalette = (PALETTES as readonly string[]).includes(settings.default_palette) ? settings.default_palette : 'oak';
+const pageTitle = title ? `${title} | Symmetry` : t('meta.title');
+const desc = description ?? t('meta.description');
+const here = Astro.url.pathname;
+const site = Astro.site ?? new URL('https://symmetry.ge');
+---
+<!doctype html>
+<html lang={lang} data-palette={defaultPalette}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={desc} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="canonical" href={new URL(here, site)} />
+    <link rel="alternate" hreflang="ka" href={new URL(altPath(here, 'ka'), site)} />
+    <link rel="alternate" hreflang="en" href={new URL(altPath(here, 'en'), site)} />
+    <link rel="alternate" hreflang="x-default" href={new URL(altPath(here, 'ka'), site)} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={desc} />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content={lang === 'ka' ? 'ka_GE' : 'en_US'} />
+    <meta name="theme-color" content="#2a1d14" />
+    <script is:inline define:vars={{ palettes: PALETTES }}>
+      document.documentElement.classList.add('js');
+      try {
+        var saved = localStorage.getItem('symmetry-palette');
+        if (saved && palettes.indexOf(saved) > -1) document.documentElement.dataset.palette = saved;
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <Fragment set:html={`<!--
+THESIS: The catalogue is a veneer specimen book. Symmetry = book-matching: two leaves of one relief, mirrored on a spine. Refuses the full-bleed photo hero + three icon cards of every decor site.
+OWN-WORLD: Six wood species as switchable palettes; code-drawn parametric reliefs shaded from --wood-lo to --wood-hi; Bodoni Moda / Noto Serif Georgian display, Manrope / Noto Sans Georgian text; hairline dimension callouts; italic specimen numbers; notch-marked selection.
+STORY: Visitor sees the material at scale, understands it is computed and made in Georgia, picks a pattern and a size, sees the price, requests an order or messages on WhatsApp.
+FIRST VIEWPORT: 12-col grid. Cols 1-5: headline at --t-4xl, lead, two actions (products, contact). Cols 6-12: book-matched leaf pair opening from the spine, dimension lines, specimen caption.
+FORM: Veneer Specimen Book, grounded list #2 (my pick; user-chosen). Seed key abd694da. Raises: Swiss master grid with stepped type; dimension leader callouts; notch-not-hue selection.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+-->`} />
+    <a class="skip" href="#main">{t('nav.skip')}</a>
+    <Header lang={lang} current={current} />
+    <main id="main">
+      <slot />
+    </main>
+    <Footer lang={lang} />
+    <PaletteSwitcher lang={lang} />
+    <script>
+      const io = new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) {
+            if (e.isIntersecting) {
+              e.target.classList.add('is-in');
+              io.unobserve(e.target);
+            }
+          }
+        },
+        { rootMargin: '0px 0px -8% 0px', threshold: 0.08 },
+      );
+      const watch = () => document.querySelectorAll('[data-reveal]:not(.is-in)').forEach((el) => io.observe(el));
+      watch();
+      document.addEventListener('symmetry:content', watch);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,56 @@
+---
+import Leaf from './Leaf.astro';
+import { type Lang, useT, path } from '../i18n/ui';
+import { type Product, loc, minPrice, priceFmt, specimenNo } from '../lib/data';
+
+interface Props { product: Product; index: number; lang: Lang; ratio?: number; d?: number; class?: string; heading?: 'h2' | 'h3' }
+const { product: p, index, lang, ratio = 0.8, d = 0, class: cls = '', heading = 'h3' } = Astro.props;
+const t = useT(lang);
+const H = heading;
+const sizes = p.sizes.length;
+---
+<a class:list={['spec', cls]} href={path(lang, `/products/${p.slug}/`)} data-reveal data-type={p.orientation} style={`--d:${d}`}>
+  <div class="frame">
+    <Leaf product={p} alt={loc(p.name, lang)} ratio={ratio} />
+    <span class="sheen" aria-hidden="true"></span>
+  </div>
+  <div class="meta">
+    <div class="row">
+      <span class="specimen-no">{specimenNo(index)}</span>
+      <H class="name">{loc(p.name, lang)}</H>
+    </div>
+    <div class="row sub">
+      <span class="mat">{loc(p.material, lang)}</span>
+      <span class="price num">
+        {lang === 'en' && <span class="from">{t('collection.from')} </span>}₾ {priceFmt(minPrice(p))}{lang === 'ka' && <span class="from"> {t('collection.from')}</span>}
+      </span>
+    </div>
+    <span class="sizes">{t(`type.${p.orientation}.s` as any)} · {sizes} {t('products.sizes')}</span>
+  </div>
+</a>
+
+<style>
+  .spec { min-width: 0; display: flex; flex-direction: column; gap: 1.1rem; text-decoration: none; color: inherit; }
+  .frame { position: relative; overflow: hidden; }
+  .frame :global(.leaf) { transition: transform 1100ms var(--ease-out); }
+  .sheen {
+    position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(105deg, transparent 35%, color-mix(in oklab, var(--wood-hi) 22%, transparent) 50%, transparent 65%);
+    transform: translateX(-100%); opacity: 0;
+    transition: transform 1100ms var(--ease-out), opacity 400ms ease;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .spec:hover .frame :global(.leaf) { transform: scale(1.025); }
+    .spec:hover .sheen { transform: translateX(100%); opacity: 1; }
+    .spec:hover .name { font-style: italic; }
+  }
+  .meta { display: grid; gap: 0.3rem; }
+  .row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.9rem; justify-content: space-between; }
+  .row:first-child { justify-content: flex-start; }
+  .specimen-no { color: var(--ink-3); font-size: var(--t-lg); }
+  .name { font-size: var(--t-xl); line-height: 1.15; transition: font-style 0ms; }
+  .sub { font-size: var(--t-sm); color: var(--ink-2); border-top: 1px solid var(--line); padding-top: 0.6rem; margin-top: 0.3rem; }
+  .price { color: var(--ink); font-weight: 600; white-space: nowrap; }
+  .from { color: var(--ink-3); font-weight: 400; }
+  .sizes { font-size: var(--t-xs); color: var(--ink-3); letter-spacing: 0.06em; }
+</style>

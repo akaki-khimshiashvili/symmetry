@@ -1,0 +1,291 @@
+{
+  "_note": "DEMO DATA: prices, delivery times and email are placeholders. Phone, city and Facebook come from the company page. Edit everything in the admin panel.",
+  "settings": {
+    "phone": "+995 599 49 92 75",
+    "whatsapp": "995599499275",
+    "email": "hello@symmetry.ge",
+    "instagram": "https://instagram.com/",
+    "facebook": "https://www.facebook.com/profile.php?id=61592200481038",
+    "tiktok": "",
+    "address_ka": "თბილისი, საქართველო",
+    "address_en": "Tbilisi, Georgia",
+    "hours_ka": "ორშ–შაბ, 10:00–19:00",
+    "hours_en": "Mon–Sat, 10:00–19:00",
+    "default_palette": "oak"
+  },
+  "products": [
+    {
+      "slug": "tide",
+      "pattern": "wave",
+      "featured": true,
+      "name": {
+        "ka": "მოქცევა",
+        "en": "Tide"
+      },
+      "short": {
+        "ka": "ვერტიკალური რიბები, რომლებიც ტალღასავით მიედინება კედელზე.",
+        "en": "Vertical ribs that roll across the wall like a slow tide."
+      },
+      "description": {
+        "ka": "მოქცევა აგებულია ერთი პარამეტრული ტალღის ფუნქციაზე: თითოეული ხის რიბი ცოტათი განსხვავებულ სიღრმეზეა დაჭრილი, ამიტომ დღის განმავლობაში სინათლე და ჩრდილი მუდმივად იცვლება. იდეალურია რესტორნის მთავარი კედლისთვის ან ლობისთვის.",
+        "en": "Tide is built on a single parametric wave: every timber rib is cut to a slightly different depth, so light and shadow shift across it through the day. A natural centrepiece for a restaurant feature wall or a lobby."
+      },
+      "material": {
+        "ka": "მასიური კაკლის ხე, მატი ზეთოვანი დაფარვა",
+        "en": "Solid walnut, matte hardwax oil finish"
+      },
+      "installation": {
+        "ka": "მონტაჟს ვახორციელებთ ჩვენი გუნდით, ფარული სამაგრებით.",
+        "en": "Installed by our own team on concealed mounting rails."
+      },
+      "delivery_days": {
+        "min": 14,
+        "max": 21
+      },
+      "installation_days": 1,
+      "sizes": [
+        {
+          "width": 1200,
+          "height": 800,
+          "price": 2400
+        },
+        {
+          "width": 1800,
+          "height": 1000,
+          "price": 3900
+        },
+        {
+          "width": 2400,
+          "height": 1200,
+          "price": 5600
+        }
+      ],
+      "orientation": "landscape"
+    },
+    {
+      "slug": "dune",
+      "pattern": "dune",
+      "featured": true,
+      "name": {
+        "ka": "დიუნა",
+        "en": "Dune"
+      },
+      "short": {
+        "ka": "ქარისგან ნაძერწი ქვიშის რელიეფი, მუხის ხეში.",
+        "en": "A wind-sculpted sand relief, carved in oak."
+      },
+      "description": {
+        "ka": "დიუნა იმეორებს უდაბნოს ქვიშის რბილ, ერთმანეთში გადასულ ხაზებს. ნიმუში ითვლება ალგორითმით, შემდეგ კი იჭრება CNC დანადგარზე და ხელით მუშავდება.",
+        "en": "Dune follows the soft, overlapping lines of desert sand. The pattern is computed, cut on a CNC machine and finished by hand."
+      },
+      "material": {
+        "ka": "ამერიკული თეთრი მუხა",
+        "en": "American white oak"
+      },
+      "installation": {
+        "ka": "მონტაჟი ერთ დღეში, ზომის მიხედვით.",
+        "en": "Installation in one day, depending on size."
+      },
+      "delivery_days": {
+        "min": 14,
+        "max": 21
+      },
+      "installation_days": 1,
+      "sizes": [
+        {
+          "width": 1000,
+          "height": 1000,
+          "price": 2100
+        },
+        {
+          "width": 1600,
+          "height": 1000,
+          "price": 3200
+        },
+        {
+          "width": 2200,
+          "height": 1300,
+          "price": 4800
+        }
+      ],
+      "orientation": "landscape"
+    },
+    {
+      "slug": "echo",
+      "pattern": "ripple",
+      "featured": true,
+      "name": {
+        "ka": "ექო",
+        "en": "Echo"
+      },
+      "short": {
+        "ka": "წრიული ტალღები, რომლებიც ცენტრიდან ვრცელდება.",
+        "en": "Concentric ripples spreading out from a single point."
+      },
+      "description": {
+        "ka": "ექო არის წყალზე დაცემული წვეთის ანარეკლი ხეში. ცენტრალური წერტილის მდებარეობა შეგიძლიათ შეარჩიოთ თქვენი სივრცის მიხედვით.",
+        "en": "Echo is the trace of a drop falling on still water, set in wood. The centre point can be placed to suit your space."
+      },
+      "material": {
+        "ka": "კაკლის და მუხის კომბინაცია",
+        "en": "Walnut and oak combination"
+      },
+      "installation": {
+        "ka": "მონტაჟი ჩვენი გუნდით, ფარული სამაგრებით.",
+        "en": "Installed by our team on concealed fixings."
+      },
+      "delivery_days": {
+        "min": 18,
+        "max": 25
+      },
+      "installation_days": 1,
+      "sizes": [
+        {
+          "width": 900,
+          "height": 1400,
+          "price": 2900
+        },
+        {
+          "width": 1200,
+          "height": 1800,
+          "price": 4100
+        }
+      ],
+      "orientation": "portrait"
+    },
+    {
+      "slug": "helix",
+      "pattern": "twist",
+      "featured": true,
+      "name": {
+        "ka": "სპირალი",
+        "en": "Helix"
+      },
+      "short": {
+        "ka": "რიბები, რომლებიც სიმაღლეში თანდათან ბრუნავს.",
+        "en": "Ribs that slowly turn as they rise."
+      },
+      "description": {
+        "ka": "სპირალში თითოეული ზოლი სიმაღლის მიხედვით ბრუნავს და მოძრაობის შეგრძნებას ქმნის. განსაკუთრებით ეფექტურია ვიწრო, მაღალ კედლებზე და დერეფნებში.",
+        "en": "In Helix each strip rotates along its height, creating a sense of motion that is especially striking on tall, narrow walls and corridors."
+      },
+      "material": {
+        "ka": "თიქის ხე",
+        "en": "Teak"
+      },
+      "installation": {
+        "ka": "მონტაჟი 1–2 დღე.",
+        "en": "Installation takes 1–2 days."
+      },
+      "delivery_days": {
+        "min": 21,
+        "max": 28
+      },
+      "installation_days": 2,
+      "sizes": [
+        {
+          "width": 800,
+          "height": 2000,
+          "price": 3100
+        },
+        {
+          "width": 1200,
+          "height": 2400,
+          "price": 4600
+        }
+      ],
+      "orientation": "portrait"
+    },
+    {
+      "slug": "prism",
+      "pattern": "prism",
+      "featured": false,
+      "name": {
+        "ka": "პრიზმა",
+        "en": "Prism"
+      },
+      "short": {
+        "ka": "გეომეტრიული პირამიდები, რომლებიც სინათლეს ნაწილებად ყოფს.",
+        "en": "Geometric pyramids that break light into facets."
+      },
+      "description": {
+        "ka": "პრიზმა შედგება ზუსტად გათვლილი პირამიდული ელემენტებისგან. ყოველი წახნაგი სინათლეს სხვადასხვა კუთხით იჭერს, ამიტომ კედელი სიღრმეს იძენს.",
+        "en": "Prism is made of precisely computed pyramid modules. Each facet catches light at its own angle, giving the wall real depth."
+      },
+      "material": {
+        "ka": "შებოლილი მუხა",
+        "en": "Smoked oak"
+      },
+      "installation": {
+        "ka": "მოდულური მონტაჟი, ერთ დღეში.",
+        "en": "Modular installation in a single day."
+      },
+      "delivery_days": {
+        "min": 14,
+        "max": 21
+      },
+      "installation_days": 1,
+      "sizes": [
+        {
+          "width": 1000,
+          "height": 700,
+          "price": 1900
+        },
+        {
+          "width": 1500,
+          "height": 1000,
+          "price": 2950
+        },
+        {
+          "width": 2000,
+          "height": 1400,
+          "price": 4400
+        }
+      ],
+      "orientation": "landscape"
+    },
+    {
+      "slug": "mosaic",
+      "pattern": "mosaic",
+      "featured": false,
+      "name": {
+        "ka": "მოზაიკა",
+        "en": "Mosaic"
+      },
+      "short": {
+        "ka": "სხვადასხვა სიღრმის ხის ბლოკები, პიქსელური რელიეფი.",
+        "en": "Wooden blocks at varying depths, a pixel relief."
+      },
+      "description": {
+        "ka": "მოზაიკაში ასობით ხის ბლოკი სხვადასხვა სიმაღლეზეა განთავსებული. შედეგი არის ტაქტილური ზედაპირი, რომელიც ახლოდან და შორიდან სრულიად განსხვავებულად აღიქმება.",
+        "en": "Mosaic sets hundreds of timber blocks at different heights. The result is a tactile surface that reads completely differently up close and from across the room."
+      },
+      "material": {
+        "ka": "საპელე (აფრიკული წითელი ხე)",
+        "en": "Sapele mahogany"
+      },
+      "installation": {
+        "ka": "მონტაჟი 1–2 დღე.",
+        "en": "Installation takes 1–2 days."
+      },
+      "delivery_days": {
+        "min": 21,
+        "max": 30
+      },
+      "installation_days": 2,
+      "sizes": [
+        {
+          "width": 1200,
+          "height": 900,
+          "price": 2700
+        },
+        {
+          "width": 1800,
+          "height": 1200,
+          "price": 4300
+        }
+      ],
+      "orientation": "landscape"
+    }
+  ]
+}

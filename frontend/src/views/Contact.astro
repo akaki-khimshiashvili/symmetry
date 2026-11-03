@@ -1,0 +1,71 @@
+---
+import Base from '../layouts/Base.astro';
+import Icon from '../components/Icon.astro';
+import LeadForm from '../components/LeadForm.astro';
+import { type Lang, useT } from '../i18n/ui';
+import { loadData, telLink, waLink } from '../lib/data';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = useT(lang);
+const { settings: s } = await loadData();
+const socials = [
+  { key: 'instagram', href: s.instagram, label: 'Instagram' },
+  { key: 'facebook', href: s.facebook, label: 'Facebook' },
+  { key: 'tiktok', href: s.tiktok, label: 'TikTok' },
+].filter((x) => x.href);
+const address = lang === 'ka' ? s.address_ka : s.address_en;
+const hours = lang === 'ka' ? s.hours_ka : s.hours_en;
+---
+<Base lang={lang} title={t('contact.title')} current="contact">
+  <section class="wrap grid contact">
+    <div class="side">
+      <h1 class="display t-4xl" data-reveal>{t('contact.title')}</h1>
+      <p class="lead" data-reveal style="--d:1">{t('contact.lead')}</p>
+
+      <dl class="direct" data-reveal style="--d:2">
+        {s.phone && (
+          <div><dt>{t('contact.phone')}</dt><dd><a class="num" href={telLink(s.phone)}><Icon name="phone" size={18} />{s.phone}</a></dd></div>
+        )}
+        {s.whatsapp && (
+          <div><dt>WhatsApp</dt><dd><a href={waLink(s.whatsapp, '')} target="_blank" rel="noopener"><Icon name="whatsapp" size={18} />{t('p.askWhatsapp')}</a></dd></div>
+        )}
+        {s.email && (
+          <div><dt>{t('contact.email')}</dt><dd><a href={`mailto:${s.email}`}><Icon name="mail" size={18} />{s.email}</a></dd></div>
+        )}
+        {socials.length > 0 && (
+          <div>
+            <dt>{t('contact.social')}</dt>
+            <dd class="soc">{socials.map((x) => <a href={x.href} target="_blank" rel="noopener"><Icon name={x.key} size={18} />{x.label}</a>)}</dd>
+          </div>
+        )}
+        {address && <div><dt>{t('contact.location')}</dt><dd><span><Icon name="pin" size={18} />{address}</span></dd></div>}
+        {hours && <div><dt>{t('contact.hours')}</dt><dd><span class="num"><Icon name="clock" size={18} />{hours}</span></dd></div>}
+      </dl>
+    </div>
+
+    <div class="form-col" data-reveal style="--d:3">
+      <LeadForm lang={lang} kind="contact" />
+    </div>
+  </section>
+</Base>
+
+<style>
+  .contact { padding-block: var(--s-5) var(--s-6); row-gap: var(--s-5); column-gap: calc(var(--gutter) * 1.5); align-items: start; }
+  .side { grid-column: 1 / span 5; display: grid; gap: var(--s-3); position: sticky; top: 7rem; }
+  .form-col { grid-column: 7 / -1; padding: clamp(1.5rem, 3.5vw, 3.5rem); background: var(--ground-2); border-radius: 24px; }
+  .form-col :global(.done) { background: var(--ground-2); }
+  .direct { display: grid; margin-top: var(--s-2); }
+  .direct div { display: grid; grid-template-columns: 8rem 1fr; gap: 1rem; padding-block: 0.85rem; border-top: 1px solid var(--line); font-size: var(--t-sm); }
+  .direct dt { color: var(--ink-3); }
+  .direct dd a, .direct dd span { display: inline-flex; align-items: center; gap: 0.55rem; text-decoration: none; color: var(--ink); }
+  .direct dd :global(.icon) { color: var(--accent); flex: none; }
+  .direct .soc { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; }
+  @media (hover: hover) and (pointer: fine) { .direct dd a:hover { text-decoration: underline; } }
+  @media (max-width: 960px) {
+    .side, .form-col { grid-column: 1 / -1; position: static; }
+  }
+  @media (max-width: 480px) {
+    .direct div { grid-template-columns: 1fr; gap: 0.2rem; }
+  }
+</style>

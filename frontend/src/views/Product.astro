@@ -1,0 +1,347 @@
+---
+import Base from '../layouts/Base.astro';
+import Icon from '../components/Icon.astro';
+import Leaf from '../components/Leaf.astro';
+import SpecimenCard from '../components/SpecimenCard.astro';
+import LeadForm from '../components/LeadForm.astro';
+import { type Lang, useT, path } from '../i18n/ui';
+import { type Product, loadData, loc, priceFmt, specimenNo, waLink, telLink } from '../lib/data';
+
+interface Props { lang: Lang; product: Product }
+const { lang, product: p } = Astro.props;
+const t = useT(lang);
+const { products, settings: s } = await loadData();
+const index = products.findIndex((x) => x.slug === p.slug);
+const name = loc(p.name, lang);
+const first = p.sizes[0];
+const others = products.filter((x) => x.slug !== p.slug).slice(0, 3);
+const hasPhoto = p.images.length > 0;
+const sizeLabel = (w: number, h: number) => `${w} × ${h} ${t('p.mm')}`;
+const days = p.delivery_days.min === p.delivery_days.max ? `${p.delivery_days.min}` : `${p.delivery_days.min}–${p.delivery_days.max}`;
+const waBase = `${t('p.waText')} «${name}»`;
+const socials = [
+  { key: 'instagram', href: s.instagram, label: 'Instagram' },
+  { key: 'facebook', href: s.facebook, label: 'Facebook' },
+  { key: 'tiktok', href: s.tiktok, label: 'TikTok' },
+].filter((x) => x.href);
+---
+<Base lang={lang} title={name} description={loc(p.short, lang)} current="products">
+  <div class="wrap crumbs">
+    <a class="back" href={path(lang, '/products/')}><Icon name="arrow-left" size={18} />{t('p.back')}</a>
+  </div>
+
+  <section class="wrap grid pdp" data-pdp data-product-id={p.id} data-wa={s.whatsapp} data-wa-base={waBase}>
+    <div class="media">
+      <figure class="stage" data-stage>
+        <div class="frame-box">
+          <div class="piece" data-frame style={`--r:${first ? (first.width / first.height).toFixed(4) : 1.5}`}>
+            <div class="frame">
+              <Leaf product={p} alt={name} ratio={first ? first.width / first.height : 1.5} eager />
+            </div>
+            <div class="dim dim-ends dim-top num"><span data-dim-w>{first?.width} {t('p.mm')}</span></div>
+            <div class="dim-side num"><span class="dim-v" data-dim-h>{first?.height} {t('p.mm')}</span></div>
+          </div>
+        </div>
+        {!hasPhoto && <figcaption class="illus label">{t('p.illustration')}</figcaption>}
+      </figure>
+      {p.images.length > 1 && (
+        <div class="thumbs">
+          {p.images.map((img, i) => (
+            <button type="button" class="thumb" data-thumb={img.url} aria-label={`${name} ${i + 1}`} aria-pressed={i === 0 ? 'true' : 'false'}>
+              <img src={img.url} alt="" loading="lazy" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+
+    <div class="info">
+      <div class="title" data-reveal>
+        <span class="specimen-no">{specimenNo(index)}</span>
+        <h1 class="display t-3xl">{name}</h1>
+      </div>
+      <p class="lead" data-reveal style="--d:1">{loc(p.short, lang)}</p>
+
+      <fieldset class="sizes" data-reveal style="--d:2">
+        <legend class="label">{t('p.chooseSize')}</legend>
+        {p.sizes.map((sz, i) => (
+          <label class="size">
+            <input
+              type="radio"
+              name="size"
+              value={sz.id}
+              checked={i === 0}
+              data-w={sz.width}
+              data-h={sz.height}
+              data-price={sz.price}
+              data-label={sizeLabel(sz.width, sz.height)}
+            />
+            <span class="notch" aria-hidden="true"></span>
+            <span class="sz num">{sizeLabel(sz.width, sz.height)}</span>
+            <span class="pr num">₾ {priceFmt(sz.price)}</span>
+          </label>
+        ))}
+      </fieldset>
+
+      <div class="buy" data-reveal style="--d:3">
+        <div class="price-row">
+          <span class="label">{t('p.price')}</span>
+          <span class="price display num" data-price aria-live="polite">₾ {first ? priceFmt(first.price) : ''}</span>
+        </div>
+        <button class="btn btn-solid order-btn" type="button" data-order-open>{t('p.order')}<Icon name="arrow" /></button>
+        <p class="note">{t('p.orderNote')}</p>
+        <div class="quick">
+          {s.whatsapp && (
+            <a class="btn btn-line" data-wa-link href={waLink(s.whatsapp, `${waBase}, ${first ? sizeLabel(first.width, first.height) : ''}`)} target="_blank" rel="noopener">
+              <Icon name="whatsapp" />{t('p.askWhatsapp')}
+            </a>
+          )}
+          {s.phone && <a class="btn btn-line num" href={telLink(s.phone)}><Icon name="phone" />{s.phone}</a>}
+        </div>
+      </div>
+
+      <dl class="specs" data-reveal style="--d:4">
+        <div><dt><Icon name="shape" size={18} />{t('p.type')}</dt><dd>{t(`type.${p.orientation}` as any)}</dd></div>
+        <div><dt><Icon name="grain" size={18} />{t('p.material')}</dt><dd>{loc(p.material, lang)}</dd></div>
+        <div><dt><Icon name="truck" size={18} />{t('p.delivery')}</dt><dd class="num">{days} {t('p.workingDays')}</dd></div>
+        <div>
+          <dt><Icon name="tool" size={18} />{t('p.installation')}</dt>
+          <dd><span class="num">{p.installation_days} {t('p.days')}</span>{loc(p.installation, lang) && <> · {loc(p.installation, lang)}</>}</dd>
+        </div>
+      </dl>
+
+      {socials.length > 0 && (
+        <div class="follow" data-reveal style="--d:5">
+          <span class="label">{t('p.follow')}</span>
+          <div class="soc">
+            {socials.map((x) => <a href={x.href} target="_blank" rel="noopener" aria-label={x.label}><Icon name={x.key} size={20} /></a>)}
+          </div>
+        </div>
+      )}
+    </div>
+  </section>
+
+  {loc(p.description, lang) && (
+    <section class="wrap grid desc">
+      <p class="prose display-quote" data-reveal>{loc(p.description, lang)}</p>
+    </section>
+  )}
+
+  {others.length > 0 && (
+    <section class="section more">
+      <div class="wrap">
+        <div class="more-head">
+          <h2 class="display t-2xl" data-reveal>{t('p.more')}</h2>
+          <a class="link-arrow" href={path(lang, '/products/')}>{t('collection.all')} <Icon name="arrow" /></a>
+        </div>
+        <div class="more-grid">
+          {others.map((o, i) => <SpecimenCard product={o} index={products.indexOf(o)} lang={lang} ratio={0.8} d={i} />)}
+        </div>
+      </div>
+    </section>
+  )}
+
+  <dialog class="drawer" data-order aria-labelledby="order-title">
+    <div class="drawer-in">
+      <div class="drawer-head">
+        <h2 id="order-title" class="display t-2xl">{t('order.title')}</h2>
+        <button class="x" type="button" data-order-close aria-label={t('nav.close')}><Icon name="close" size={22} /></button>
+      </div>
+      <p class="drawer-lead">{t('order.lead')}</p>
+      <div class="summary">
+        <span class="label">{t('order.summary')}</span>
+        <div class="sum-row">
+          <span class="sum-name"><span class="specimen-no">{specimenNo(index)}</span> {name}</span>
+          <span class="num" data-sum-size>{first ? sizeLabel(first.width, first.height) : ''}</span>
+          <span class="num sum-price" data-sum-price>₾ {first ? priceFmt(first.price) : ''}</span>
+        </div>
+      </div>
+      <LeadForm lang={lang} kind="order" />
+    </div>
+  </dialog>
+</Base>
+
+<style>
+  .crumbs { padding-top: var(--s-3); }
+  .back { display: inline-flex; align-items: center; gap: 0.5rem; font-size: var(--t-sm); color: var(--ink-2); text-decoration: none; transition: color 200ms ease; }
+  @media (hover: hover) and (pointer: fine) { .back:hover { color: var(--ink); } }
+
+  .pdp { padding-block: var(--s-5) var(--s-6); row-gap: var(--s-5); align-items: start; }
+  .media { grid-column: 1 / span 7; position: sticky; top: 6rem; }
+  .info { grid-column: 9 / -1; display: grid; gap: var(--s-5); }
+
+  .stage { display: grid; gap: 0.9rem; }
+  /* The panel sits on the page with shop-drawing callouts: width above, height to the right. */
+  .frame-box { container-type: size; height: min(68vh, 44rem); display: grid; place-items: center; padding: 2rem 2.25rem 0 0; }
+  .piece {
+    position: relative;
+    width: min(100cqw, calc(100cqh * var(--r)));
+    height: min(100cqh, calc(100cqw / var(--r)));
+    transition: width 700ms var(--ease-in-out), height 700ms var(--ease-in-out);
+  }
+  .frame { position: absolute; inset: 0; overflow: hidden; box-shadow: 0 40px 60px -35px rgb(0 0 0 / 0.55); }
+  .frame :global(.leaf) { height: 100%; aspect-ratio: auto !important; }
+  .dim-top { position: absolute; left: 0; right: 0; bottom: calc(100% + 0.9rem); }
+  .dim-side {
+    position: absolute; top: 0; bottom: 0; left: calc(100% + 0.9rem); width: 1rem;
+    display: flex; justify-content: center; color: var(--ink-3); font-size: var(--t-xs); letter-spacing: 0.08em;
+  }
+  .dim-side::before { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: currentColor; opacity: 0.55; }
+  .dim-side::after { content: ''; position: absolute; left: 25%; right: 25%; top: 0; bottom: 0; border-block: 1px solid currentColor; opacity: 0.8; }
+  .dim-side span { position: relative; align-self: center; background: var(--ground); padding-block: 0.5rem; }
+  .dim-top span { background: var(--ground); }
+  .illus { color: var(--ink-3); }
+  .thumbs { display: flex; gap: 0.6rem; margin-top: var(--s-2); }
+  .thumb { width: 4.5rem; height: 4.5rem; padding: 0; border: 1px solid var(--line); background: none; cursor: pointer; overflow: hidden; transition: border-color 200ms ease, transform 160ms var(--ease-out); }
+  .thumb:active { transform: scale(0.96); }
+  .thumb[aria-pressed='true'] { border-color: var(--accent); }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+  .title { display: grid; gap: 0.3rem; }
+  .title .specimen-no { font-size: var(--t-xl); color: var(--ink-3); }
+
+  .sizes { border: 0; padding: 0; display: grid; }
+  .sizes legend { margin-bottom: 0.8rem; }
+  .size {
+    position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 1rem;
+    padding: 1rem 0.25rem; border-top: 1px solid var(--line); cursor: pointer; transition: background-color 200ms ease;
+  }
+  .size:last-of-type { border-bottom: 1px solid var(--line); }
+  .size input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .size .notch { width: 0.55rem; height: 0.55rem; border: 1px solid var(--ink-3); transform: rotate(45deg); transition: background-color 200ms ease, border-color 200ms ease, transform 300ms var(--ease-out); }
+  .size .sz { color: var(--ink-2); transition: color 200ms ease; }
+  .size .pr { color: var(--ink-3); font-size: var(--t-sm); transition: color 200ms ease; }
+  .size:has(input:checked) .notch { background: var(--accent); border-color: var(--accent); transform: rotate(45deg) scale(1.15); }
+  .size:has(input:checked) .sz, .size:has(input:checked) .pr { color: var(--ink); }
+  .size:has(input:focus-visible) { outline: 1.5px solid var(--accent); outline-offset: 2px; }
+  @media (hover: hover) and (pointer: fine) { .size:hover { background: color-mix(in oklab, var(--ink) 4%, transparent); } }
+
+  .buy { display: grid; gap: 1rem; }
+  .price-row { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+  .price { font-size: var(--t-3xl); line-height: 1; letter-spacing: -0.02em; }
+  .order-btn { width: 100%; --h: 3.6rem; font-size: var(--t-base); }
+  .note { font-size: var(--t-xs); color: var(--ink-3); }
+  .quick { display: grid; grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr)); gap: 0.6rem; }
+  .quick .btn { padding-inline: 1rem; }
+
+  .specs { display: grid; }
+  .specs div { display: grid; grid-template-columns: 9rem 1fr; gap: 1rem; padding-block: 0.9rem; border-top: 1px solid var(--line); font-size: var(--t-sm); }
+  .specs dt { display: inline-flex; align-items: center; gap: 0.55rem; color: var(--ink-3); }
+  .specs dt :global(.icon) { color: var(--accent); }
+  .specs dd { color: var(--ink); }
+
+  .follow { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  .soc { display: flex; gap: 0.25rem; }
+  .soc a { display: inline-flex; width: 2.75rem; height: 2.75rem; align-items: center; justify-content: center; color: var(--ink-2); border-radius: 50%; transition: color 200ms ease, background-color 200ms ease; }
+  @media (hover: hover) and (pointer: fine) { .soc a:hover { color: var(--ink); background: var(--ground-2); } }
+
+  .desc { padding-bottom: var(--s-6); }
+  .display-quote {
+    grid-column: 2 / span 9; font-family: var(--f-display); font-size: var(--t-2xl); line-height: 1.35; color: var(--ink);
+    max-width: 34ch; text-wrap: pretty;
+  }
+  :lang(ka) .display-quote { font-size: var(--t-xl); line-height: 1.6; max-width: 46ch; }
+
+  .more { background: var(--ground-2); border-top: 1px solid var(--line); }
+  .more-head { display: grid; justify-items: center; text-align: center; gap: var(--s-2); margin-bottom: var(--s-5); }
+  .more-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gutter); }
+
+  /* Order drawer */
+  .drawer {
+    margin: 0 0 0 auto; height: 100dvh; max-height: none; width: min(36rem, 100vw); max-width: 100vw;
+    border: 0; border-left: 1px solid var(--line); padding: 0; background: var(--ground); color: var(--ink);
+    transform: none; transition: transform 460ms var(--ease-drawer), overlay 460ms allow-discrete, display 460ms allow-discrete;
+  }
+  .drawer:not([open]) { transform: translateX(100%); }
+  @starting-style { .drawer[open] { transform: translateX(100%); } }
+  .drawer::backdrop { background: rgb(0 0 0 / 0.5); opacity: 1; transition: opacity 400ms ease, overlay 400ms allow-discrete, display 400ms allow-discrete; }
+  .drawer:not([open])::backdrop { opacity: 0; }
+  @starting-style { .drawer[open]::backdrop { opacity: 0; } }
+  .drawer-in { padding: var(--s-4) clamp(1.25rem, 4vw, 2.5rem) var(--s-5); display: grid; gap: var(--s-3); }
+  .drawer-head { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
+  .x { width: 2.75rem; height: 2.75rem; display: inline-flex; align-items: center; justify-content: center; background: none; border: 1px solid var(--line); border-radius: 50%; cursor: pointer; transition: transform 160ms var(--ease-out), border-color 200ms ease; }
+  .x:active { transform: scale(0.94); }
+  .drawer-lead { color: var(--ink-2); }
+  .summary { display: grid; gap: 0.6rem; padding: 1.1rem 1.25rem; background: var(--ground-2); border-radius: 16px; }
+  .sum-row { display: grid; grid-template-columns: 1fr auto; gap: 0.3rem 1rem; }
+  .sum-name { font-family: var(--f-display); font-size: var(--t-lg); grid-column: 1 / -1; }
+  .sum-name .specimen-no { color: var(--ink-3); }
+  .sum-price { font-weight: 600; }
+
+  @media (max-width: 1000px) {
+    .media { grid-column: 1 / -1; position: static; }
+    .info { grid-column: 1 / -1; }
+    .frame-box { height: min(60vh, 34rem); }
+    .display-quote { grid-column: 1 / -1; }
+  }
+  @media (max-width: 760px) {
+    .more-grid { grid-template-columns: 1fr 1fr; }
+    .more-grid > :global(:nth-child(3)) { display: none; }
+  }
+  @media (max-width: 520px) {
+    .frame-box { height: 86vw; padding-right: 1.9rem; }
+    .specs div { grid-template-columns: 1fr; gap: 0.25rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .piece { transition: none; }
+    .drawer { transition: opacity 200ms ease, overlay 200ms allow-discrete, display 200ms allow-discrete; }
+    .drawer:not([open]) { transform: none; opacity: 0; }
+    @starting-style { .drawer[open] { transform: none; opacity: 0; } }
+  }
+</style>
+
+<script>
+  const root = document.querySelector<HTMLElement>('[data-pdp]');
+  if (root) {
+    const fmt = (n: number) => new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(n).replace(/,/g, ' ');
+    const priceEl = root.querySelector<HTMLElement>('[data-price]')!;
+    const frame = root.querySelector<HTMLElement>('[data-frame]');
+    const dimW = root.querySelector<HTMLElement>('[data-dim-w]');
+    const dimH = root.querySelector<HTMLElement>('[data-dim-h]');
+    const wa = root.querySelector<HTMLAnchorElement>('[data-wa-link]');
+    const drawer = document.querySelector<HTMLDialogElement>('[data-order]')!;
+    const form = drawer.querySelector<HTMLFormElement>('form')!;
+    const sumSize = drawer.querySelector<HTMLElement>('[data-sum-size]')!;
+    const sumPrice = drawer.querySelector<HTMLElement>('[data-sum-price]')!;
+    const mm = dimW?.textContent?.replace(/[\d\s]/g, '').trim() || 'mm';
+
+    const apply = (input: HTMLInputElement) => {
+      const { w, h, price, label } = input.dataset;
+      priceEl.textContent = `₾ ${fmt(Number(price))}`;
+      if (frame) frame.style.setProperty('--r', String(Number(w) / Number(h)));
+      if (dimW) dimW.textContent = `${w} ${mm}`;
+      if (dimH) dimH.textContent = `${h} ${mm}`;
+      sumSize.textContent = label || '';
+      sumPrice.textContent = `₾ ${fmt(Number(price))}`;
+      (form.elements.namedItem('size_id') as HTMLInputElement).value = input.value;
+      if (wa && root.dataset.wa) {
+        const text = `${root.dataset.waBase}, ${label}`;
+        wa.href = `https://wa.me/${root.dataset.wa.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`;
+      }
+    };
+
+    const checked = root.querySelector<HTMLInputElement>('input[name="size"]:checked');
+    (form.elements.namedItem('product_id') as HTMLInputElement).value = root.dataset.productId || '';
+    if (checked) apply(checked);
+    root.addEventListener('change', (e) => {
+      const t = e.target as HTMLInputElement;
+      if (t.name === 'size') apply(t);
+    });
+
+    // Gallery thumbs
+    const mainImg = root.querySelector<HTMLImageElement>('.frame img');
+    root.querySelectorAll<HTMLButtonElement>('[data-thumb]').forEach((b) =>
+      b.addEventListener('click', () => {
+        if (mainImg) mainImg.src = b.dataset.thumb!;
+        root.querySelectorAll('[data-thumb]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      }),
+    );
+
+    // Order drawer
+    document.querySelector('[data-order-open]')?.addEventListener('click', () => drawer.showModal());
+    drawer.querySelector('[data-order-close]')?.addEventListener('click', () => drawer.close());
+    drawer.addEventListener('click', (e) => {
+      if (e.target === drawer) drawer.close();
+    });
+  }
+</script>

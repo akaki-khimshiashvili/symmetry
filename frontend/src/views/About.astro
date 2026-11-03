@@ -1,0 +1,99 @@
+---
+import Base from '../layouts/Base.astro';
+import Icon from '../components/Icon.astro';
+import { type Lang, useT, path } from '../i18n/ui';
+import { relief } from '../lib/relief';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = useT(lang);
+
+// Portrait slots are placeholders until real photography arrives. Each frame is a relief so the page holds together.
+const portrait = (pattern: string, uid: string, mirror = false) =>
+  relief({ pattern, width: 800, height: 1000, density: 0.7, uid, mirror });
+const team = [
+  { role: t('about.role.designer'), pattern: 'dune' },
+  { role: t('about.role.maker'), pattern: 'twist' },
+  { role: t('about.role.install'), pattern: 'prism' },
+];
+---
+<Base lang={lang} title={t('about.title')} current="about">
+  <section class="wrap intro center-stack">
+    <h1 class="display t-4xl" data-reveal>{t('about.title')}</h1>
+    <p class="lead big" data-reveal style="--d:2">{t('about.lead')}</p>
+  </section>
+
+  <section class="wrap grid founder">
+    <figure class="portrait f-portrait" data-reveal="clip">
+      <div class="ph" set:html={portrait('wave', 'fd')} />
+      <span class="ph-note label">{t('about.photoSoon')}</span>
+    </figure>
+    <div class="founder-copy">
+      <div class="prose" data-reveal>
+        <p>{t('about.body1')}</p>
+        <p>{t('about.body2')}</p>
+      </div>
+      <div class="person" data-reveal style="--d:2">
+        <span class="label">{t('about.founder')}</span>
+        <span class="person-name display">{t('about.placeholderName')}</span>
+        <span class="person-role">{t('about.role.founder')}</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="section team">
+    <div class="wrap">
+      <h2 class="display t-3xl" data-reveal>{t('about.team')}</h2>
+      <ul class="team-grid">
+        {team.map((m, i) => (
+          <li data-reveal style={`--d:${i}`}>
+            <figure class="portrait">
+              <div class="ph" set:html={portrait(m.pattern, `tm${i}`, i % 2 === 1)} />
+              <span class="ph-note label">{t('about.photoSoon')}</span>
+            </figure>
+            <span class="person-name display">{t('about.placeholderName')}</span>
+            <span class="person-role">{m.role}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  <section class="wrap cta">
+    <p class="display t-2xl" data-reveal>{t('close.title')}</p>
+    <a class="btn btn-solid" href={path(lang, '/contact/')} data-reveal style="--d:2">{t('hero.cta.contact')}<Icon name="arrow" /></a>
+  </section>
+</Base>
+
+<style>
+  .intro { padding-block: var(--s-5) var(--s-6); }
+  .big { font-family: var(--f-display); font-size: var(--t-xl); color: var(--ink); line-height: 1.45; }
+  .founder { padding-bottom: var(--s-6); row-gap: var(--s-5); align-items: center; }
+  .f-portrait { grid-column: 1 / span 6; }
+  .founder-copy { grid-column: 8 / -1; display: grid; gap: var(--s-4); }
+  .portrait { position: relative; aspect-ratio: 4 / 5; overflow: hidden; background: var(--gap); border-radius: 20px; }
+  .ph { position: absolute; inset: 0; opacity: 0.75; }
+  .ph-note {
+    position: absolute; left: 1rem; bottom: 1rem; padding: 0.45rem 0.75rem; border-radius: 999px;
+    background: color-mix(in oklab, var(--ground) 82%, transparent); color: var(--ink-2);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .person { display: grid; gap: 0.25rem; border-top: 1px solid var(--line); padding-top: var(--s-2); }
+  .person-name { font-size: var(--t-xl); line-height: 1.2; }
+  .person-role { color: var(--ink-2); font-size: var(--t-sm); }
+  .team { background: var(--ground-2); border-block: 1px solid var(--line); }
+  .team h2 { margin-bottom: var(--s-5); }
+  .team-grid { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-4) var(--gutter); }
+  .team-grid li { display: grid; gap: 0.35rem; }
+  .team-grid li:nth-child(2) { margin-top: var(--s-5); }
+  .team-grid .portrait { margin-bottom: 0.8rem; }
+  .cta { display: grid; justify-items: center; text-align: center; gap: var(--s-3); padding-block: var(--s-6); }
+  @media (max-width: 900px) {
+    .f-portrait, .founder-copy { grid-column: 1 / -1; }
+    .team-grid { grid-template-columns: 1fr 1fr; }
+    .team-grid li:nth-child(2) { margin-top: 0; }
+  }
+  @media (max-width: 560px) {
+    .team-grid { grid-template-columns: 1fr; }
+  }
+</style>

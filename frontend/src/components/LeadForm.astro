@@ -1,0 +1,262 @@
+---
+import Icon from './Icon.astro';
+import { type Lang, useT, CLIENT_TYPES } from '../i18n/ui';
+import { API_URL } from '../lib/data';
+
+interface Props { lang: Lang; kind: 'contact' | 'order'; id?: string }
+const { lang, kind, id = `${kind}-form` } = Astro.props;
+const t = useT(lang);
+const msgs = {
+  required: t('f.error.required'),
+  phone: t('f.error.phone'),
+  email: t('f.error.email'),
+  network: t('f.error.network'),
+  generic: t('f.error.generic'),
+  sending: t('f.sending'),
+};
+const endpoint = `${API_URL}/${kind === 'order' ? 'orders' : 'contact'}`;
+const f = (k: string) => `${id}-${k}`;
+---
+<form class="lead" id={id} data-lead-form data-endpoint={endpoint} data-msgs={JSON.stringify(msgs)} novalidate>
+  <input type="hidden" name="lang" value={lang} />
+  {kind === 'order' && (<><input type="hidden" name="product_id" /><input type="hidden" name="size_id" /></>)}
+  <div class="hp" aria-hidden="true">
+    <label>Website <input type="text" name="website" tabindex="-1" autocomplete="off" /></label>
+  </div>
+
+  <div class="fields">
+    <div class="field half">
+      <label for={f('first')}>{t('f.firstName')}</label>
+      <input id={f('first')} name="first_name" autocomplete="given-name" required />
+      <p class="err" data-err="first_name"></p>
+    </div>
+    <div class="field half">
+      <label for={f('last')}>{t('f.lastName')}</label>
+      <input id={f('last')} name="last_name" autocomplete="family-name" required />
+      <p class="err" data-err="last_name"></p>
+    </div>
+    <div class="field half">
+      <label for={f('phone')}>{t('f.phone')}</label>
+      <input id={f('phone')} name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+995 5__ __ __ __" required />
+      <p class="err" data-err="phone"></p>
+    </div>
+    <div class="field half">
+      <label for={f('type')}>{t('f.clientType')}</label>
+      <div class="select">
+        <select id={f('type')} name="client_type" required>
+          <option value="">{t('f.select')}</option>
+          {CLIENT_TYPES.map((c) => <option value={c}>{t(`ct.${c}` as any)}</option>)}
+        </select>
+      </div>
+      <p class="err" data-err="client_type"></p>
+    </div>
+
+    <fieldset class="field full">
+      <legend>{t('f.channel')}</legend>
+      <div class="choices">
+        {(['whatsapp', 'email', 'phone'] as const).map((c, i) => (
+          <label class="choice">
+            <input type="radio" name="channel" value={c} checked={i === 0} required />
+            <span class="notch" aria-hidden="true"></span>
+            <Icon name={c} size={18} />
+            <span>{t(`ch.${c}`)}</span>
+          </label>
+        ))}
+      </div>
+      <p class="err" data-err="channel"></p>
+    </fieldset>
+
+    <div class="field full email-field" data-email-field>
+      <label for={f('email')}>{t('f.email')} <span class="opt" data-email-opt>({t('f.optional')})</span></label>
+      <input id={f('email')} name="email" type="email" autocomplete="email" aria-describedby={f('email-hint')} />
+      <p class="hint" id={f('email-hint')}>{t('f.emailHint')}</p>
+      <p class="err" data-err="email"></p>
+    </div>
+
+    {kind === 'contact' && (
+      <fieldset class="field full">
+        <legend>{t('f.intent')} <span class="opt">({t('f.optional')})</span></legend>
+        <div class="choices">
+          {(['order', 'question'] as const).map((c) => (
+            <label class="choice">
+              <input type="radio" name="intent" value={c} />
+              <span class="notch" aria-hidden="true"></span>
+              <span>{t(`f.intent.${c}`)}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+    )}
+
+    <div class="field full">
+      <label for={f('msg')}>{t('f.message')} <span class="opt">({t('f.optional')})</span></label>
+      <textarea id={f('msg')} name="message" rows="4" maxlength="4000"></textarea>
+    </div>
+  </div>
+
+  <p class="form-err" role="alert" data-form-err hidden><Icon name="alert" size={18} /><span></span></p>
+
+  <button class="btn btn-solid submit" type="submit" data-label={kind === 'order' ? t('order.submit') : t('f.submit')}>
+    <span>{kind === 'order' ? t('order.submit') : t('f.submit')}</span>
+    <Icon name="arrow" />
+  </button>
+
+  <div class="done" data-done hidden tabindex="-1">
+    <span class="done-mark"><Icon name="check" size={22} /></span>
+    <p class="done-t">{kind === 'order' ? t('order.success.t') : t('f.success.t')}</p>
+    <p class="done-d">{kind === 'order' ? t('order.success.d') : t('f.success.d')}</p>
+  </div>
+</form>
+
+<style>
+  .lead { position: relative; display: grid; gap: var(--s-3); }
+  .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem var(--gutter); }
+  .field { display: grid; gap: 0.45rem; min-width: 0; border: 0; padding: 0; }
+  .full { grid-column: 1 / -1; }
+  label, legend { font-size: var(--t-sm); font-weight: 500; color: var(--ink-2); padding: 0; }
+  .opt { color: var(--ink-3); font-weight: 400; }
+  input:not([type='radio']), select, textarea {
+    width: 100%; min-height: 3.1rem; padding: 0.75rem 0;
+    background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
+    font-size: var(--t-base); color: var(--ink);
+    transition: border-color 200ms ease;
+  }
+  textarea { resize: vertical; min-height: 6rem; line-height: 1.6; }
+  input::placeholder, textarea::placeholder { color: var(--ink-3); opacity: 1; }
+  input:not([type='radio']):focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: none; border-bottom-color: var(--accent); box-shadow: 0 1px 0 0 var(--accent);
+  }
+  .select { position: relative; }
+  .select::after {
+    content: ''; position: absolute; right: 0.2rem; top: 50%; width: 0.45rem; height: 0.45rem;
+    border-right: 1.5px solid var(--ink-2); border-bottom: 1.5px solid var(--ink-2);
+    transform: translateY(-70%) rotate(45deg); pointer-events: none;
+  }
+  select { appearance: none; padding-right: 1.5rem; cursor: pointer; }
+  select option { background: var(--ground-2); color: var(--ink); }
+  [aria-invalid='true'] { border-bottom-color: oklch(0.68 0.16 30) !important; }
+  .err { min-height: 0; font-size: var(--t-xs); color: oklch(0.72 0.15 35); }
+  .err:empty { display: none; }
+  .hint { font-size: var(--t-xs); color: var(--ink-3); }
+  .choices { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.35rem; }
+  .choice {
+    position: relative; display: inline-flex; align-items: center; gap: 0.6rem;
+    padding: 0.7rem 1rem; border: 1px solid var(--line); border-radius: var(--radius);
+    color: var(--ink); cursor: pointer; transition: border-color 200ms ease, background-color 200ms ease;
+  }
+  .choice input { position: absolute; opacity: 0; inset: 0; cursor: pointer; margin: 0; }
+  .choice .notch { width: 0.5rem; height: 0.5rem; border: 1px solid var(--ink-3); transform: rotate(45deg); transition: background-color 200ms ease, border-color 200ms ease; }
+  .choice:has(input:checked) { border-color: var(--ink-2); background: color-mix(in oklab, var(--ink) 5%, transparent); }
+  .choice:has(input:checked) .notch { background: var(--accent); border-color: var(--accent); }
+  .choice:has(input:focus-visible) { outline: 1.5px solid var(--accent); outline-offset: 3px; }
+  @media (hover: hover) and (pointer: fine) { .choice:hover { border-color: var(--ink-3); } }
+  .form-err {
+    display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.9rem 1rem;
+    border: 1px solid oklch(0.6 0.14 32 / 0.6); color: var(--ink); font-size: var(--t-sm);
+    background: oklch(0.6 0.14 32 / 0.08);
+  }
+  .form-err[hidden] { display: none; }
+  .submit { justify-self: start; min-width: 14rem; }
+  .done {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 0.5rem;
+    background: var(--ground); outline: none;
+    opacity: 1; transform: none; transition: opacity 500ms var(--ease-out), transform 600ms var(--ease-out);
+  }
+  .done[hidden] { display: none; }
+  @starting-style { .done:not([hidden]) { opacity: 0; transform: translateY(10px); } }
+  .done-mark { display: inline-flex; width: 3rem; height: 3rem; align-items: center; justify-content: center; border: 1px solid var(--accent); color: var(--accent); border-radius: 50%; margin-bottom: 0.75rem; }
+  .done-t { font-family: var(--f-display); font-size: var(--t-2xl); line-height: 1.15; }
+  .done-d { color: var(--ink-2); }
+  @media (max-width: 620px) {
+    .fields { grid-template-columns: 1fr; }
+    .submit { width: 100%; }
+  }
+</style>
+
+<script>
+  type Msgs = Record<string, string>;
+  const PHONE = /^\+?\d{7,15}$/;
+  const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+  document.querySelectorAll<HTMLFormElement>('[data-lead-form]').forEach((form) => {
+    const msgs: Msgs = JSON.parse(form.dataset.msgs || '{}');
+    const btn = form.querySelector<HTMLButtonElement>('button[type=submit]')!;
+    const btnLabel = btn.querySelector('span')!;
+    const formErr = form.querySelector<HTMLElement>('[data-form-err]')!;
+    const done = form.querySelector<HTMLElement>('[data-done]')!;
+    const emailOpt = form.querySelector<HTMLElement>('[data-email-opt]');
+
+    const setErr = (name: string, msg: string) => {
+      const el = form.querySelector<HTMLElement>(`[data-err="${name}"]`);
+      if (el) el.textContent = msg;
+      form.querySelectorAll<HTMLElement>(`[name="${name}"]`).forEach((i) => {
+        if (msg) i.setAttribute('aria-invalid', 'true');
+        else i.removeAttribute('aria-invalid');
+      });
+    };
+
+    const syncChannel = () => {
+      const ch = (form.elements.namedItem('channel') as RadioNodeList)?.value;
+      if (emailOpt) emailOpt.hidden = ch === 'email';
+    };
+    form.addEventListener('change', (e) => {
+      const target = e.target as HTMLInputElement;
+      if (target.name === 'channel') syncChannel();
+      if (target.name) setErr(target.name, '');
+    });
+    syncChannel();
+
+    const validate = (data: Record<string, string>) => {
+      const errs: Record<string, string> = {};
+      for (const k of ['first_name', 'last_name', 'phone', 'client_type', 'channel']) {
+        if (!data[k]?.trim()) errs[k] = msgs.required;
+      }
+      const phone = (data.phone || '').replace(/[\s\-()]/g, '');
+      if (phone && !PHONE.test(phone)) errs.phone = msgs.phone;
+      if (data.channel === 'email' && !data.email?.trim()) errs.email = msgs.required;
+      else if (data.email && !EMAIL.test(data.email.trim())) errs.email = msgs.email;
+      return errs;
+    };
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      formErr.hidden = true;
+      const data = Object.fromEntries(new FormData(form).entries()) as Record<string, string>;
+      ['first_name', 'last_name', 'phone', 'client_type', 'channel', 'email'].forEach((k) => setErr(k, ''));
+      const errs = validate(data);
+      if (Object.keys(errs).length) {
+        Object.entries(errs).forEach(([k, v]) => setErr(k, v));
+        form.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+        return;
+      }
+      btn.disabled = true;
+      btnLabel.textContent = msgs.sending;
+      try {
+        const res = await fetch(form.dataset.endpoint!, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        if (res.status === 422) {
+          const body = await res.json().catch(() => ({}));
+          Object.entries(body.fields || {}).forEach(([k, v]) =>
+            setErr(k, v === 'invalid' ? (k === 'email' ? msgs.email : k === 'phone' ? msgs.phone : msgs.required) : msgs.required),
+          );
+          throw new Error(msgs.generic);
+        }
+        if (!res.ok) throw new Error(msgs.network);
+        done.hidden = false;
+        done.focus();
+        form.dispatchEvent(new CustomEvent('lead:sent', { bubbles: true }));
+      } catch (err) {
+        const m = err instanceof Error && err.message === msgs.generic ? msgs.generic : msgs.network;
+        formErr.querySelector('span')!.textContent = m;
+        formErr.hidden = false;
+      } finally {
+        btn.disabled = false;
+        btnLabel.textContent = btn.dataset.label || '';
+      }
+    });
+  });
+</script>

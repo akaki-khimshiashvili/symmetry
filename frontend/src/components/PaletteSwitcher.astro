@@ -1,0 +1,135 @@
+---
+import { type Lang, useT, PALETTES } from '../i18n/ui';
+import { relief } from '../lib/relief';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = useT(lang);
+const swatch = (p: string, uid: string) => relief({ pattern: 'wave', width: 160, height: 160, density: 0.42, uid: `${uid}${p}` });
+---
+<div class="pal" data-pal>
+  <div class="pal-pop" id="pal-pop" role="radiogroup" aria-label={t('palette.title')} data-pal-pop hidden>
+    <p class="label pal-title">{t('palette.title')}</p>
+    <div class="pal-list">
+      {PALETTES.map((p, i) => (
+        <button type="button" class="pal-opt" role="radio" aria-checked="false" data-set={p}>
+          <span class="sw" data-palette={p} set:html={swatch(p, 'po')} />
+          <span class="nm">
+            <span class="specimen-no">№ {String(i + 1).padStart(2, '0')}</span>
+            {t(`palette.${p}` as any)}
+          </span>
+          <span class="notch" aria-hidden="true"></span>
+        </button>
+      ))}
+    </div>
+  </div>
+  <button type="button" class="pal-btn" aria-expanded="false" aria-controls="pal-pop" data-pal-btn>
+    <span class="sw" data-pal-current set:html={swatch('', 'pc')} />
+    <span class="pal-txt">
+      <span class="label">{t('palette.label')}</span>
+      <span class="pal-name" data-pal-name></span>
+    </span>
+  </button>
+</div>
+
+<script is:inline define:vars={{ names: Object.fromEntries(PALETTES.map((p) => [p, t(`palette.${p}` as any)])) }}>
+  (function () {
+    var root = document.documentElement;
+    var wrap = document.querySelector('[data-pal]');
+    var btn = wrap.querySelector('[data-pal-btn]');
+    var pop = wrap.querySelector('[data-pal-pop]');
+    var name = wrap.querySelector('[data-pal-name]');
+    var opts = wrap.querySelectorAll('[data-set]');
+
+    function sync() {
+      var cur = root.dataset.palette;
+      name.textContent = names[cur] || '';
+      opts.forEach(function (o) { o.setAttribute('aria-checked', String(o.dataset.set === cur)); });
+    }
+    function open(v) {
+      if (v) {
+        pop.hidden = false;
+        requestAnimationFrame(function () { pop.classList.add('on'); });
+        var c = pop.querySelector('[aria-checked="true"]') || opts[0];
+        c.focus();
+      } else {
+        pop.classList.remove('on');
+        setTimeout(function () { if (!pop.classList.contains('on')) pop.hidden = true; }, 160);
+      }
+      btn.setAttribute('aria-expanded', String(v));
+    }
+    btn.addEventListener('click', function () { open(btn.getAttribute('aria-expanded') !== 'true'); });
+    opts.forEach(function (o, i) {
+      o.addEventListener('click', function () {
+        root.dataset.palette = o.dataset.set;
+        try { localStorage.setItem('symmetry-palette', o.dataset.set); } catch (e) {}
+        sync();
+      });
+      o.addEventListener('keydown', function (e) {
+        var d = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : 0;
+        if (d) { e.preventDefault(); var n = opts[(i + d + opts.length) % opts.length]; n.focus(); n.click(); }
+      });
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && btn.getAttribute('aria-expanded') === 'true') { open(false); btn.focus(); }
+    });
+    document.addEventListener('pointerdown', function (e) {
+      if (!wrap.contains(e.target) && btn.getAttribute('aria-expanded') === 'true') open(false);
+    });
+    sync();
+  })();
+</script>
+
+<style>
+  .pal { position: fixed; left: var(--margin); bottom: 1.25rem; z-index: 50; }
+  .pal-btn {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.4rem 1rem 0.4rem 0.4rem;
+    background: color-mix(in oklab, var(--ground-2) 92%, transparent);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--line); border-radius: 999px; cursor: pointer;
+    box-shadow: 0 10px 30px -12px rgb(0 0 0 / 0.45);
+    transition: transform 160ms var(--ease-out), border-color 200ms ease;
+  }
+  .pal-btn:active { transform: scale(0.97); }
+  @media (hover: hover) and (pointer: fine) { .pal-btn:hover { border-color: var(--ink-3); } }
+  .pal-btn .sw { width: 2.25rem; height: 2.25rem; border-radius: 50%; overflow: hidden; }
+  .pal-txt { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.15; }
+  .pal-txt .label { font-size: 0.625rem; }
+  .pal-name { font-family: var(--f-display); font-size: 0.95rem; color: var(--ink); }
+
+  .pal-pop {
+    position: absolute; left: 0; bottom: calc(100% + 0.6rem);
+    width: min(19rem, calc(100vw - 2 * var(--margin)));
+    padding: 1rem; background: var(--ground-2); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: 0 24px 60px -20px rgb(0 0 0 / 0.55);
+    transform-origin: bottom left; opacity: 0; transform: scale(0.96) translateY(4px);
+    transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
+  }
+  .pal-pop.on { opacity: 1; transform: none; }
+  .pal-title { margin-bottom: 0.75rem; }
+  .pal-list { display: grid; gap: 0.25rem; }
+  .pal-opt {
+    position: relative; display: flex; align-items: center; gap: 0.85rem; width: 100%;
+    padding: 0.45rem 0.5rem; background: none; border: 0; border-radius: 8px; cursor: pointer; text-align: left;
+    transition: background-color 160ms ease;
+  }
+  @media (hover: hover) and (pointer: fine) { .pal-opt:hover { background: var(--ground-3); } }
+  .pal-opt .sw { width: 2.6rem; height: 2.6rem; border-radius: 6px; overflow: hidden; flex: none; }
+  .nm { display: flex; flex-direction: column; font-size: var(--t-sm); line-height: 1.25; color: var(--ink); }
+  .nm .specimen-no { font-size: 0.8rem; color: var(--ink-3); }
+  /* Selection is a notch, not a hue */
+  .notch {
+    margin-left: auto; width: 0.55rem; height: 0.55rem; border: 1px solid var(--line);
+    transform: rotate(45deg); transition: background-color 200ms ease, border-color 200ms ease;
+  }
+  .pal-opt[aria-checked='true'] .notch { background: var(--accent); border-color: var(--accent); }
+  @media (prefers-reduced-motion: reduce) {
+    .pal-pop { transform: none; transition: opacity 150ms ease; }
+  }
+  @media (max-width: 620px) {
+    .pal { bottom: 0.9rem; }
+    .pal-txt { display: none; }
+    .pal-btn { padding: 0.3rem; }
+  }
+</style>

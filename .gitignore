@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.astro/
+.env
+backend/data/*.sqlite*
+backend/data/rebuild.log
+backend/public/uploads/*
+!backend/public/uploads/.gitkeep
+.impeccable/review/

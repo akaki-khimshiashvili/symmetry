@@ -1,0 +1,70 @@
+---
+import Icon from './Icon.astro';
+import Wordmark from './Wordmark.astro';
+import { type Lang, useT, path } from '../i18n/ui';
+import { loadData, telLink, waLink } from '../lib/data';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = useT(lang);
+const { settings: s } = await loadData();
+const year = new Date().getFullYear();
+const socials = [
+  { key: 'instagram', href: s.instagram, label: 'Instagram' },
+  { key: 'facebook', href: s.facebook, label: 'Facebook' },
+  { key: 'tiktok', href: s.tiktok, label: 'TikTok' },
+].filter((x) => x.href);
+---
+<footer class="footer">
+  <div class="wrap">
+    <div class="grid top">
+      <div class="intro">
+        <Wordmark size="lg" />
+        <p class="tag">{t('footer.tagline')}</p>
+      </div>
+      <nav class="col c-nav" aria-label="Footer">
+        <a href={path(lang, '/products/')}>{t('nav.products')}</a>
+        <a href={path(lang, '/about/')}>{t('nav.about')}</a>
+        <a href={path(lang, '/contact/')}>{t('nav.contact')}</a>
+      </nav>
+      <div class="col c-contact">
+        {s.phone && <a class="num" href={telLink(s.phone)}><Icon name="phone" size={16} />{s.phone}</a>}
+        {s.whatsapp && <a href={waLink(s.whatsapp, '')} target="_blank" rel="noopener"><Icon name="whatsapp" size={16} />WhatsApp</a>}
+        {s.email && <a href={`mailto:${s.email}`}><Icon name="mail" size={16} />{s.email}</a>}
+      </div>
+      <div class="col c-social">
+        {socials.map((x) => (
+          <a href={x.href} target="_blank" rel="noopener"><Icon name={x.key} size={16} />{x.label}</a>
+        ))}
+        <span class="addr"><Icon name="pin" size={16} />{lang === 'ka' ? s.address_ka : s.address_en}</span>
+      </div>
+    </div>
+    <div class="base">
+      <span>© {year} Symmetry. {t('footer.rights')}</span>
+      <span class="label">Parametric Wall Art · Georgia</span>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .footer { border-top: 1px solid var(--line); padding-top: var(--s-5); padding-bottom: 6rem; background: var(--ground-2); }
+  .top { row-gap: var(--s-4); }
+  .intro { grid-column: span 5; display: flex; flex-direction: column; gap: var(--s-3); }
+  .tag { color: var(--ink-2); max-width: 32ch; }
+  .col { grid-column: span 2; display: flex; flex-direction: column; gap: 0.7rem; font-size: var(--t-sm); }
+  .c-contact { grid-column: span 3; }
+  .col a, .addr { display: inline-flex; align-items: center; gap: 0.6rem; color: var(--ink-2); text-decoration: none; transition: color 200ms ease; }
+  @media (hover: hover) and (pointer: fine) { .col a:hover { color: var(--ink); } }
+  .base {
+    display: flex; justify-content: space-between; gap: var(--s-2); flex-wrap: wrap;
+    margin-top: var(--s-5); padding-top: var(--s-3); border-top: 1px solid var(--line);
+    font-size: var(--t-xs); color: var(--ink-3);
+  }
+  @media (max-width: 960px) {
+    .intro { grid-column: 1 / -1; }
+    .col, .c-contact { grid-column: span 4; }
+  }
+  @media (max-width: 620px) {
+    .col, .c-contact { grid-column: 1 / -1; }
+  }
+</style>

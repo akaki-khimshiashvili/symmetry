@@ -1,0 +1,113 @@
+/* ------------------------------------------------------------------
+   Wood palettes. Each is a species from the specimen book.
+   Applied on <html data-palette="…">, and on any element (swatches).
+------------------------------------------------------------------- */
+:root,
+[data-palette='walnut'] {
+  --ground: oklch(0.205 0.022 52);
+  --ground-2: oklch(0.245 0.026 54);
+  --ground-3: oklch(0.29 0.03 56);
+  --ink: oklch(0.935 0.018 78);
+  --ink-2: oklch(0.79 0.03 72);
+  --ink-3: oklch(0.66 0.035 68);
+  --line: oklch(0.36 0.03 58);
+  --wood-lo: oklch(0.2 0.035 45);
+  --wood-hi: oklch(0.74 0.085 68);
+  --accent: oklch(0.8 0.095 76);
+  --accent-ink: oklch(0.2 0.03 55);
+  --gap: oklch(0.13 0.02 45);
+  color-scheme: dark;
+}
+[data-palette='ebony'] {
+  --ground: oklch(0.155 0.008 60);
+  --ground-2: oklch(0.195 0.01 60);
+  --ground-3: oklch(0.24 0.012 60);
+  --ink: oklch(0.94 0.012 85);
+  --ink-2: oklch(0.78 0.02 78);
+  --ink-3: oklch(0.65 0.025 75);
+  --line: oklch(0.32 0.012 60);
+  --wood-lo: oklch(0.15 0.015 40);
+  --wood-hi: oklch(0.66 0.1 58);
+  --accent: oklch(0.79 0.12 72);
+  --accent-ink: oklch(0.16 0.01 60);
+  --gap: oklch(0.09 0.006 50);
+  color-scheme: dark;
+}
+[data-palette='oak'] {
+  --ground: oklch(0.945 0.012 82);
+  --ground-2: oklch(0.915 0.016 80);
+  --ground-3: oklch(0.875 0.02 78);
+  /* White ground, dark oak as the second colour */
+  --ink: oklch(0.24 0.03 52);
+  --ink-2: oklch(0.38 0.035 54);
+  --ink-3: oklch(0.48 0.035 58);
+  --line: oklch(0.84 0.018 76);
+  --wood-lo: oklch(0.27 0.04 50);
+  --wood-hi: oklch(0.86 0.055 74);
+  --accent: oklch(0.31 0.045 50);
+  --accent-ink: oklch(0.97 0.008 85);
+  --gap: oklch(0.2 0.03 48);
+  color-scheme: light;
+}
+[data-palette='teak'] {
+  --ground: oklch(0.885 0.04 78);
+  --ground-2: oklch(0.85 0.048 76);
+  --ground-3: oklch(0.81 0.055 74);
+  --ink: oklch(0.24 0.04 48);
+  --ink-2: oklch(0.38 0.05 52);
+  --ink-3: oklch(0.46 0.055 54);
+  --line: oklch(0.76 0.05 72);
+  --wood-lo: oklch(0.4 0.085 50);
+  --wood-hi: oklch(0.86 0.1 78);
+  --accent: oklch(0.36 0.09 42);
+  --accent-ink: oklch(0.95 0.02 80);
+  --gap: oklch(0.3 0.06 45);
+  color-scheme: light;
+}
+[data-palette='sapele'] {
+  --ground: oklch(0.2 0.035 30);
+  --ground-2: oklch(0.245 0.042 31);
+  --ground-3: oklch(0.29 0.05 32);
+  --ink: oklch(0.935 0.02 65);
+  --ink-2: oklch(0.8 0.04 55);
+  --ink-3: oklch(0.68 0.05 48);
+  --line: oklch(0.37 0.05 32);
+  --wood-lo: oklch(0.22 0.06 28);
+  --wood-hi: oklch(0.66 0.13 40);
+  --accent: oklch(0.82 0.09 70);
+  --accent-ink: oklch(0.2 0.04 30);
+  --gap: oklch(0.13 0.03 28);
+  color-scheme: dark;
+}
+[data-palette='smoked'] {
+  --ground: oklch(0.285 0.01 70);
+  --ground-2: oklch(0.33 0.012 70);
+  --ground-3: oklch(0.38 0.014 72);
+  --ink: oklch(0.95 0.008 85);
+  --ink-2: oklch(0.82 0.014 80);
+  --ink-3: oklch(0.72 0.018 78);
+  --line: oklch(0.44 0.014 72);
+  --wood-lo: oklch(0.24 0.02 62);
+  --wood-hi: oklch(0.78 0.04 78);
+  --accent: oklch(0.86 0.065 86);
+  --accent-ink: oklch(0.24 0.01 70);
+  --gap: oklch(0.17 0.01 65);
+  color-scheme: dark;
+}
+
+/* Shade ramp used by every relief: 12 steps between --wood-lo and --wood-hi */
+.rl .rl-ground { fill: var(--gap); }
+.rl .f0, .rl .s0 { fill: var(--wood-lo); stop-color: var(--wood-lo); }
+.rl .f1, .rl .s1 { fill: color-mix(in oklab, var(--wood-hi) 9%, var(--wood-lo)); stop-color: color-mix(in oklab, var(--wood-hi) 9%, var(--wood-lo)); }
+.rl .f2, .rl .s2 { fill: color-mix(in oklab, var(--wood-hi) 18%, var(--wood-lo)); stop-color: color-mix(in oklab, var(--wood-hi) 18%, var(--wood-lo)); }
+.rl .f3, .rl .s3 { fill: color-mix(in oklab, var(--wood-hi) 27%, var(--wood-lo)); stop-color: color-mix(in oklab, var(--wood-hi) 27%, var(--wood-lo)); }
+.rl .f4, .rl .s4 { fill: color-mix(in oklab, var(--wood-hi) 36%, var(--wood-lo)); stop-color: color-mix(in oklab, var(--wood-hi) 36%, var(--wood-lo)); }
+.rl .f5, .rl .s5 { fill: color-mix(in oklab, var(--wood-hi) 45%, var(--wood-lo)); stop-color: color-mix(in oklab, var(--wood-hi) 45%, var(--wood-lo)); }
+.rl .f6, .rl .s6 { fill: color-mix(in oklab, var(--wood-hi) 55%, var(--wood-lo)); stop-color: color-mix(in oklab, var(--wood-hi) 55%, var(--wood-lo)); }
+.rl .f7, .rl .s7 { fill: color-mix(in oklab, var(--wood-hi) 64%, var(--wood-lo)); stop-color: color-mix(in oklab, var(--wood-hi) 64%, var(--wood-lo)); }
+.rl .f8, .rl .s8 { fill: color-mix(in oklab, var(--wood-hi) 73%, var(--wood-lo)); stop-color: color-mix(in oklab, var(--wood-hi) 73%, var(--wood-lo)); }
+.rl .f9, .rl .s9 { fill: color-mix(in oklab, var(--wood-hi) 82%, var(--wood-lo)); stop-color: color-mix(in oklab, var(--wood-hi) 82%, var(--wood-lo)); }
+.rl .f10, .rl .s10 { fill: color-mix(in oklab, var(--wood-hi) 91%, var(--wood-lo)); stop-color: color-mix(in oklab, var(--wood-hi) 91%, var(--wood-lo)); }
+.rl .f11, .rl .s11 { fill: var(--wood-hi); stop-color: var(--wood-hi); }
+.rl { display: block; width: 100%; height: 100%; }
+
