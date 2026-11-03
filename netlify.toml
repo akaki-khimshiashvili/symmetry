@@ -1,0 +1,27 @@
+# Netlify: builds the Astro site in /frontend. Every push to `main` deploys to production.
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22.16.0"
+  # Set PUBLIC_API_URL and SITE_URL in Netlify → Site configuration → Environment variables.
+  # Without PUBLIC_API_URL the build uses backend/data/seed.json and forms cannot submit.
+
+# Hashed build assets and fonts never change under the same URL: cache them for a year.
+[[headers]]
+  for = "/_astro/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/fonts/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
