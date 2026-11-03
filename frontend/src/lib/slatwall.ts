@@ -9,7 +9,7 @@
  * morning sun (shadows travel). The camera starts in its resting view.
  * Scroll: the camera orbits, the wave travels along the wall and the light shifts a little.
  *
- * Performance: one InstancedMesh (single draw call), 1024² soft shadow map, DPR capped,
+ * Performance: one InstancedMesh (single draw call), 2048² soft shadow map, DPR capped,
  * rendering paused off screen / in background tabs. Loaded as a separate chunk.
  */
 import {
@@ -94,8 +94,10 @@ export function mountSlatWall(host: HTMLElement, opts: { reduce: boolean; woodCo
   /* ---------- Light ---------- */
   const key = new DirectionalLight(0xffe4c2, 2.6);
   key.castShadow = true;
-  key.shadow.mapSize.set(1024, 1024);
-  Object.assign(key.shadow.camera, { left: -12, right: 12, top: 5, bottom: -5, near: 1, far: 30 });
+  // The shadow box must cover the whole visible wall for every light position (intro sweep + scroll);
+  // otherwise its edge shows up as a straight line travelling across the wall.
+  key.shadow.mapSize.set(2048, 2048);
+  Object.assign(key.shadow.camera, { left: -16, right: 16, top: 9, bottom: -9, near: 1, far: 30 });
   key.shadow.bias = -0.0006;
   key.shadow.radius = 12;
   key.shadow.blurSamples = 16;

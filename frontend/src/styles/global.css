@@ -256,9 +256,24 @@ html.js [data-reveal='clip'] > * {
   transition-delay: calc(var(--d, 0) * 90ms);
 }
 html.js [data-reveal='clip'].is-in > * { clip-path: inset(0 0 0 0); }
+html.js [data-reveal].reveal-instant, html.js [data-reveal].reveal-instant > * { transition: none !important; }
+
+/* ------------------------------------------------------------------
+   Page-to-page: a short crossfade of the content while the header stays put
+   (it switches to the new page's state instantly, pill included).
+------------------------------------------------------------------- */
+@view-transition { navigation: auto; }
+::view-transition-old(root) { animation: 160ms ease both vt-out; }
+::view-transition-new(root) { animation: 240ms var(--ease-out) 60ms both vt-in; }
+::view-transition-group(site-header) { animation: none; }
+::view-transition-old(site-header) { display: none; }
+::view-transition-new(site-header) { animation: none; }
+@keyframes vt-out { to { opacity: 0; } }
+@keyframes vt-in { from { opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
   html { transition: none; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
   html.js [data-reveal], html.js [data-reveal='clip'] > * {
     transform: none; filter: none; clip-path: none;
     transition: opacity 400ms ease;

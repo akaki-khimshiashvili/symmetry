@@ -1,9 +1,17 @@
 ---
+import Icon from './Icon.astro';
 import { type Lang, useT, path } from '../i18n/ui';
+import { loadData } from '../lib/data';
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
 const t = useT(lang);
+const { settings } = await loadData();
+const socials = [
+  { key: 'instagram', href: settings.instagram, label: 'Instagram' },
+  { key: 'facebook', href: settings.facebook, label: 'Facebook' },
+  { key: 'tiktok', href: settings.tiktok, label: 'TikTok' },
+].filter((x) => x.href);
 
 /* Static fallback (no WebGL / before the 3D scene is ready): the same wall, drawn flat. */
 const VW = 1200, VH = 520;
@@ -30,6 +38,17 @@ const slats = Array.from({ length: N }, (_, i) => {
       <a class="btn btn-solid btn-lg" href={path(lang, '/products/')}>{t('hero.cta.products')}</a>
       <a class="btn btn-line btn-lg" href={path(lang, '/contact/')}>{t('hero.cta.contact')}</a>
     </div>
+    {socials.length > 0 && (
+      <ul class="h-social" aria-label={t('contact.social')}>
+        {socials.map((x) => (
+          <li>
+            <a href={x.href} target="_blank" rel="noopener" aria-label={x.label} title={x.label}>
+              <Icon name={x.key} size={18} />
+            </a>
+          </li>
+        ))}
+      </ul>
+    )}
   </div>
 
   <figure class="scene" aria-hidden="true" data-scene>
@@ -63,12 +82,28 @@ const slats = Array.from({ length: N }, (_, i) => {
   .h-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.85rem; }
   .btn-lg { --h: 3.75rem; padding: 0 1.9rem; font-size: var(--t-base); }
 
+  /* Socials: a centred row of round outline buttons under the actions. */
+  .h-social { display: flex; justify-content: center; gap: 0.5rem; margin: 0.25rem 0 0; padding: 0; list-style: none; }
+  .h-social a {
+    display: inline-grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: 50%;
+    border: 1px solid color-mix(in oklab, var(--ink) 16%, transparent); color: var(--ink-2);
+    background: color-mix(in oklab, var(--ground) 70%, transparent);
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 160ms var(--ease-out);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .h-social a:hover { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  }
+  .h-social a:active { transform: scale(0.95); }
+
   /* One calm entrance: title, lead and buttons fade up in turn. */
-  :global(html.js) .hero :is(.h-title, .h-lead, .h-actions) { opacity: 0; transform: translateY(16px); }
-  :global(html.js) .hero.play :is(.h-title, .h-lead, .h-actions) { opacity: 1; transform: none; transition: opacity 800ms ease, transform 900ms var(--ease-out); }
+  :global(html.js) .hero :is(.h-title, .h-lead, .h-actions, .h-social) { opacity: 0; transform: translateY(16px); }
+  :global(html.js) .hero.play :is(.h-title, .h-lead, .h-actions, .h-social) { opacity: 1; transform: none; transition: opacity 800ms ease, transform 900ms var(--ease-out); }
   :global(html.js) .hero.play .h-title { transition-delay: 100ms; }
   :global(html.js) .hero.play .h-lead { transition-delay: 250ms; }
   :global(html.js) .hero.play .h-actions { transition-delay: 400ms; }
+  :global(html.js) .hero.play .h-social { transition-delay: 550ms; }
+  /* Coming from another page of the site: no intro replay. */
+  :global(html.nav-internal) .hero :is(.h-title, .h-lead, .h-actions, .h-social) { opacity: 1; transform: none; transition: none !important; }
 
   /* ---------- The wall ---------- */
   .scene {
@@ -93,7 +128,7 @@ const slats = Array.from({ length: N }, (_, i) => {
   .hero { display: flex; flex-direction: column; height: calc(100svh - var(--header-h)); min-height: 30rem; }
   .scene { flex: 1 1 auto; height: auto; min-height: 12rem; }
   @media (min-width: 761px) {
-    .hero { min-height: 38rem; }
+    .hero { min-height: 38rem; padding-top: clamp(3rem, 11vh, 7rem); }
     .scene { min-height: 20rem; }
   }
   /* Phones: text and wall sit together as one centred group; spare height goes above and below it. */
@@ -108,7 +143,7 @@ const slats = Array.from({ length: N }, (_, i) => {
     .hero-copy { gap: 0.9rem; }
   }
   @media (prefers-reduced-motion: reduce) {
-    :global(html.js) .hero :is(.h-title, .h-lead, .h-actions) { opacity: 1; transform: none; }
+    :global(html.js) .hero :is(.h-title, .h-lead, .h-actions, .h-social) { opacity: 1; transform: none; }
     .hero.play * { transition: none !important; }
   }
 </style>

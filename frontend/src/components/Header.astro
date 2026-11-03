@@ -26,9 +26,9 @@ const SLATS = 8;
       ))}
     </nav>
     <div class="tools">
-      <a class="lang" href={switchHref} hreflang={other} lang={other} aria-label={t('lang.switch')}>
-        <span class:list={['opt', { on: lang === 'ka' }]}>KA</span>
-        <span class:list={['opt', { on: lang === 'en' }]}>EN</span>
+      <a class="lang" href={switchHref} hreflang={other} lang={other} aria-label={t('lang.switch')} data-lang-switch data-on={lang}>
+        <span class="opt" data-opt="ka">KA</span>
+        <span class="opt" data-opt="en">EN</span>
       </a>
       <button class="menu-btn" type="button" data-menu-btn aria-expanded="false" aria-controls="site-menu"
         data-open-label={t('nav.menu')} data-close-label={t('nav.close')} aria-label={t('nav.menu')}>
@@ -47,6 +47,7 @@ const SLATS = 8;
     {menuLinks.map((l, i) => (
       <a href={l.href} style={`--j:${i}`} aria-current={current === l.key ? 'page' : undefined}>
         <span class="mi-label">{l.label}</span>
+        <span class="mi-arrow" aria-hidden="true">→</span>
       </a>
     ))}
     <a class="menu-lang" href={switchHref} hreflang={other} lang={other} style={`--j:${menuLinks.length}`}>{t('lang.switch')}</a>
@@ -55,7 +56,7 @@ const SLATS = 8;
 
 <style>
   .site-header {
-    position: sticky; top: 0; z-index: 60;
+    position: sticky; top: 0; z-index: 60; view-transition-name: site-header;
     transition: background-color 400ms ease, border-color 400ms ease;
     border-bottom: 1px solid transparent;
   }
@@ -68,37 +69,50 @@ const SLATS = 8;
   .site-header[data-menu-open] { background: var(--ground); }
   .bar { display: flex; align-items: center; gap: clamp(1rem, 0.5rem + 2vw, 2.5rem); height: var(--header-h); }
   .brand { text-decoration: none; display: inline-flex; }
-  .nav { display: flex; gap: clamp(1.25rem, 0.5rem + 2vw, 2.5rem); margin-left: auto; }
+  .nav { display: flex; align-items: center; gap: clamp(1.25rem, 0.5rem + 2vw, 2.5rem); margin-left: auto; }
   .nav a {
     position: relative; text-decoration: none; font-size: var(--t-sm); font-weight: 500; letter-spacing: 0.03em;
-    color: var(--ink-2); padding-block: 0.5rem; transition: color 200ms ease;
+    color: var(--ink-3); padding-block: 0.5rem; transition: color 200ms ease;
   }
+  /* A hairline that grows out from the centre. */
   .nav a::after {
-    content: ''; position: absolute; left: 0; right: 0; bottom: 0.2rem; height: 1px; background: currentColor;
-    transform: scaleX(0); transform-origin: left; transition: transform 380ms var(--ease-out);
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0.15rem; height: 1.5px; border-radius: 1px;
+    background: var(--accent); transform: scaleX(0); transition: transform 280ms var(--ease-out);
   }
-  .nav a[aria-current='page'] { color: var(--ink); }
-  .nav a[aria-current='page']::after { transform: scaleX(1); }
   @media (hover: hover) and (pointer: fine) {
     .nav a:hover { color: var(--ink); }
     .nav a:hover::after { transform: scaleX(1); }
   }
+  .nav a:focus-visible::after { transform: scaleX(1); }
+  /* Current page: full-strength text and a line that stays. */
+  .nav a[aria-current='page'] { color: var(--ink); font-weight: 600; }
+  .nav a[aria-current='page']::after { transform: scaleX(1); }
+
   .tools { display: flex; align-items: center; gap: var(--s-2); }
 
-  /* Language switch: the active language sits in a dark oak pill; the other stays a quiet link. */
+  /* Language switch: one dark oak pill sits under the active language. On click it slides
+     to the other side, then the page changes. */
   .lang {
-    display: inline-flex; align-items: center; gap: 2px; padding: 3px; text-decoration: none;
+    position: relative; display: inline-grid; grid-template-columns: 1fr 1fr; padding: 3px; text-decoration: none;
     border: 1px solid var(--line); border-radius: 999px;
     font-size: clamp(0.66rem, 0.6rem + 0.2vw, 0.75rem); font-weight: 700; letter-spacing: 0.1em;
+    transition: border-color 240ms ease;
   }
+  .lang::before {
+    content: ''; position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px);
+    border-radius: 999px; background: var(--accent);
+    transition: transform 320ms var(--ease-out);
+  }
+  .lang[data-on='en']::before { transform: translateX(100%); }
   .lang .opt {
-    display: inline-flex; align-items: center; justify-content: center;
-    min-width: 2.1em; padding: 0.42em 0.7em; border-radius: 999px; color: var(--ink-3);
-    transition: color 200ms ease, background-color 200ms ease;
+    position: relative; display: inline-flex; align-items: center; justify-content: center;
+    min-width: 2.1em; padding: 0.42em 0.7em; color: var(--ink-3);
+    transition: color 220ms ease;
   }
-  .lang .opt.on { background: var(--accent); color: var(--accent-ink); }
+  .lang[data-on='ka'] [data-opt='ka'], .lang[data-on='en'] [data-opt='en'] { color: var(--accent-ink); }
   @media (hover: hover) and (pointer: fine) {
-    .lang:hover .opt:not(.on) { color: var(--ink); background: color-mix(in oklab, var(--ink) 7%, transparent); }
+    .lang:hover { border-color: color-mix(in oklab, var(--ink) 35%, transparent); }
+    .lang[data-on='ka']:hover [data-opt='en'], .lang[data-on='en']:hover [data-opt='ka'] { color: var(--ink); }
   }
 
   /* Menu button: two lines that turn into an ✕. */
@@ -114,6 +128,10 @@ const SLATS = 8;
   }
   .burger i:nth-child(1) { top: 0; }
   .burger i:nth-child(2) { top: calc(100% - 1.6px); }
+  @media (hover: hover) and (pointer: fine) {
+    .menu-btn[aria-expanded='false']:hover .burger i:nth-child(1) { transform: scaleX(0.6); transform-origin: right; }
+    .menu-btn[aria-expanded='false']:hover .burger i:nth-child(2) { transform: scaleX(0.6); transform-origin: left; }
+  }
   .menu-btn[aria-expanded='true'] .burger i:nth-child(1) { top: calc(50% - 0.8px); transform: rotate(45deg); }
   .menu-btn[aria-expanded='true'] .burger i:nth-child(2) { top: calc(50% - 0.8px); transform: rotate(-45deg); }
 
@@ -142,7 +160,25 @@ const SLATS = 8;
   .menu.open .menu-nav a { opacity: 1; transform: none; }
   .menu.closing .menu-nav a { opacity: 0; transform: translateY(-6px); transition: opacity 160ms ease, transform 200ms ease; transition-delay: 0ms; }
   .mi-label { font-size: clamp(1.7rem, 1.2rem + 3vw, 2.4rem); font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; }
-  .menu-nav a[aria-current='page'] .mi-label { color: var(--accent); }
+  .mi-label { position: relative; transition: transform 360ms var(--ease-out); }
+  .mi-arrow {
+    margin-left: auto; align-self: center; font-size: 1.4rem; color: var(--ink-3);
+    opacity: 0; transform: translateX(-10px); transition: opacity 260ms ease, transform 360ms var(--ease-out);
+  }
+  /* Active page in the menu: an accent bar slides in front of the label. */
+  .menu-nav a[aria-current='page'] .mi-label { color: var(--accent); transform: translateX(1.1rem); }
+  .menu-nav a[aria-current='page'] .mi-label::before {
+    content: ''; position: absolute; left: -1.1rem; top: 50%; width: 0.55rem; height: 0.55rem; border-radius: 50%;
+    background: var(--accent); transform: translateY(-50%);
+  }
+  .menu-nav a:active .mi-label { transform: translateX(0.5rem); }
+  .menu-nav a[aria-current='page']:active .mi-label { transform: translateX(1.4rem); }
+  .menu-nav a:active .mi-arrow, .menu-nav a:focus-visible .mi-arrow { opacity: 1; transform: none; }
+  @media (hover: hover) and (pointer: fine) {
+    .menu-nav a:not(.menu-lang):hover .mi-label { transform: translateX(0.5rem); }
+    .menu-nav a[aria-current='page']:hover .mi-label { transform: translateX(1.4rem); }
+    .menu-nav a:hover .mi-arrow { opacity: 1; transform: none; }
+  }
   .menu-nav .menu-lang { border: 0; margin-top: var(--s-2); font-size: var(--t-sm); font-weight: 600; color: var(--ink-2); letter-spacing: 0.06em; }
 
   @media (max-width: 860px) {
@@ -153,10 +189,27 @@ const SLATS = 8;
   @media (min-width: 861px) { .menu { display: none !important; } }
   @media (prefers-reduced-motion: reduce) {
     .menu-slats span, .menu-nav a, .burger i { transition-duration: 1ms !important; transition-delay: 0ms !important; }
+    .mi-label, .mi-arrow { transition-duration: 1ms !important; }
+    .nav a::after, .lang::before { transition: none !important; }
   }
 </style>
 
 <script>
+  // Language switch: slide the pill across first, then go to the other language's page.
+  document.querySelectorAll<HTMLAnchorElement>('[data-lang-switch]').forEach((sw) =>
+    sw.addEventListener('click', (e) => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+      e.preventDefault();
+      sw.dataset.on = sw.getAttribute('hreflang')!;
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      setTimeout(() => { location.href = sw.href; }, reduce ? 0 : 300);
+    }),
+  );
+  // Back button restoring this page from cache: put the pill back on this page's language.
+  addEventListener('pageshow', (e) => {
+    if (e.persisted) document.querySelectorAll<HTMLElement>('[data-lang-switch]').forEach((sw) => (sw.dataset.on = document.documentElement.lang));
+  });
+
   const header = document.querySelector<HTMLElement>('[data-header]')!;
   const onScroll = () => header.toggleAttribute('data-scrolled', window.scrollY > 12);
   onScroll();

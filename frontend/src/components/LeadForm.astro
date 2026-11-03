@@ -16,6 +16,15 @@ const msgs = {
 };
 const endpoint = `${API_URL}/${kind === 'order' ? 'orders' : 'contact'}`;
 const f = (k: string) => `${id}-${k}`;
+const channels = [
+  { key: 'whatsapp', icon: 'whatsapp' },
+  { key: 'email', icon: 'mail' },
+  { key: 'phone', icon: 'phone' },
+] as const;
+const intents = [
+  { key: 'order', icon: 'bag' },
+  { key: 'question', icon: 'question' },
+] as const;
 ---
 <form class="lead" id={id} data-lead-form data-endpoint={endpoint} data-msgs={JSON.stringify(msgs)} novalidate>
   <input type="hidden" name="lang" value={lang} />
@@ -24,51 +33,73 @@ const f = (k: string) => `${id}-${k}`;
     <label>Website <input type="text" name="website" tabindex="-1" autocomplete="off" /></label>
   </div>
 
+  <p class="note"><span class="req" aria-hidden="true">*</span> {t('f.reqNote')}</p>
+
   <div class="fields">
-    <div class="field half">
-      <label for={f('first')}>{t('f.firstName')}</label>
-      <input id={f('first')} name="first_name" autocomplete="given-name" required />
+    <div class="field">
+      <label for={f('first')}>{t('f.firstName')} <span class="req" aria-hidden="true">*</span></label>
+      <div class="control">
+        <Icon name="user" size={18} class="ci" />
+        <input id={f('first')} name="first_name" autocomplete="given-name" required />
+      </div>
       <p class="err" data-err="first_name"></p>
     </div>
-    <div class="field half">
-      <label for={f('last')}>{t('f.lastName')}</label>
-      <input id={f('last')} name="last_name" autocomplete="family-name" required />
+
+    <div class="field">
+      <label for={f('last')}>{t('f.lastName')} <span class="req" aria-hidden="true">*</span></label>
+      <div class="control">
+        <Icon name="user" size={18} class="ci" />
+        <input id={f('last')} name="last_name" autocomplete="family-name" required />
+      </div>
       <p class="err" data-err="last_name"></p>
     </div>
-    <div class="field half">
-      <label for={f('phone')}>{t('f.phone')}</label>
-      <input id={f('phone')} name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+995 5__ __ __ __" required />
+
+    <div class="field">
+      <label for={f('phone')}>{t('f.phone')} <span class="req" aria-hidden="true">*</span></label>
+      <div class="control">
+        <Icon name="phone" size={18} class="ci" />
+        <input id={f('phone')} name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+995 5XX XX XX XX" required />
+      </div>
       <p class="err" data-err="phone"></p>
     </div>
-    <div class="field half">
-      <label for={f('type')}>{t('f.clientType')}</label>
-      <div class="select">
+
+    <div class="field">
+      <label for={f('type')}>{t('f.clientType')} <span class="req" aria-hidden="true">*</span></label>
+      <div class="control">
+        <Icon name="briefcase" size={18} class="ci" />
         <select id={f('type')} name="client_type" required>
           <option value="">{t('f.select')}</option>
           {CLIENT_TYPES.map((c) => <option value={c}>{t(`ct.${c}` as any)}</option>)}
         </select>
+        <Icon name="chevron" size={18} class="chev" />
       </div>
       <p class="err" data-err="client_type"></p>
     </div>
 
     <fieldset class="field full">
-      <legend>{t('f.channel')}</legend>
-      <div class="choices">
-        {(['whatsapp', 'email', 'phone'] as const).map((c, i) => (
-          <label class="choice">
-            <input type="radio" name="channel" value={c} checked={i === 0} required />
-            <span class="notch" aria-hidden="true"></span>
-            <Icon name={c} size={18} />
-            <span>{t(`ch.${c}`)}</span>
+      <legend>{t('f.channel')} <span class="req" aria-hidden="true">*</span></legend>
+      <div class="seg">
+        {channels.map((c, i) => (
+          <label class="seg-opt">
+            <input type="radio" name="channel" value={c.key} checked={i === 0} required />
+            <Icon name={c.icon} size={18} />
+            <span>{t(`ch.${c.key}`)}</span>
           </label>
         ))}
       </div>
       <p class="err" data-err="channel"></p>
     </fieldset>
 
-    <div class="field full email-field" data-email-field>
-      <label for={f('email')}>{t('f.email')} <span class="opt" data-email-opt>({t('f.optional')})</span></label>
-      <input id={f('email')} name="email" type="email" autocomplete="email" aria-describedby={f('email-hint')} />
+    <div class="field full">
+      <label for={f('email')}>
+        {t('f.email')}
+        <span class="req" aria-hidden="true" data-email-req hidden>*</span>
+        <span class="opt" data-email-opt>({t('f.optional')})</span>
+      </label>
+      <div class="control">
+        <Icon name="mail" size={18} class="ci" />
+        <input id={f('email')} name="email" type="email" autocomplete="email" placeholder="name@example.com" aria-describedby={f('email-hint')} />
+      </div>
       <p class="hint" id={f('email-hint')}>{t('f.emailHint')}</p>
       <p class="err" data-err="email"></p>
     </div>
@@ -76,12 +107,12 @@ const f = (k: string) => `${id}-${k}`;
     {kind === 'contact' && (
       <fieldset class="field full">
         <legend>{t('f.intent')} <span class="opt">({t('f.optional')})</span></legend>
-        <div class="choices">
-          {(['order', 'question'] as const).map((c) => (
-            <label class="choice">
-              <input type="radio" name="intent" value={c} />
-              <span class="notch" aria-hidden="true"></span>
-              <span>{t(`f.intent.${c}`)}</span>
+        <div class="seg">
+          {intents.map((c) => (
+            <label class="seg-opt">
+              <input type="radio" name="intent" value={c.key} />
+              <Icon name={c.icon} size={18} />
+              <span>{t(`f.intent.${c.key}`)}</span>
             </label>
           ))}
         </div>
@@ -90,7 +121,10 @@ const f = (k: string) => `${id}-${k}`;
 
     <div class="field full">
       <label for={f('msg')}>{t('f.message')} <span class="opt">({t('f.optional')})</span></label>
-      <textarea id={f('msg')} name="message" rows="4" maxlength="4000"></textarea>
+      <div class="control area">
+        <Icon name="message" size={18} class="ci" />
+        <textarea id={f('msg')} name="message" rows="4" maxlength="4000"></textarea>
+      </div>
     </div>
   </div>
 
@@ -98,6 +132,7 @@ const f = (k: string) => `${id}-${k}`;
 
   <button class="btn btn-solid submit" type="submit" data-label={kind === 'order' ? t('order.submit') : t('f.submit')}>
     <span>{kind === 'order' ? t('order.submit') : t('f.submit')}</span>
+    <Icon name="arrow" size={18} />
   </button>
 
   <div class="done" data-done hidden tabindex="-1">
@@ -108,68 +143,113 @@ const f = (k: string) => `${id}-${k}`;
 </form>
 
 <style>
-  .lead { position: relative; display: grid; gap: var(--s-3); }
+  .lead {
+    --field-bg: color-mix(in oklab, var(--ground) 55%, white);
+    --field-line: color-mix(in oklab, var(--ink) 13%, transparent);
+    --field-line-hover: color-mix(in oklab, var(--ink) 26%, transparent);
+    --danger: oklch(0.55 0.16 30);
+    position: relative; display: grid; gap: var(--s-3);
+  }
   .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
-  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem var(--gutter); }
-  .field { display: grid; gap: 0.45rem; min-width: 0; border: 0; padding: 0; }
+
+  .note { margin: 0; font-size: var(--t-xs); color: var(--ink-3); }
+  .req { color: var(--accent); font-weight: 600; }
+  .req[hidden], .opt[hidden] { display: none; }
+  .opt { font-weight: 400; color: var(--ink-3); }
+
+  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem 1rem; }
+  .field { display: grid; gap: 0.45rem; min-width: 0; margin: 0; padding: 0; border: 0; }
   .full { grid-column: 1 / -1; }
-  label, legend { font-size: var(--t-sm); font-weight: 500; color: var(--ink-2); padding: 0; }
-  .opt { color: var(--ink-3); font-weight: 400; }
-  input:not([type='radio']), select, textarea {
-    width: 100%; min-height: 3.1rem; padding: 0.75rem 0;
-    background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
-    font-size: var(--t-base); color: var(--ink);
-    transition: border-color 200ms ease;
+  label, legend { display: block; padding: 0; font-size: var(--t-sm); font-weight: 500; color: var(--ink-2); }
+  legend { margin-bottom: 0.45rem; }
+
+  /* ---------- Inputs ---------- */
+  .control {
+    position: relative; display: flex; align-items: center;
+    background: var(--field-bg); border: 1px solid var(--field-line); border-radius: 10px;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
   }
-  textarea { resize: vertical; min-height: 6rem; line-height: 1.6; }
-  input::placeholder, textarea::placeholder { color: var(--ink-3); opacity: 1; }
-  input:not([type='radio']):focus-visible, select:focus-visible, textarea:focus-visible {
-    outline: none; border-bottom-color: var(--accent); box-shadow: 0 1px 0 0 var(--accent);
+  .control :global(.ci) { position: absolute; left: 0.9rem; color: var(--ink-3); pointer-events: none; transition: color 150ms ease; }
+  .control :global(.chev) { position: absolute; right: 0.85rem; color: var(--ink-3); pointer-events: none; }
+  .control input, .control select, .control textarea {
+    width: 100%; min-width: 0; height: 3rem; padding: 0 1rem 0 2.75rem;
+    background: transparent; border: 0; border-radius: inherit; outline: none;
+    font: inherit; font-size: var(--t-base); color: var(--ink);
   }
-  .select { position: relative; }
-  .select::after {
-    content: ''; position: absolute; right: 0.2rem; top: 50%; width: 0.45rem; height: 0.45rem;
-    border-right: 1.5px solid var(--ink-2); border-bottom: 1.5px solid var(--ink-2);
-    transform: translateY(-70%) rotate(45deg); pointer-events: none;
+  .control select { appearance: none; padding-right: 2.6rem; cursor: pointer; }
+  .control select:invalid { color: var(--ink-3); }
+  select option { color: var(--ink); background: var(--ground); }
+  .control.area { align-items: flex-start; }
+  .control.area :global(.ci) { top: 0.85rem; }
+  .control textarea { height: auto; min-height: 7.5rem; padding-block: 0.75rem; line-height: 1.55; resize: vertical; }
+  .control ::placeholder { color: var(--ink-3); opacity: 0.7; }
+
+  @media (hover: hover) and (pointer: fine) {
+    .control:hover { border-color: var(--field-line-hover); }
   }
-  select { appearance: none; padding-right: 1.5rem; cursor: pointer; }
-  select option { background: var(--ground-2); color: var(--ink); }
-  [aria-invalid='true'] { border-bottom-color: oklch(0.68 0.16 30) !important; }
-  .err { min-height: 0; font-size: var(--t-xs); color: oklch(0.72 0.15 35); }
+  .control:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 12%, transparent);
+  }
+  .control:focus-within :global(.ci) { color: var(--ink); }
+
+  /* ---------- Segmented choices (channel, intent) ---------- */
+  .seg { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .seg-opt {
+    position: relative; flex: 1 1 0; min-width: 8.5rem;
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.55rem;
+    height: 3rem; padding: 0 1rem; border-radius: 10px; cursor: pointer;
+    background: var(--field-bg); border: 1px solid var(--field-line); color: var(--ink-2);
+    font-size: var(--t-sm); font-weight: 500;
+    transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease, transform 160ms var(--ease-out);
+  }
+  .seg-opt input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+  @media (hover: hover) and (pointer: fine) {
+    .seg-opt:hover { border-color: var(--field-line-hover); color: var(--ink); }
+  }
+  .seg-opt:active { transform: scale(0.97); }
+  .seg-opt:has(input:checked) { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .seg-opt:has(input:focus-visible) { outline: 1.5px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- Messages ---------- */
+  .hint { margin: 0; font-size: var(--t-xs); color: var(--ink-3); }
+  .err { margin: 0; font-size: var(--t-xs); font-weight: 500; color: var(--danger); }
   .err:empty { display: none; }
-  .hint { font-size: var(--t-xs); color: var(--ink-3); }
-  .choices { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.35rem; }
-  .choice {
-    position: relative; display: inline-flex; align-items: center; gap: 0.6rem;
-    padding: 0.7rem 1rem; border: 1px solid var(--line); border-radius: var(--radius);
-    color: var(--ink); cursor: pointer; transition: border-color 200ms ease, background-color 200ms ease;
-  }
-  .choice input { position: absolute; opacity: 0; inset: 0; cursor: pointer; margin: 0; }
-  .choice .notch { width: 0.5rem; height: 0.5rem; border: 1px solid var(--ink-3); transform: rotate(45deg); transition: background-color 200ms ease, border-color 200ms ease; }
-  .choice:has(input:checked) { border-color: var(--ink-2); background: color-mix(in oklab, var(--ink) 5%, transparent); }
-  .choice:has(input:checked) .notch { background: var(--accent); border-color: var(--accent); }
-  .choice:has(input:focus-visible) { outline: 1.5px solid var(--accent); outline-offset: 3px; }
-  @media (hover: hover) and (pointer: fine) { .choice:hover { border-color: var(--ink-3); } }
+  .field:has([aria-invalid='true']) .control { border-color: var(--danger); }
+  .field:has([aria-invalid='true']) .control:focus-within { box-shadow: 0 0 0 3px color-mix(in oklab, var(--danger) 12%, transparent); }
+  .field:has([aria-invalid='true']) :global(.ci) { color: var(--danger); }
+
   .form-err {
-    display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.9rem 1rem;
-    border: 1px solid oklch(0.6 0.14 32 / 0.6); color: var(--ink); font-size: var(--t-sm);
-    background: oklch(0.6 0.14 32 / 0.08);
+    display: flex; gap: 0.6rem; align-items: flex-start; margin: 0; padding: 0.85rem 1rem;
+    border-radius: 10px; font-size: var(--t-sm); color: var(--ink);
+    background: color-mix(in oklab, var(--danger) 8%, transparent);
+    border: 1px solid color-mix(in oklab, var(--danger) 35%, transparent);
   }
+  .form-err :global(.icon) { color: var(--danger); flex: none; margin-top: 1px; }
   .form-err[hidden] { display: none; }
-  .submit { justify-self: start; min-width: 14rem; }
+
+  /* ---------- Submit ---------- */
+  .submit { justify-self: start; min-width: 12rem; gap: 0.6rem; }
+  .submit:active { transform: scale(0.97); }
+
+  /* ---------- Sent ---------- */
   .done {
     position: absolute; inset: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 0.5rem;
     background: var(--ground); outline: none;
-    opacity: 1; transform: none; transition: opacity 500ms var(--ease-out), transform 600ms var(--ease-out);
+    opacity: 1; transform: none; transition: opacity 250ms var(--ease-out), transform 250ms var(--ease-out);
   }
   .done[hidden] { display: none; }
-  @starting-style { .done:not([hidden]) { opacity: 0; transform: translateY(10px); } }
-  .done-mark { display: inline-flex; width: 3rem; height: 3rem; align-items: center; justify-content: center; border: 1px solid var(--accent); color: var(--accent); border-radius: 50%; margin-bottom: 0.75rem; }
+  @starting-style { .done:not([hidden]) { opacity: 0; transform: translateY(8px); } }
+  .done-mark { display: inline-flex; width: 3rem; height: 3rem; align-items: center; justify-content: center; border-radius: 50%; background: var(--accent); color: var(--accent-ink); margin-bottom: 0.75rem; }
   .done-t { font-family: var(--f-display); font-size: var(--t-2xl); line-height: 1.15; }
   .done-d { color: var(--ink-2); }
+
   @media (max-width: 620px) {
     .fields { grid-template-columns: 1fr; }
     .submit { width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .done { transform: none; }
   }
 </style>
 
@@ -185,24 +265,43 @@ const f = (k: string) => `${id}-${k}`;
     const formErr = form.querySelector<HTMLElement>('[data-form-err]')!;
     const done = form.querySelector<HTMLElement>('[data-done]')!;
     const emailOpt = form.querySelector<HTMLElement>('[data-email-opt]');
+    const emailReq = form.querySelector<HTMLElement>('[data-email-req]');
+    const emailInput = form.querySelector<HTMLInputElement>('[name="email"]');
 
-    const setErr = (name: string, msg: string) => {
+    const val = (name: string) => ((form.elements.namedItem(name) as HTMLInputElement | RadioNodeList | null)?.value ?? '').trim();
+
+    const setErr = (name: string, m: string) => {
       const el = form.querySelector<HTMLElement>(`[data-err="${name}"]`);
-      if (el) el.textContent = msg;
+      if (el) el.textContent = m;
       form.querySelectorAll<HTMLElement>(`[name="${name}"]`).forEach((i) => {
-        if (msg) i.setAttribute('aria-invalid', 'true');
+        if (m) i.setAttribute('aria-invalid', 'true');
         else i.removeAttribute('aria-invalid');
       });
     };
 
+    // Email becomes required when the visitor picks "Email" as the reply channel.
     const syncChannel = () => {
-      const ch = (form.elements.namedItem('channel') as RadioNodeList)?.value;
-      if (emailOpt) emailOpt.hidden = ch === 'email';
+      const isEmail = val('channel') === 'email';
+      if (emailOpt) emailOpt.hidden = isEmail;
+      if (emailReq) emailReq.hidden = !isEmail;
+      if (emailInput) emailInput.required = isEmail;
     };
+
+    form.addEventListener('input', (e) => {
+      const target = e.target as HTMLInputElement;
+      if (target.name && target.getAttribute('aria-invalid')) setErr(target.name, '');
+    });
     form.addEventListener('change', (e) => {
       const target = e.target as HTMLInputElement;
-      if (target.name === 'channel') syncChannel();
+      if (target.name === 'channel') { syncChannel(); setErr('email', ''); }
       if (target.name) setErr(target.name, '');
+    });
+    // Format problems are pointed out when the visitor leaves the field, not while typing.
+    form.addEventListener('focusout', (e) => {
+      const n = (e.target as HTMLInputElement).name;
+      const v = val(n);
+      if (n === 'phone' && v && !PHONE.test(v.replace(/[\s\-()]/g, ''))) setErr(n, msgs.phone);
+      if (n === 'email' && v && !EMAIL.test(v)) setErr(n, msgs.email);
     });
     syncChannel();
 

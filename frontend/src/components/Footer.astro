@@ -4,9 +4,14 @@ import Wordmark from './Wordmark.astro';
 import { type Lang, useT, path } from '../i18n/ui';
 import { loadData, telLink, waLink } from '../lib/data';
 
-interface Props { lang: Lang }
-const { lang } = Astro.props;
+interface Props { lang: Lang; current?: string }
+const { lang, current = '' } = Astro.props;
 const t = useT(lang);
+const navLinks = [
+  { key: 'products', href: path(lang, '/products/'), label: t('nav.products') },
+  { key: 'about', href: path(lang, '/about/'), label: t('nav.about') },
+  { key: 'contact', href: path(lang, '/contact/'), label: t('nav.contact') },
+];
 const { settings: s } = await loadData();
 const year = new Date().getFullYear();
 const socials = [
@@ -23,19 +28,27 @@ const socials = [
         <p class="tag">{t('footer.tagline')}</p>
       </div>
       <nav class="col c-nav" aria-label="Footer">
-        <a href={path(lang, '/products/')}>{t('nav.products')}</a>
-        <a href={path(lang, '/about/')}>{t('nav.about')}</a>
-        <a href={path(lang, '/contact/')}>{t('nav.contact')}</a>
+        {navLinks.map((l) => (
+          <a href={l.href} aria-current={current === l.key ? 'page' : undefined}><span class="fl">{l.label}</span></a>
+        ))}
       </nav>
       <div class="col c-contact">
-        {s.phone && <a class="num" href={telLink(s.phone)}><Icon name="phone" size={16} />{s.phone}</a>}
-        {s.whatsapp && <a href={waLink(s.whatsapp, '')} target="_blank" rel="noopener"><Icon name="whatsapp" size={16} />WhatsApp</a>}
-        {s.email && <a href={`mailto:${s.email}`}><Icon name="mail" size={16} />{s.email}</a>}
+        {s.phone && <a class="num" href={telLink(s.phone)}><Icon name="phone" size={16} /><span class="fl">{s.phone}</span></a>}
+        {s.whatsapp && <a href={waLink(s.whatsapp, '')} target="_blank" rel="noopener"><Icon name="whatsapp" size={16} /><span class="fl">WhatsApp</span></a>}
+        {s.email && <a href={`mailto:${s.email}`}><Icon name="mail" size={16} /><span class="fl">{s.email}</span></a>}
       </div>
       <div class="col c-social">
-        {socials.map((x) => (
-          <a href={x.href} target="_blank" rel="noopener"><Icon name={x.key} size={16} />{x.label}</a>
-        ))}
+        {socials.length > 0 && (
+          <ul class="socials">
+            {socials.map((x) => (
+              <li>
+                <a class="soc" href={x.href} target="_blank" rel="noopener" aria-label={x.label} title={x.label}>
+                  <Icon name={x.key} size={18} />
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
         <span class="addr"><Icon name="pin" size={16} />{lang === 'ka' ? s.address_ka : s.address_en}</span>
       </div>
     </div>
@@ -53,8 +66,41 @@ const socials = [
   .tag { color: var(--ink-2); max-width: 32ch; }
   .col { grid-column: span 2; display: flex; flex-direction: column; gap: 0.7rem; font-size: var(--t-sm); }
   .c-contact { grid-column: span 3; }
-  .col a, .addr { display: inline-flex; align-items: center; gap: 0.6rem; color: var(--ink-2); text-decoration: none; transition: color 200ms ease; }
-  @media (hover: hover) and (pointer: fine) { .col a:hover { color: var(--ink); } }
+  .col a, .addr { display: inline-flex; align-items: center; gap: 0.6rem; color: var(--ink-2); text-decoration: none; }
+  .col a { align-self: flex-start; color: var(--ink-3); transition: color 200ms ease; }
+  /* Same as the header nav: text darkens and a hairline grows out from the centre, under the text only. */
+  .fl { position: relative; padding-block: 0.15rem; }
+  .fl::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: -0.1rem; height: 1.5px; border-radius: 1px;
+    background: var(--accent); transform: scaleX(0); transition: transform 280ms var(--ease-out);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .col a:hover { color: var(--ink); }
+    .col a:hover .fl::after { transform: scaleX(1); }
+  }
+  .col a:focus-visible .fl::after { transform: scaleX(1); }
+  .col a[aria-current='page'] { color: var(--ink); font-weight: 600; }
+  .col a[aria-current='page'] .fl::after { transform: scaleX(1); }
+  /* Socials: round icon buttons; on hover the oak fills out from the centre and the icon turns light. */
+  .socials { display: flex; gap: 0.6rem; list-style: none; margin: 0 0 0.4rem; padding: 0; }
+  .col a.soc {
+    position: relative; isolation: isolate; justify-content: center; gap: 0;
+    width: 2.75rem; height: 2.75rem; border-radius: 50%; overflow: hidden;
+    border: 1px solid var(--line); color: var(--ink-2);
+    transition: color 260ms ease, border-color 260ms ease, transform 120ms var(--ease-out);
+  }
+  .soc::before {
+    content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit;
+    background: var(--accent); transform: scale(0); transition: transform 360ms var(--ease-out);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .col a.soc:hover { color: var(--accent-ink); border-color: var(--accent); }
+    .soc:hover::before { transform: scale(1); }
+  }
+  .col a.soc:focus-visible { color: var(--accent-ink); border-color: var(--accent); }
+  .soc:focus-visible::before { transform: scale(1); }
+  .col a.soc:active { transform: scale(0.94); }
+  @media (prefers-reduced-motion: reduce) { .fl::after, .soc::before { transition: none; } }
   .base {
     display: flex; justify-content: space-between; gap: var(--s-2); flex-wrap: wrap;
     margin-top: var(--s-5); padding-top: var(--s-3); border-top: 1px solid var(--line);

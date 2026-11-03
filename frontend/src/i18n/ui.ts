@@ -110,6 +110,8 @@ export const ui = {
     'f.error.network': 'გაგზავნა ვერ მოხერხდა. შეამოწმეთ ინტერნეტი და სცადეთ თავიდან, ან მოგვწერეთ WhatsApp-ზე.',
     'f.error.generic': 'შეამოწმეთ მონიშნული ველები.',
     'f.select': 'აირჩიეთ',
+    'f.req': 'სავალდებულო',
+    'f.reqNote': 'ვარსკვლავით (*) მონიშნული ველები სავალდებულოა',
 
     'ct.restaurant': 'რესტორანი / კაფე',
     'ct.office': 'ოფისი / კომერციული სივრცე',
@@ -245,6 +247,8 @@ export const ui = {
     'f.error.network': 'We couldn’t send that. Check your connection and try again, or message us on WhatsApp.',
     'f.error.generic': 'Please check the highlighted fields.',
     'f.select': 'Select',
+    'f.req': 'required',
+    'f.reqNote': 'Fields marked with * are required',
 
     'ct.restaurant': 'Restaurant / café',
     'ct.office': 'Office / commercial space',

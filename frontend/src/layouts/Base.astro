@@ -31,7 +31,15 @@ const site = Astro.site ?? new URL('https://symmetry.ge');
     <meta name="theme-color" content="#f1ebe1" />
     <link rel="preload" href="/fonts/firago/FiraGO-Regular.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/firago/FiraGO-Medium.woff2" as="font" type="font/woff2" crossorigin />
-    <script is:inline>document.documentElement.classList.add('js');</script>
+    <link rel="preload" href="/fonts/firago/FiraGO-SemiBold.woff2" as="font" type="font/woff2" crossorigin />
+    <script is:inline>
+      (function () {
+        var html = document.documentElement;
+        html.classList.add('js');
+        // Arriving from another page of this site: the page should simply be there, not replay its intro.
+        try { if (document.referrer && new URL(document.referrer).origin === location.origin) html.classList.add('nav-internal'); } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <Fragment set:html={`<!--
@@ -47,7 +55,18 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     <main id="main">
       <slot />
     </main>
-    <Footer lang={lang} />
+    <Footer lang={lang} current={current} />
+    <script is:inline>
+      // Runs before first paint: on internal navigation, anything already on screen is shown as-is;
+      // only content further down still reveals as it scrolls in.
+      if (document.documentElement.classList.contains('nav-internal')) {
+        var vh = innerHeight;
+        document.querySelectorAll('[data-reveal]').forEach(function (el) {
+          var r = el.getBoundingClientRect();
+          if (r.top < vh && r.bottom > 0) el.classList.add('is-in', 'reveal-instant');
+        });
+      }
+    </script>
     <script>
       const io = new IntersectionObserver(
         (entries) => {
