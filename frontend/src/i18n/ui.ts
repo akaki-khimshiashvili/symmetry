@@ -19,22 +19,13 @@ export const ui = {
     'hero.lead': 'ხის 3D პანელები და ექსკლუზიური კედლის დეკორი, შექმნილი პარამეტრული დიზაინით და დამზადებული საქართველოში.',
     'hero.cta.products': 'პროდუქციის ნახვა',
     'hero.cta.contact': 'დაგვიკავშირდით',
-    'hero.caption': 'წიგნისებრი შეწყვილება',
-    'hero.captionNote': 'ორი ფურცელი, ერთი ნიმუში, სარკისებრად.',
 
     'collection.title': 'კოლექცია',
-    'collection.lead': 'ჩვენი პანელები ორი ტიპისაა: ვერტიკალური და ჰორიზონტალური. აირჩიეთ დიზაინი და ზომა, დანარჩენზე კი ჩვენ ვიზრუნებთ.',
     'collection.all': 'ყველა პროდუქტი',
     'collection.featured': 'რჩეული დიზაინები',
     'collection.from': 'დან',
 
 
-    'spaces.title': 'სივრცეები, რომლებსაც ვქმნით',
-    'spaces.restaurant': 'რესტორნები და კაფეები',
-    'spaces.office': 'ოფისები',
-    'spaces.hotel': 'სასტუმროები',
-    'spaces.designer': 'ინტერიერის დიზაინერები',
-    'spaces.home': 'სახლები',
 
     'close.title': 'შექმენით საკუთარი დეკორი.',
     'close.lead': 'დაგვიკავშირდით და ერთად შევქმნით თქვენთვის სასურველ დეკორს, ან ნახეთ უკვე ხელმისაწვდომი პროდუქცია.',
@@ -131,14 +122,6 @@ export const ui = {
     'ch.email': 'ელ-ფოსტა',
     'ch.phone': 'ზარი',
 
-    'palette.label': 'ხის ჯიში',
-    'palette.title': 'აირჩიეთ ხის პალიტრა',
-    'palette.walnut': 'კაკალი',
-    'palette.ebony': 'მაკასარის ებონი',
-    'palette.oak': 'თეთრი და მუქი მუხა',
-    'palette.teak': 'თიქი',
-    'palette.sapele': 'საპელე',
-    'palette.smoked': 'შებოლილი მუხა',
 
     'footer.tagline': 'პარამეტრული კედლის ხელოვნება და 3D დეკორი საქართველოში.',
     'footer.rights': 'ყველა უფლება დაცულია.',
@@ -171,22 +154,13 @@ export const ui = {
     'hero.lead': 'Wooden 3D panels and exclusive wall decor, parametrically designed and made in Georgia.',
     'hero.cta.products': 'View products',
     'hero.cta.contact': 'Contact us',
-    'hero.caption': 'Book-matched',
-    'hero.captionNote': 'Two leaves, one pattern, mirrored.',
 
     'collection.title': 'The collection',
-    'collection.lead': 'Our panels come in two types: portrait and landscape. Choose a design and a size, and we take care of the rest.',
     'collection.all': 'All products',
     'collection.featured': 'Featured designs',
     'collection.from': 'from',
 
 
-    'spaces.title': 'Spaces we make for',
-    'spaces.restaurant': 'Restaurants & cafés',
-    'spaces.office': 'Offices',
-    'spaces.hotel': 'Hotels',
-    'spaces.designer': 'Interior designers',
-    'spaces.home': 'Homes',
 
     'close.title': 'Design your own decor.',
     'close.lead': 'Get in touch and we’ll create the decor you have in mind, or browse the products available now.',
@@ -283,14 +257,6 @@ export const ui = {
     'ch.email': 'Email',
     'ch.phone': 'Phone call',
 
-    'palette.label': 'Wood',
-    'palette.title': 'Choose a wood palette',
-    'palette.walnut': 'Walnut',
-    'palette.ebony': 'Macassar ebony',
-    'palette.oak': 'White & dark oak',
-    'palette.teak': 'Teak',
-    'palette.sapele': 'Sapele',
-    'palette.smoked': 'Smoked oak',
 
     'footer.tagline': 'Parametric wall art and 3D decor, made in Georgia.',
     'footer.rights': 'All rights reserved.',
@@ -325,6 +291,4 @@ export function altPath(currentPath: string, target: Lang) {
   return path(target, stripped);
 }
 
-export const PALETTES = ['walnut', 'ebony', 'oak', 'teak', 'sapele', 'smoked'] as const;
-export type Palette = (typeof PALETTES)[number];
 export const CLIENT_TYPES = ['restaurant', 'office', 'designer', 'hotel', 'individual', 'other'] as const;

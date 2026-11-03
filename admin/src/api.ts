@@ -86,9 +86,6 @@ export const ORIENTATIONS: Record<string, string> = { portrait: 'ვერტი
 export const PATTERNS: Record<string, string> = {
   wave: 'ტალღა', dune: 'დიუნა', ripple: 'ექო (წრიული)', twist: 'სპირალი', prism: 'პრიზმა', mosaic: 'მოზაიკა',
 };
-export const PALETTES: Record<string, string> = {
-  walnut: 'კაკალი', ebony: 'მაკასარის ებონი', oak: 'თეთრი და მუქი მუხა', teak: 'თიქი', sapele: 'საპელე', smoked: 'შებოლილი მუხა',
-};
 
 const MONTHS = ['იან', 'თებ', 'მარ', 'აპრ', 'მაი', 'ივნ', 'ივლ', 'აგვ', 'სექ', 'ოქტ', 'ნოე', 'დეკ'];
 export const fmtDate = (s: string) => {

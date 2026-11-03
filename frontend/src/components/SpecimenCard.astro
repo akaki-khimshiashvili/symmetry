@@ -3,17 +3,22 @@ import Leaf from './Leaf.astro';
 import { type Lang, useT, path } from '../i18n/ui';
 import { type Product, loc, minPrice, priceFmt, specimenNo } from '../lib/data';
 
-interface Props { product: Product; index: number; lang: Lang; ratio?: number; d?: number; class?: string; heading?: 'h2' | 'h3' }
-const { product: p, index, lang, ratio = 0.8, d = 0, class: cls = '', heading = 'h3' } = Astro.props;
+interface Props { product: Product; index: number; lang: Lang; ratio?: number; d?: number; class?: string; heading?: 'h2' | 'h3'; compact?: boolean }
+const { product: p, index, lang, ratio = 0.8, d = 0, class: cls = '', heading = 'h3', compact = false } = Astro.props;
 const t = useT(lang);
 const H = heading;
 const sizes = p.sizes.length;
 ---
-<a class:list={['spec', cls]} href={path(lang, `/products/${p.slug}/`)} data-reveal data-type={p.orientation} style={`--d:${d}`}>
-  <div class="frame">
+<a class:list={['spec', cls, { compact }]} href={path(lang, `/products/${p.slug}/`)} data-reveal data-type={p.orientation} style={`--d:${d}`}>
+  <div class="frame lift">
     <Leaf product={p} alt={loc(p.name, lang)} ratio={ratio} />
-    <span class="sheen" aria-hidden="true"></span>
   </div>
+  {compact ? (
+    <div class="c-meta">
+      <H class="name">{loc(p.name, lang)}</H>
+      <span class="price num">{lang === 'en' && <span class="from">{t('collection.from')} </span>}₾ {priceFmt(minPrice(p))}{lang === 'ka' && <span class="from"> {t('collection.from')}</span>}</span>
+    </div>
+  ) : (
   <div class="meta">
     <div class="row">
       <span class="specimen-no">{specimenNo(index)}</span>
@@ -27,24 +32,18 @@ const sizes = p.sizes.length;
     </div>
     <span class="sizes">{t(`type.${p.orientation}.s` as any)} · {sizes} {t('products.sizes')}</span>
   </div>
+  )}
 </a>
 
 <style>
   .spec { min-width: 0; display: flex; flex-direction: column; gap: 1.1rem; text-decoration: none; color: inherit; }
   .frame { position: relative; overflow: hidden; }
-  .frame :global(.leaf) { transition: transform 1100ms var(--ease-out); }
-  .sheen {
-    position: absolute; inset: 0; pointer-events: none;
-    background: linear-gradient(105deg, transparent 35%, color-mix(in oklab, var(--wood-hi) 22%, transparent) 50%, transparent 65%);
-    transform: translateX(-100%); opacity: 0;
-    transition: transform 1100ms var(--ease-out), opacity 400ms ease;
-  }
-  @media (hover: hover) and (pointer: fine) {
-    .spec:hover .frame :global(.leaf) { transform: scale(1.025); }
-    .spec:hover .sheen { transform: translateX(100%); opacity: 1; }
-    .spec:hover .name { font-style: italic; }
-  }
   .meta { display: grid; gap: 0.3rem; }
+  .compact { gap: 0.9rem; }
+  .c-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 0.25rem 0.75rem; flex-wrap: wrap; }
+  .c-meta .name { font-size: var(--t-lg); font-weight: 500; }
+  .c-meta .price { font-size: var(--t-sm); }
+  @media (max-width: 620px) { .c-meta { flex-direction: column; align-items: flex-start; } }
   .row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.9rem; justify-content: space-between; }
   .row:first-child { justify-content: flex-start; }
   .specimen-no { color: var(--ink-3); font-size: var(--t-lg); }

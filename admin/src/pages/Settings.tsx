@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
-import { api, type Settings, PALETTES } from '../api';
+import { api, type Settings } from '../api';
 import { Loading, toast } from '../ui';
-import { relief } from '../../../frontend/src/lib/relief';
 
 const FIELDS: { key: string; label: string; hint?: string; type?: string }[] = [
   { key: 'phone', label: 'ტელეფონის ნომერი', hint: 'მაგ. +995 555 12 34 56', type: 'tel' },
@@ -36,24 +35,10 @@ export function SettingsPage() {
       <header class="page-head">
         <div>
           <h1>პარამეტრები</h1>
-          <p class="muted">საკონტაქტო ინფორმაცია და საიტის ფერთა პალიტრა.</p>
+          <p class="muted">საკონტაქტო ინფორმაცია, რომელიც საიტზე ჩანს.</p>
         </div>
         <button class="btn primary" disabled={saving}>{saving ? 'ინახება…' : 'შენახვა'}</button>
       </header>
-
-      <section class="card pad-lg">
-        <h2>საიტის ძირითადი პალიტრა</h2>
-        <p class="muted small">ვიზიტორები ხედავენ ამ პალიტრას პირველად. საიტზე ხის ჯიშის გადამრთველით შეგიძლიათ ყველა ვარიანტი შეადაროთ.</p>
-        <div class="palettes" role="radiogroup" aria-label="პალიტრა">
-          {Object.entries(PALETTES).map(([k, v]) => (
-            <label key={k} class={`pal ${s.default_palette === k ? 'on' : ''}`}>
-              <input type="radio" name="palette" value={k} checked={s.default_palette === k} onChange={() => setS({ ...s, default_palette: k })} />
-              <span class="pal-sw" data-palette={k} dangerouslySetInnerHTML={{ __html: relief({ pattern: 'wave', width: 300, height: 200, density: 0.6, uid: `st${k}` }) }} />
-              <span>{v}</span>
-            </label>
-          ))}
-        </div>
-      </section>
 
       <section class="card pad-lg">
         <h2>კონტაქტი</h2>

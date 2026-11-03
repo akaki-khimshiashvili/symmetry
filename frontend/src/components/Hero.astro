@@ -1,0 +1,130 @@
+---
+import { type Lang, useT, path } from '../i18n/ui';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = useT(lang);
+
+/* Static fallback (no WebGL / before the 3D scene is ready): the same wall, drawn flat. */
+const VW = 1200, VH = 520;
+const N = 28, W = 26, G = 13, H = 380, TOP = 64;
+const X0 = (VW - (N * W + (N - 1) * G)) / 2;
+const slats = Array.from({ length: N }, (_, i) => {
+  const d = 12 + 50 * (0.5 + 0.5 * Math.sin(i * 0.36));
+  const x = X0 + i * (W + G);
+  const dx = d * 0.26, dy = d * 0.14;
+  return {
+    x,
+    side: `${x + W},${TOP} ${x + W + dx},${TOP - dy} ${x + W + dx},${TOP + H - dy} ${x + W},${TOP + H}`,
+    top: `${x},${TOP} ${x + dx},${TOP - dy} ${x + W + dx},${TOP - dy} ${x + W},${TOP}`,
+    sx: x + d * 1.1,
+    sy: TOP + d * 0.3,
+  };
+});
+---
+<section class="hero" data-hero>
+  <div class="wrap center-stack hero-copy">
+    <h1 class="h-title">{t('hero.title')}</h1>
+    <p class="lead h-lead">{t('hero.lead')}</p>
+    <div class="h-actions">
+      <a class="btn btn-solid btn-lg" href={path(lang, '/products/')}>{t('hero.cta.products')}</a>
+      <a class="btn btn-line btn-lg" href={path(lang, '/contact/')}>{t('hero.cta.contact')}</a>
+    </div>
+  </div>
+
+  <figure class="scene" aria-hidden="true" data-scene>
+    <svg class="fallback" viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="slatFront" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" class="f0" />
+          <stop offset="1" class="f1" />
+        </linearGradient>
+        <filter id="soft" x="-30%" y="-20%" width="160%" height="140%"><feGaussianBlur stdDeviation="9" /></filter>
+      </defs>
+      <g filter="url(#soft)">{slats.map((s) => <rect class="sh" x={s.sx} y={s.sy} width={W} height={H} />)}</g>
+      {slats.map((s) => (
+        <g>
+          <polygon class="side" points={s.side} />
+          <polygon class="top" points={s.top} />
+          <rect class="front" x={s.x} y={TOP} width={W} height={H} />
+        </g>
+      ))}
+    </svg>
+  </figure>
+</section>
+
+<style>
+  .hero { position: relative; padding-top: var(--s-5); overflow: clip; }
+  .hero-copy { position: relative; z-index: 1; }
+  .h-title { font-size: clamp(2.7rem, 1rem + 5.2vw, 5.6rem); font-weight: 600; line-height: 1.05; letter-spacing: -0.035em; text-wrap: balance; max-width: 14ch; }
+  :lang(ka) .h-title { font-size: clamp(2.4rem, 0.9rem + 4.6vw, 5rem); line-height: 1.14; letter-spacing: -0.02em; max-width: 16ch; }
+  .h-lead { font-size: clamp(1.1rem, 1rem + 0.45vw, 1.35rem); }
+  .h-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.85rem; }
+  .btn-lg { --h: 3.75rem; padding: 0 1.9rem; font-size: var(--t-base); }
+
+  /* One calm entrance: title, lead and buttons fade up in turn. */
+  :global(html.js) .hero :is(.h-title, .h-lead, .h-actions) { opacity: 0; transform: translateY(16px); }
+  :global(html.js) .hero.play :is(.h-title, .h-lead, .h-actions) { opacity: 1; transform: none; transition: opacity 800ms ease, transform 900ms var(--ease-out); }
+  :global(html.js) .hero.play .h-title { transition-delay: 100ms; }
+  :global(html.js) .hero.play .h-lead { transition-delay: 250ms; }
+  :global(html.js) .hero.play .h-actions { transition-delay: 400ms; }
+
+  /* ---------- The wall ---------- */
+  .scene {
+    position: relative; height: clamp(24rem, 44vw, 44rem); margin-top: var(--s-3);
+    /* A soft pool of warm light on the page where the wall stands. */
+    background: radial-gradient(55% 60% at 45% 45%, color-mix(in oklab, var(--wood-hi) 22%, transparent), transparent 75%);
+  }
+  .scene :global(canvas) { position: absolute; inset: 0; width: 100% !important; height: 100% !important; display: block; opacity: 0; transition: opacity 600ms ease; }
+  .scene.gl-ready :global(canvas) { opacity: 1; }
+  .fallback { position: absolute; inset: 0; width: 100%; height: 100%; transition: opacity 600ms ease; }
+  .f0 { stop-color: color-mix(in oklab, var(--wood-hi) 88%, white); }
+  .f1 { stop-color: color-mix(in oklab, var(--wood-hi) 70%, var(--wood-lo)); }
+  .front { fill: url(#slatFront); }
+  .top { fill: color-mix(in oklab, var(--wood-hi) 75%, white); }
+  .side { fill: color-mix(in oklab, var(--wood-hi) 55%, var(--wood-lo)); }
+  .sh { fill: rgb(40 22 10 / 0.26); }
+  /* With JS, the drawing only shows if WebGL is missing. */
+  :global(html.js) .scene:not(.no-gl) .fallback { opacity: 0; }
+
+  @media (max-width: 760px) {
+    .scene { height: 28rem; }
+  }
+  @media (max-width: 620px) {
+    .h-actions { width: 100%; }
+    .h-actions :global(.btn) { flex: 1 1 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :global(html.js) .hero :is(.h-title, .h-lead, .h-actions) { opacity: 1; transform: none; }
+    .hero.play * { transition: none !important; }
+  }
+</style>
+
+<script>
+  const hero = document.querySelector<HTMLElement>('[data-hero]')!;
+  const scene = hero.querySelector<HTMLElement>('[data-scene]')!;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const hasGL = (() => {
+    try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); }
+    catch { return false; }
+  })();
+  if (!hasGL) scene.classList.add('no-gl');
+
+  // The 3D scene is its own chunk: it starts downloading now, in parallel with fonts and paint.
+  const wall = hasGL ? import('../lib/slatwall') : null;
+
+  const start = () => requestAnimationFrame(() => requestAnimationFrame(async () => {
+    hero.classList.add('play');
+    if (!wall) return;
+    try {
+      const { mountSlatWall } = await wall;
+      const wood = getComputedStyle(document.documentElement).getPropertyValue('--wood-hi').trim() || '#d8b98f';
+      mountSlatWall(scene, { reduce, woodColor: wood, onReady: () => scene.classList.add('gl-ready') });
+    } catch {
+      scene.classList.add('no-gl');
+    }
+  }));
+  if (document.fonts?.ready) Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 600))]).then(start);
+  else start();
+</script>

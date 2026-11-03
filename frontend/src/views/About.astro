@@ -1,6 +1,5 @@
 ---
 import Base from '../layouts/Base.astro';
-import Icon from '../components/Icon.astro';
 import { type Lang, useT, path } from '../i18n/ui';
 import { relief } from '../lib/relief';
 
@@ -61,7 +60,7 @@ const team = [
 
   <section class="wrap cta">
     <p class="display t-2xl" data-reveal>{t('close.title')}</p>
-    <a class="btn btn-solid" href={path(lang, '/contact/')} data-reveal style="--d:2">{t('hero.cta.contact')}<Icon name="arrow" /></a>
+    <a class="btn btn-solid" href={path(lang, '/contact/')} data-reveal style="--d:2">{t('hero.cta.contact')}</a>
   </section>
 </Base>
 
