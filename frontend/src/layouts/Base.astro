@@ -57,15 +57,100 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     </main>
     <Footer lang={lang} current={current} />
     <script is:inline>
-      // Runs before first paint: on internal navigation, anything already on screen is shown as-is;
-      // only content further down still reveals as it scrolls in.
-      if (document.documentElement.classList.contains('nav-internal')) {
-        var vh = innerHeight;
-        document.querySelectorAll('[data-reveal]').forEach(function (el) {
-          var r = el.getBoundingClientRect();
-          if (r.top < vh && r.bottom > 0) el.classList.add('is-in', 'reveal-instant');
-        });
-      }
+      // Set the header's scrolled state without its 400ms background fade: used whenever a page opens
+      // already scrolled (language switch, reload, back/forward), so the bar is solid from the first frame.
+      window.__syncHeader = function () {
+        var h = document.querySelector('[data-header]');
+        if (!h) return;
+        var on = scrollY > 12;
+        if (h.hasAttribute('data-scrolled') === on) return;
+        h.style.transition = 'none';
+        h.toggleAttribute('data-scrolled', on);
+        void h.offsetHeight; // commit the new style before transitions come back
+        requestAnimationFrame(function () { requestAnimationFrame(function () { h.style.transition = ''; }); });
+      };
+    </script>
+    <script is:inline>
+      // Language switch: reopen at the same block the visitor was reading (saved in Header.astro).
+      (function () {
+        var s;
+        try { s = JSON.parse(sessionStorage.getItem('symmetry:spot') || 'null'); sessionStorage.removeItem('symmetry:spot'); } catch (e) { return; }
+        if (!s || s.to !== location.pathname || Date.now() - s.t > 15000) return;
+        if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+        var moved = false;
+        var stop = function () { moved = true; };
+        ['wheel', 'touchstart', 'keydown', 'pointerdown'].forEach(function (ev) { addEventListener(ev, stop, { once: true, passive: true }); });
+        var place = function () {
+          if (moved) return;
+          var doc = document.documentElement;
+          var top;
+          if (s.end) top = doc.scrollHeight;
+          else {
+            var blocks = document.querySelectorAll('main > *, body > footer');
+            var b = blocks[Math.min(s.i, blocks.length - 1)];
+            if (!b) return;
+            var head = document.querySelector('[data-header]');
+            var r = b.getBoundingClientRect();
+            top = scrollY + r.top + r.height * s.f - ((head ? head.offsetHeight : 0) + 1);
+          }
+          doc.style.scrollBehavior = 'auto';
+          scrollTo(0, Math.max(0, top));
+          doc.style.scrollBehavior = '';
+          window.__syncHeader();
+        };
+        place();
+        // Web fonts and images can shift heights after this; settle again once they have loaded.
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(place);
+        addEventListener('load', place, { once: true });
+        // Late layout shifts (styles, images) during the first moments: follow them until the visitor scrolls.
+        if (window.ResizeObserver) {
+          var ro = new ResizeObserver(function () { place(); });
+          ro.observe(document.body);
+          setTimeout(function () { ro.disconnect(); }, 2500);
+        }
+      })();
+    </script>
+    <script is:inline>
+      // Back to the catalogue from a product page (link or nav, not the browser's Back button, which
+      // restores on its own): reopen at the same scroll position, before the first paint.
+      (function () {
+        var c, ref;
+        try { c = JSON.parse(sessionStorage.getItem('symmetry:catalogue') || 'null'); ref = new URL(document.referrer); } catch (e) { return; }
+        if (!c || c.url !== location.pathname + location.search || Date.now() - c.t > 30 * 60 * 1000) return;
+        if (ref.origin !== location.origin || !/\/products\/[^/]+\/?$/.test(ref.pathname)) return;
+        var nav = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+        if (nav && nav.type === 'back_forward') return;
+        if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+        var moved = false;
+        ['wheel', 'touchstart', 'keydown', 'pointerdown'].forEach(function (ev) { addEventListener(ev, function () { moved = true; }, { once: true, passive: true }); });
+        var place = function () {
+          if (moved) return;
+          var doc = document.documentElement;
+          doc.style.scrollBehavior = 'auto';
+          scrollTo(0, c.y);
+          doc.style.scrollBehavior = '';
+          window.__syncHeader();
+        };
+        place();
+        // The type filter and web fonts can change heights after this; settle again when they have.
+        document.addEventListener('DOMContentLoaded', place, { once: true });
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(place);
+        addEventListener('load', place, { once: true });
+        // Late layout shifts (styles, images) during the first moments: follow them until the visitor scrolls.
+        if (window.ResizeObserver) {
+          var ro = new ResizeObserver(function () { place(); });
+          ro.observe(document.body);
+          setTimeout(function () { ro.disconnect(); }, 2500);
+        }
+      })();
+    </script>
+    <script is:inline>
+      // The header gets its solid background before first paint whenever the page opens scrolled
+      // (language switch, back/forward, reload), so content never shows through or above it.
+      window.__syncHeader();
+      // The browser may restore the scroll position itself (reload, back/forward) after this runs.
+      addEventListener('pageshow', function () { window.__syncHeader(); });
+      addEventListener('load', function () { requestAnimationFrame(window.__syncHeader); });
     </script>
     <script>
       const io = new IntersectionObserver(

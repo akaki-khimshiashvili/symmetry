@@ -19,8 +19,9 @@ const types = (['portrait', 'landscape'] as const).map((key) => {
   const items = products.filter((p) => p.orientation === key);
   return { key, items, cover: items.find((p) => p.featured) ?? items[0], from: items.length ? Math.min(...items.map(minPrice)) : 0 };
 }).filter((x) => x.cover);
+
 ---
-<Base lang={lang}>
+<Base lang={lang} current="home">
   <Hero lang={lang} />
 
   <!-- Collection: pictures with text, on one even grid -->
@@ -55,18 +56,23 @@ const types = (['portrait', 'landscape'] as const).map((key) => {
     </div>
   </section>
 
-  <!-- Close -->
+  <!-- Close: a dark oak panel, type only. Big title on top; lead and actions split below a hairline. -->
   <section class="close wrap">
-    <div class="close-panel center-stack">
-      <h2 class="display t-3xl" data-reveal>{t('close.title')}</h2>
-      <p class="lead" data-reveal style="--d:1">{t('close.lead')}</p>
-      <div class="actions" data-reveal style="--d:2">
-        {settings.whatsapp && (
-          <a class="btn btn-solid" href={waLink(settings.whatsapp, t('p.waText'))} target="_blank" rel="noopener"><Icon name="whatsapp" />WhatsApp</a>
-        )}
-        {settings.phone && <a class="btn btn-line num" href={telLink(settings.phone)}><Icon name="phone" />{settings.phone}</a>}
+    <div class="close-panel">
+      <p class="label close-eyebrow" data-reveal>{t('close.eyebrow')}</p>
+      <h2 class="display close-title" data-reveal style="--d:1">{t('close.title')}</h2>
+      <div class="close-foot">
+        <p class="close-lead" data-reveal style="--d:2">{t('close.lead')}</p>
+        <div class="close-cta" data-reveal style="--d:3">
+          <div class="actions">
+            {settings.whatsapp && (
+              <a class="btn close-btn-main" href={waLink(settings.whatsapp, t('p.waText'))} target="_blank" rel="noopener"><Icon name="whatsapp" />WhatsApp</a>
+            )}
+            {settings.phone && <a class="btn close-btn-alt num" href={telLink(settings.phone)}><Icon name="phone" />{settings.phone}</a>}
+          </div>
+          <a class="close-link" href={path(lang, '/products/')}>{t('close.products')}</a>
+        </div>
       </div>
-      <a class="link-arrow" href={path(lang, '/products/')} data-reveal style="--d:3">{t('close.products')} <Icon name="arrow" /></a>
     </div>
   </section>
 </Base>
@@ -89,13 +95,61 @@ const types = (['portrait', 'landscape'] as const).map((key) => {
   .all { display: flex; justify-content: center; margin-top: var(--s-5); }
 
   /* ---------- Close ---------- */
-  .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.85rem; }
   .close { padding-bottom: var(--s-6); }
-  .close-panel { padding: clamp(3.5rem, 2rem + 6vw, 7.5rem) clamp(1.5rem, 1rem + 4vw, 5rem); background: var(--ground-2); border-radius: 28px; }
+  .close-panel {
+    display: grid; gap: clamp(1rem, 0.6rem + 1.4vw, 2rem);
+    padding: clamp(2.25rem, 1rem + 5vw, 6rem) clamp(1.25rem, 0.5rem + 5vw, 6rem);
+    background:
+      radial-gradient(80% 120% at 100% 0%, color-mix(in oklab, var(--wood-hi) 14%, transparent), transparent 70%),
+      var(--accent);
+    color: var(--accent-ink);
+    border-radius: clamp(16px, 1rem + 1vw, 28px);
+  }
+  .close-eyebrow { color: var(--wood-hi); }
+  .close-title {
+    font-size: clamp(2.1rem, 0.8rem + 5.4vw, 6.2rem); line-height: 1; letter-spacing: -0.035em;
+    color: var(--accent-ink); max-width: 16ch;
+  }
+  :lang(ka) .close-title { font-size: clamp(1.7rem, 0.7rem + 4.2vw, 4.8rem); line-height: 1.12; letter-spacing: -0.015em; max-width: 18ch; }
+  .close-foot {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end;
+    gap: clamp(1.5rem, 1rem + 3vw, 4rem);
+    margin-top: clamp(1rem, 0.5rem + 2.5vw, 3rem); padding-top: clamp(1.5rem, 1rem + 1.5vw, 2.5rem);
+    border-top: 1px solid color-mix(in oklab, var(--accent-ink) 16%, transparent);
+  }
+  .close-lead {
+    font-size: clamp(0.95rem, 0.88rem + 0.35vw, 1.2rem); line-height: 1.65; max-width: 42ch; text-wrap: pretty;
+    color: color-mix(in oklab, var(--accent-ink) 74%, transparent);
+  }
+  .close-cta { display: grid; justify-items: end; gap: 1.1rem; }
+  /* The group only fades; its buttons and link rise one after another (backwards fill keeps hover intact). */
+  :global(html.js) .close-cta[data-reveal] { transform: none; filter: none; }
+  :global(html.js) .close-cta:global(.is-in) :is(.actions > *, .close-link) { animation: rise-in 700ms var(--ease-out) backwards; animation-delay: 220ms; }
+  :global(html.js) .close-cta:global(.is-in) .actions > :nth-child(2) { animation-delay: 310ms; }
+  :global(html.js) .close-cta:global(.is-in) .close-link { animation-delay: 400ms; }
+  @media (prefers-reduced-motion: reduce) {
+    :global(html.js) .close-cta:global(.is-in) :is(.actions > *, .close-link) { animation: none; }
+  }
+  .actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.75rem; }
+  .close-btn-main { background: var(--wood-hi); color: var(--accent); }
+  .close-btn-alt { color: var(--accent-ink); border-color: color-mix(in oklab, var(--accent-ink) 30%, transparent); }
+  .close-link {
+    font-size: var(--t-sm); font-weight: 600; letter-spacing: 0.03em; text-decoration: none; color: var(--accent-ink);
+    padding-block: 0.3rem; border-bottom: 1px solid color-mix(in oklab, var(--accent-ink) 28%, transparent);
+    transition: border-color 240ms ease;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .close-btn-main:hover { background: var(--accent-ink); transform: translateY(-2px); }
+    .close-btn-alt:hover { border-color: var(--accent-ink); background: color-mix(in oklab, var(--accent-ink) 8%, transparent); }
+    .close-link:hover { border-color: var(--accent-ink); }
+  }
 
   /* ---------- Responsive ---------- */
+  /* Tablets: lead and actions stack, everything on one left edge. */
   @media (max-width: 960px) {
-
+    .close-foot { grid-template-columns: minmax(0, 1fr); align-items: start; }
+    .close-cta { justify-items: start; }
+    .actions { justify-content: flex-start; }
   }
   @media (max-width: 620px) {
     /* On phones each type sits on its own row; the tall one is kept narrower so it never towers. */
@@ -104,7 +158,11 @@ const types = (['portrait', 'landscape'] as const).map((key) => {
     .tile-portrait .tile-img :global(.leaf) { aspect-ratio: 4 / 5 !important; }
     .featured-grid { gap: var(--s-4) 0.9rem; }
     .cell { flex-basis: calc(var(--r) * 7rem); }
-    .actions .btn { flex: 1 1 auto; }
+    .close-cta { width: 100%; justify-items: stretch; }
+    .close-link { justify-self: start; }
+    .actions { width: 100%; flex-direction: column; gap: 0.6rem; }
+    .actions .btn { --h: 3rem; width: 100%; font-size: var(--t-xs); }
+    .close-link { font-size: var(--t-xs); }
   }
 </style>
 

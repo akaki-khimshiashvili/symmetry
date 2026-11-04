@@ -54,7 +54,7 @@ export function Dashboard() {
             <ul class="feed">
               {orders.map((o) => (
                 <li key={o.id}>
-                  <div><b>{o.first_name} {o.last_name}</b> · {o.product_name} <span class="muted">{o.size_label}</span></div>
+                  <div><b>{[o.first_name, o.last_name].filter(Boolean).join(' ')}</b> · {o.product_name} <span class="muted">{o.size_label}</span></div>
                   <div class="muted small">{fmtPrice(o.price)} · {CHANNELS[o.channel]} · {fmtDate(o.created_at)}</div>
                 </li>
               ))}
@@ -67,7 +67,7 @@ export function Dashboard() {
             <ul class="feed">
               {messages.map((m) => (
                 <li key={m.id}>
-                  <div><b>{m.first_name} {m.last_name}</b> <span class="muted">· {m.phone}</span></div>
+                  <div><b>{[m.first_name, m.last_name].filter(Boolean).join(' ')}</b> <span class="muted">· {m.phone}</span></div>
                   <div class="muted small clamp">{m.message || 'ტექსტის გარეშე'}</div>
                 </li>
               ))}

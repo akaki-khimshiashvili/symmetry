@@ -4,7 +4,7 @@ import { Icon, Loading, Empty, toast, confirmAction } from '../ui';
 import { contactHref } from './Orders';
 
 const STATUS: Record<string, string> = { new: 'ახალი', read: 'წაკითხული', archived: 'არქივი' };
-const INTENT: Record<string, string> = { order: 'შეკვეთა', question: 'კითხვა' };
+const INTENT: Record<string, string> = { order: 'შეკვეთა', question: 'კითხვა', other: 'სხვა' };
 
 export function MessagesPage({ onChange }: { onChange: () => void }) {
   const [items, setItems] = useState<Message[] | null>(null);
@@ -47,7 +47,7 @@ export function MessagesPage({ onChange }: { onChange: () => void }) {
             <article class={`card entry ${m.status === 'new' ? 'is-new' : ''}`} key={m.id}>
               <div class="entry-main">
                 <div class="entry-top">
-                  <b>{m.first_name} {m.last_name}</b>
+                  <b>{[m.first_name, m.last_name].filter(Boolean).join(' ')}</b>
                   {m.intent && <span class="tag">{INTENT[m.intent]}</span>}
                   <span class="muted small">{fmtDate(m.created_at)} · {m.lang === 'en' ? 'EN' : 'KA'}</span>
                 </div>

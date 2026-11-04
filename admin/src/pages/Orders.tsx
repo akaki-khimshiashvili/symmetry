@@ -55,7 +55,7 @@ export function OrdersPage({ onChange }: { onChange: () => void }) {
             <article class={`card entry ${o.status === 'new' ? 'is-new' : ''}`} key={o.id}>
               <div class="entry-main">
                 <div class="entry-top">
-                  <b>{o.first_name} {o.last_name}</b>
+                  <b>{[o.first_name, o.last_name].filter(Boolean).join(' ')}</b>
                   <span class="muted small">#{o.id} · {fmtDate(o.created_at)} · {o.lang === 'en' ? 'EN' : 'KA'}</span>
                 </div>
                 <div class="entry-product">

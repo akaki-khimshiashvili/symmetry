@@ -114,7 +114,7 @@ final class Leads
     public static function validate(array $b): array
     {
         $errors = [];
-        foreach (['first_name', 'last_name', 'phone'] as $f) {
+        foreach (['first_name', 'phone'] as $f) {
             if (trim((string) ($b[$f] ?? '')) === '') {
                 $errors[$f] = 'required';
             }
@@ -145,7 +145,7 @@ final class Leads
     {
         return [
             'first_name' => mb_substr(trim((string) $b['first_name']), 0, 120),
-            'last_name' => mb_substr(trim((string) $b['last_name']), 0, 120),
+            'last_name' => mb_substr(trim((string) ($b['last_name'] ?? '')), 0, 120), // no longer asked; kept for old rows
             'phone' => mb_substr(trim((string) $b['phone']), 0, 40),
             'email' => mb_substr(trim((string) ($b['email'] ?? '')), 0, 200),
             'client_type' => (string) $b['client_type'],

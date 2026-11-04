@@ -4,8 +4,8 @@
  * Solid oak slats (rounded edges, per-slat grain and tone) stand off a wall. One wave formula
  * sets every slat's depth and twist. The wall is a shadow-only plane, so the slats sit on the page.
  *
- * Opening (≈3.4s): slats rise into place from the centre out, turn from edge-on to face the room,
- * then their depth ripples outward from the middle. Meanwhile the key light sweeps across like
+ * Opening (≈2.6s): every slat is already full width and height, lying flat on the wall; then it grows
+ * out in 3D to its depth on the wave (and eases into its twist), centre slat first, rippling outward. Meanwhile the key light sweeps across like
  * morning sun (shadows travel). The camera starts in its resting view.
  * Scroll: the camera orbits, the wave travels along the wall and the light shifts a little.
  *
@@ -72,10 +72,7 @@ function oakTexture(base: [number, number, number]) {
 }
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
-const easeOut = (p: number) => 1 - Math.pow(1 - clamp01(p), 4);
 const easeInOut = (p: number) => { const t = clamp01(p); return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; };
-/** A soft overshoot for the rise, so slats settle like something placed by hand. */
-const easeBack = (p: number) => { const t = clamp01(p); const c1 = 1.2, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
 
 export function mountSlatWall(host: HTMLElement, opts: { reduce: boolean; woodColor: string; onReady?: () => void }) {
   const renderer = new WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
@@ -159,10 +156,10 @@ export function mountSlatWall(host: HTMLElement, opts: { reduce: boolean; woodCo
   };
 
   /* ---------- Timeline ---------- */
-  const RISE = 0.9, TURN = 1.3, RIPPLE = 1.4;
-  const STEP = 0.028;
+  const GROW = 1.8;
+  const STEP = 0.03;
   const SPREAD = CENTER * STEP;
-  const INTRO = 0.2 + SPREAD + RISE + 0.35 + TURN + 0.25 + RIPPLE;
+  const INTRO = 0.15 + SPREAD + GROW;
 
   let progress = 0, smoothP = 0;
   let visible = true;
@@ -180,17 +177,12 @@ export function mountSlatWall(host: HTMLElement, opts: { reduce: boolean; woodCo
 
     for (let i = 0; i < N; i++) {
       const fromC = Math.abs(i - CENTER) * STEP;
-      // 1. rise into place
-      const r = easeBack((t - 0.2 - fromC) / RISE);
-      // 2. turn from edge-on to face
-      const q = easeInOut((t - 0.2 - SPREAD - RISE * 0.6 - fromC * 0.8) / TURN);
-      // 3. depth ripples out from the middle
-      const d = easeOut((t - 0.2 - SPREAD - RISE * 0.6 - TURN * 0.7 - fromC * 1.2) / RIPPLE);
-
-      const depth = 0.03 + (depthAt(i, phase) - 0.03) * d;
-      dummy.position.set(-TOTAL / 2 + SLAT_W / 2 + i * PITCH, -0.6 * (1 - r), 0);
-      dummy.rotation.set(0, (Math.PI / 2) * 0.96 * (1 - q) + twistAt(i, phase) * q, 0);
-      dummy.scale.set(1, Math.max(0.001, clamp01(r * 1.02)), depth);
+      // Full width and height from the first frame; only the depth off the wall grows.
+      const g = easeInOut((t - 0.15 - fromC) / GROW);
+      const depth = 0.015 + (depthAt(i, phase) - 0.015) * g;
+      dummy.position.set(-TOTAL / 2 + SLAT_W / 2 + i * PITCH, 0, 0);
+      dummy.rotation.set(0, twistAt(i, phase) * g, 0);
+      dummy.scale.set(1, 1, depth);
       dummy.updateMatrix();
       slats.setMatrixAt(i, dummy.matrix);
     }

@@ -169,7 +169,11 @@ const socials = [
   .media { grid-column: 1 / span 7; position: sticky; top: 6rem; }
   .info { grid-column: 9 / -1; display: grid; gap: var(--s-5); }
 
-  .stage { display: grid; gap: 0.9rem; }
+  .stage { display: grid; gap: 0.9rem; animation: stage-in 800ms var(--ease-out) 80ms both; }
+  /* The panel arrives once per visit: a short rise and settle; the dimension callouts follow. */
+  @keyframes stage-in { from { opacity: 0; transform: translateY(14px) scale(0.985); } }
+  .dim-top, .dim-side { animation: dims-in 500ms ease 550ms both; }
+  @keyframes dims-in { from { opacity: 0; } }
   /* The panel sits on the page with shop-drawing callouts: width above, height to the right. */
   .frame-box { container-type: size; height: min(68vh, 44rem); display: grid; place-items: center; padding: 2rem 2.25rem 0 0; }
   .piece {
@@ -205,7 +209,7 @@ const socials = [
     padding: 1rem 0.25rem; border-top: 1px solid var(--line); cursor: pointer; transition: background-color 200ms ease;
   }
   .size:last-of-type { border-bottom: 1px solid var(--line); }
-  .size input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .size input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; appearance: none; background: none; border: 0; }
   .size .notch { width: 0.55rem; height: 0.55rem; border: 1px solid var(--ink-3); transform: rotate(45deg); transition: background-color 200ms ease, border-color 200ms ease, transform 300ms var(--ease-out); }
   .size .sz { color: var(--ink-2); transition: color 200ms ease; }
   .size .pr { color: var(--ink-3); font-size: var(--t-sm); transition: color 200ms ease; }
@@ -219,8 +223,10 @@ const socials = [
   .price { font-size: var(--t-3xl); line-height: 1; letter-spacing: -0.02em; }
   .order-btn { width: 100%; --h: 3.6rem; font-size: var(--t-base); }
   .note { font-size: var(--t-xs); color: var(--ink-3); }
-  .quick { display: grid; grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr)); gap: 0.6rem; }
-  .quick .btn { padding-inline: 1rem; }
+  /* Secondary contact: two compact buttons side by side, icon tight to its label. */
+  .quick { display: grid; grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr)); gap: 0.6rem; }
+  .quick .btn { --h: 3rem; padding-inline: 1rem; gap: 0.5rem; font-size: var(--t-sm); }
+  .quick .btn :global(svg) { width: 1.05em; height: 1.05em; }
 
   .specs { display: grid; }
   .specs div { display: grid; grid-template-columns: 9rem 1fr; gap: 1rem; padding-block: 0.9rem; border-top: 1px solid var(--line); font-size: var(--t-sm); }
@@ -281,6 +287,7 @@ const socials = [
   }
   @media (prefers-reduced-motion: reduce) {
     .piece { transition: none; }
+    .stage { animation: dims-in 300ms ease both; }
     .drawer { transition: opacity 200ms ease, overlay 200ms allow-discrete, display 200ms allow-discrete; }
     .drawer:not([open]) { transform: none; opacity: 0; }
     @starting-style { .drawer[open] { transform: none; opacity: 0; } }
@@ -322,14 +329,29 @@ const socials = [
     if (checked) apply(checked);
     root.addEventListener('change', (e) => {
       const t = e.target as HTMLInputElement;
-      if (t.name === 'size') apply(t);
+      if (t.name === 'size') {
+        apply(t);
+        // Feedback: the new price settles in place.
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches)
+          priceEl.animate([{ opacity: 0.3, transform: 'translateY(5px)' }, { opacity: 1, transform: 'none' }], { duration: 240, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
+      }
     });
+
+    // "All products" goes back to the catalogue as the visitor left it (filter + scroll, see Base.astro).
+    try {
+      const back = document.querySelector<HTMLAnchorElement>('a.back');
+      const c = JSON.parse(sessionStorage.getItem('symmetry:catalogue') || 'null');
+      if (back && c && new URL(c.url, location.href).pathname === back.pathname) back.href = c.url;
+    } catch {}
 
     // Gallery thumbs
     const mainImg = root.querySelector<HTMLImageElement>('.frame img');
     root.querySelectorAll<HTMLButtonElement>('[data-thumb]').forEach((b) =>
       b.addEventListener('click', () => {
-        if (mainImg) mainImg.src = b.dataset.thumb!;
+        if (mainImg && mainImg.src !== new URL(b.dataset.thumb!, location.href).href) {
+          mainImg.src = b.dataset.thumb!;
+          mainImg.animate([{ opacity: 0.25 }, { opacity: 1 }], { duration: 220, easing: 'ease' });
+        }
         root.querySelectorAll('[data-thumb]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
       }),
     );

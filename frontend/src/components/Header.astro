@@ -7,11 +7,12 @@ const { lang, current } = Astro.props;
 const t = useT(lang);
 const other: Lang = lang === 'ka' ? 'en' : 'ka';
 const links = [
+  { key: 'home', href: path(lang, '/'), label: t('nav.home') },
   { key: 'products', href: path(lang, '/products/'), label: t('nav.products') },
   { key: 'about', href: path(lang, '/about/'), label: t('nav.about') },
   { key: 'contact', href: path(lang, '/contact/'), label: t('nav.contact') },
 ];
-const menuLinks = [{ key: 'home', href: path(lang, '/'), label: t('nav.home') }, ...links];
+const menuLinks = links;
 const switchHref = altPath(Astro.url.pathname, other);
 const SLATS = 8;
 ---
@@ -56,7 +57,7 @@ const SLATS = 8;
 
 <style>
   .site-header {
-    position: sticky; top: 0; z-index: 60; view-transition-name: site-header;
+    position: sticky; top: 0; z-index: 60;
     transition: background-color 400ms ease, border-color 400ms ease;
     border-bottom: 1px solid transparent;
   }
@@ -195,11 +196,33 @@ const SLATS = 8;
 </style>
 
 <script>
+  // Remember where we are (which top-level block sits under the header, and how far into it),
+  // so the other language opens at the same place. Matched by block, not pixels: the two
+  // languages' text runs to different lengths. Restored in Base.astro before first paint.
+  const saveSpot = (href: string) => {
+    try {
+      const to = new URL(href, location.href).pathname;
+      if (scrollY < 4) { sessionStorage.removeItem('symmetry:spot'); return; }
+      const y = (document.querySelector<HTMLElement>('[data-header]')?.offsetHeight ?? 0) + 1;
+      const blocks = Array.from(document.querySelectorAll<HTMLElement>('main > *, body > footer'));
+      let i = blocks.findIndex((b) => b.getBoundingClientRect().bottom > y);
+      if (i < 0) i = blocks.length - 1;
+      const r = blocks[i].getBoundingClientRect();
+      const f = r.height ? Math.min(1, Math.max(0, (y - r.top) / r.height)) : 0;
+      const end = innerHeight + scrollY >= document.documentElement.scrollHeight - 2;
+      sessionStorage.setItem('symmetry:spot', JSON.stringify({ to, i, f, end, t: Date.now() }));
+    } catch {}
+  };
+  document.querySelectorAll<HTMLAnchorElement>('.menu-lang').forEach((a) =>
+    a.addEventListener('click', (e) => { if (!(e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0)) saveSpot(a.href); }),
+  );
+
   // Language switch: slide the pill across first, then go to the other language's page.
   document.querySelectorAll<HTMLAnchorElement>('[data-lang-switch]').forEach((sw) =>
     sw.addEventListener('click', (e) => {
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
       e.preventDefault();
+      saveSpot(sw.href);
       sw.dataset.on = sw.getAttribute('hreflang')!;
       const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
       setTimeout(() => { location.href = sw.href; }, reduce ? 0 : 300);
@@ -212,7 +235,8 @@ const SLATS = 8;
 
   const header = document.querySelector<HTMLElement>('[data-header]')!;
   const onScroll = () => header.toggleAttribute('data-scrolled', window.scrollY > 12);
-  onScroll();
+  // First sync without the fade (see Base.astro); after that, scrolling fades the bar in and out.
+  (window as any).__syncHeader?.();
   addEventListener('scroll', onScroll, { passive: true });
 
   const btn = header.querySelector<HTMLButtonElement>('[data-menu-btn]')!;

@@ -32,7 +32,7 @@ const slats = Array.from({ length: N }, (_, i) => {
 ---
 <section class="hero" data-hero>
   <div class="wrap center-stack hero-copy">
-    <h1 class="h-title">{t('hero.title')}</h1>
+    <h1 class="h-title">{t('hero.title').split(' ').map((w, i) => <><span class="w" style={`--w:${i}`}>{w}</span>{' '}</>)}</h1>
     <p class="lead h-lead">{t('hero.lead')}</p>
     <div class="h-actions">
       <a class="btn btn-solid btn-lg" href={path(lang, '/products/')}>{t('hero.cta.products')}</a>
@@ -95,15 +95,32 @@ const slats = Array.from({ length: N }, (_, i) => {
   }
   .h-social a:active { transform: scale(0.95); }
 
-  /* One calm entrance: title, lead and buttons fade up in turn. */
-  :global(html.js) .hero :is(.h-title, .h-lead, .h-actions, .h-social) { opacity: 0; transform: translateY(16px); }
-  :global(html.js) .hero.play :is(.h-title, .h-lead, .h-actions, .h-social) { opacity: 1; transform: none; transition: opacity 800ms ease, transform 900ms var(--ease-out); }
-  :global(html.js) .hero.play .h-title { transition-delay: 100ms; }
-  :global(html.js) .hero.play .h-lead { transition-delay: 250ms; }
-  :global(html.js) .hero.play .h-actions { transition-delay: 400ms; }
-  :global(html.js) .hero.play .h-social { transition-delay: 550ms; }
-  /* Coming from another page of the site: no intro replay. */
-  :global(html.nav-internal) .hero :is(.h-title, .h-lead, .h-actions, .h-social) { opacity: 1; transform: none; transition: none !important; }
+  /* Entrance: the title rises word by word, then the lead, then each button and social link in turn. */
+  .h-title .w { display: inline-block; }
+  :global(html.js) .hero .h-title .w { opacity: 0; transform: translateY(0.4em); }
+  :global(html.js) .hero.play .h-title .w {
+    opacity: 1; transform: none;
+    transition: opacity 700ms ease, transform 900ms var(--ease-out);
+    transition-delay: calc(80ms + var(--w) * 70ms);
+  }
+  :global(html.js) .hero .h-lead { opacity: 0; transform: translateY(14px); }
+  :global(html.js) .hero.play .h-lead { opacity: 1; transform: none; transition: opacity 800ms ease 320ms, transform 900ms var(--ease-out) 320ms; }
+  /* The rows stay put; their buttons rise one after another (backwards fill, so hover still works after). */
+  :global(html.js) .hero :is(.h-actions, .h-social) { opacity: 0; }
+  :global(html.js) .hero.play :is(.h-actions, .h-social) { opacity: 1; }
+  :global(html.js) .hero.play .h-actions > * { animation: rise-in 700ms var(--ease-out) backwards; animation-delay: 480ms; }
+  :global(html.js) .hero.play .h-actions > :nth-child(2) { animation-delay: 570ms; }
+  :global(html.js) .hero.play .h-social li { animation: rise-in 600ms var(--ease-out) backwards; animation-delay: 680ms; }
+  :global(html.js) .hero.play .h-social li:nth-child(2) { animation-delay: 740ms; }
+  :global(html.js) .hero.play .h-social li:nth-child(3) { animation-delay: 800ms; }
+
+  /* Coming back from another page of the site: the same sequence, shorter and quieter. */
+  :global(html.js.nav-internal) .hero .h-title .w { transform: translateY(0.2em); }
+  :global(html.js.nav-internal) .hero.play .h-title .w { transform: none; transition-duration: 450ms, 550ms; transition-delay: calc(var(--w) * 40ms); }
+  :global(html.js.nav-internal) .hero.play .h-lead { transition-duration: 450ms, 550ms; transition-delay: 160ms; }
+  :global(html.js.nav-internal) .hero.play .h-actions > * { animation-duration: 500ms; animation-delay: 240ms; }
+  :global(html.js.nav-internal) .hero.play .h-actions > :nth-child(2) { animation-delay: 290ms; }
+  :global(html.js.nav-internal) .hero.play .h-social li { animation-duration: 450ms; animation-delay: 340ms; }
 
   /* ---------- The wall ---------- */
   .scene {
@@ -143,8 +160,10 @@ const slats = Array.from({ length: N }, (_, i) => {
     .hero-copy { gap: 0.9rem; }
   }
   @media (prefers-reduced-motion: reduce) {
-    :global(html.js) .hero :is(.h-title, .h-lead, .h-actions, .h-social) { opacity: 1; transform: none; }
-    .hero.play * { transition: none !important; }
+    :global(html.js) .hero :is(.h-lead, .h-actions, .h-social), :global(html.js) .hero .h-title .w { transform: none; }
+    :global(html.js) .hero.play .h-title .w, :global(html.js) .hero.play .h-lead { transition: opacity 400ms ease; transition-delay: 0ms; }
+    :global(html.js) .hero.play :is(.h-actions > *, .h-social li) { animation: none; }
+    :global(html.js) .hero.play :is(.h-actions, .h-social) { transition: opacity 400ms ease 150ms; }
   }
 </style>
 

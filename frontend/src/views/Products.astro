@@ -83,20 +83,37 @@ const { products } = await loadData();
   const cat = document.querySelector<HTMLElement>('[data-cat]');
   if (bar && cat) {
     const cells = [...cat.querySelectorAll<HTMLElement>('.cell')];
-    const apply = (f: string) => {
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const apply = (f: string, animate = false) => {
+      let k = 0;
       bar.querySelectorAll<HTMLButtonElement>('[data-f]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.f === f)));
       for (const c of cells) {
         c.hidden = !(f === 'all' || c.dataset.type === f);
         c.querySelector('.spec')?.classList.add('is-in');
+        // The cards that remain settle into their new places, a few at a time.
+        if (animate && !c.hidden) {
+          c.getAnimations().forEach((a) => a.cancel());
+          c.animate(
+            reduce
+              ? [{ opacity: 0 }, { opacity: 1 }]
+              : [{ opacity: 0, transform: 'translateY(10px) scale(0.98)' }, { opacity: 1, transform: 'none' }],
+            { duration: reduce ? 200 : 320, delay: Math.min(k++, 8) * 35, easing: 'cubic-bezier(0.23, 1, 0.32, 1)', fill: 'backwards' },
+          );
+        }
       }
       const url = new URL(location.href);
       if (f === 'all') url.searchParams.delete('type');
       else url.searchParams.set('type', f);
       history.replaceState(null, '', url);
     };
+    // Opening a product remembers where the visitor was in the catalogue (restored in Base.astro).
+    cat.addEventListener('click', (e) => {
+      if (!(e.target as HTMLElement).closest('a[href]')) return;
+      try { sessionStorage.setItem('symmetry:catalogue', JSON.stringify({ url: location.pathname + location.search, y: scrollY, t: Date.now() })); } catch {}
+    });
     bar.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-f]');
-      if (b) apply(b.dataset.f!);
+      if (b && b.getAttribute('aria-pressed') !== 'true') apply(b.dataset.f!, true);
     });
     const initial = new URLSearchParams(location.search).get('type');
     if (initial === 'portrait' || initial === 'landscape') apply(initial);

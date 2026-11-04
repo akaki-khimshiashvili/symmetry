@@ -21,11 +21,9 @@ const hours = lang === 'ka' ? s.hours_ka : s.hours_en;
   <section class="wrap grid contact">
     <div class="side">
       <h1 class="display t-4xl" data-reveal>{t('contact.title')}</h1>
-      <p class="lead" data-reveal style="--d:1">{t('contact.lead')}</p>
-
-      <ul class="cards" data-reveal style="--d:2">
+      <ul class="cards">
         {s.phone && (
-          <li>
+          <li data-reveal style="--d:1">
             <a class="card" href={telLink(s.phone)}>
               <span class="ic"><Icon name="phone" size={20} /></span>
               <span class="txt"><span class="k">{t('contact.phone')}</span><span class="v num">{s.phone}</span></span>
@@ -34,7 +32,7 @@ const hours = lang === 'ka' ? s.hours_ka : s.hours_en;
           </li>
         )}
         {s.whatsapp && (
-          <li>
+          <li data-reveal style="--d:2">
             <a class="card" href={waLink(s.whatsapp, '')} target="_blank" rel="noopener">
               <span class="ic"><Icon name="whatsapp" size={20} /></span>
               <span class="txt"><span class="k">WhatsApp</span><span class="v">{t('p.askWhatsapp')}</span></span>
@@ -43,7 +41,7 @@ const hours = lang === 'ka' ? s.hours_ka : s.hours_en;
           </li>
         )}
         {s.email && (
-          <li>
+          <li data-reveal style="--d:3">
             <a class="card" href={`mailto:${s.email}`}>
               <span class="ic"><Icon name="mail" size={20} /></span>
               <span class="txt"><span class="k">{t('contact.email')}</span><span class="v">{s.email}</span></span>

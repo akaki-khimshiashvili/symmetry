@@ -71,11 +71,14 @@ try {
                 return ['ok' => true]; // honeypot
             }
             $errors = Leads::validate($b);
+            $intent = (string) ($b['intent'] ?? '');
+            if (!in_array($intent, ['order', 'question', 'other'], true)) {
+                $errors['intent'] = 'required';
+            }
             if ($errors) {
                 throw new HttpError(422, 'Validation failed', $errors);
             }
             $c = Leads::clean($b);
-            $intent = in_array($b['intent'] ?? '', ['order', 'question'], true) ? $b['intent'] : '';
             $pdo->prepare('INSERT INTO messages (first_name, last_name, phone, email, client_type, channel, intent, message, lang) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
                 ->execute([$c['first_name'], $c['last_name'], $c['phone'], $c['email'], $c['client_type'], $c['channel'], $intent, $c['message'], $c['lang']]);
             return ['ok' => true, 'id' => (int) $pdo->lastInsertId()];

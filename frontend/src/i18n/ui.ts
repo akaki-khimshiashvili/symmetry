@@ -27,6 +27,7 @@ export const ui = {
 
 
 
+    'close.eyebrow': 'ინდივიდუალური შეკვეთა',
     'close.title': 'შექმენით საკუთარი დეკორი.',
     'close.lead': 'დაგვიკავშირდით და ერთად შევქმნით თქვენთვის სასურველ დეკორს, ან ნახეთ უკვე ხელმისაწვდომი პროდუქცია.',
     'close.products': 'ხელმისაწვდომი პროდუქცია',
@@ -98,6 +99,7 @@ export const ui = {
     'f.intent': 'რა გაინტერესებთ?',
     'f.intent.order': 'შეკვეთა',
     'f.intent.question': 'მხოლოდ კითხვა',
+    'f.intent.other': 'სხვა',
     'f.message': 'შეტყობინება',
     'f.optional': 'არასავალდებულო',
     'f.submit': 'გაგზავნა',
@@ -164,6 +166,7 @@ export const ui = {
 
 
 
+    'close.eyebrow': 'Made to order',
     'close.title': 'Design your own decor.',
     'close.lead': 'Get in touch and we’ll create the decor you have in mind, or browse the products available now.',
     'close.products': 'Products available now',
@@ -235,6 +238,7 @@ export const ui = {
     'f.intent': 'What are you after?',
     'f.intent.order': 'Placing an order',
     'f.intent.question': 'Just a question',
+    'f.intent.other': 'Something else',
     'f.message': 'Message',
     'f.optional': 'optional',
     'f.submit': 'Send',
