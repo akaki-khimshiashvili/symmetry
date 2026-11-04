@@ -1,0 +1,11 @@
+# Local backend: `docker compose up -d` → API at http://localhost:8000/api
+services:
+  api:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      # Live code, the SQLite database, uploaded photos and config.local.php all stay on the host.
+      - ./backend:/app
+    # No SYMMETRY_ORIGINS here, so any http://localhost:<port> front end may call the API (dev only).
+    restart: unless-stopped

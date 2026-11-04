@@ -10,10 +10,13 @@ final class HttpError extends Exception
 
 final class Http
 {
-    public static function cors(array $allowed): void
+    public static function cors(array $allowed, bool $allowLocal = false): void
     {
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-        if ($origin !== '' && in_array($origin, $allowed, true)) {
+        $ok = in_array($origin, $allowed, true)
+            // Development: any local port (Vite moves to 5174, 5175… when 5173 is taken).
+            || ($allowLocal && preg_match('#^http://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$#', $origin));
+        if ($origin !== '' && $ok) {
             header('Access-Control-Allow-Origin: ' . $origin);
             header('Vary: Origin');
             header('Access-Control-Allow-Headers: Content-Type, Authorization');
@@ -69,14 +72,16 @@ final class Http
 
 final class Auth
 {
-    public static function login(PDO $pdo, array $config, string $password): string
+    public static function login(PDO $pdo, array $config, string $username, string $password): string
     {
-        $ok = $config['admin_password_hash'] !== ''
+        // Check both parts every time so a wrong username and a wrong password take the same path.
+        $userOk = hash_equals(mb_strtolower((string) $config['admin_username']), mb_strtolower(trim($username)));
+        $passOk = $config['admin_password_hash'] !== ''
             ? password_verify($password, $config['admin_password_hash'])
             : hash_equals((string) $config['admin_password'], $password);
-        if (!$ok) {
+        if (!($userOk && $passOk)) {
             usleep(400000);
-            throw new HttpError(401, 'პაროლი არასწორია');
+            throw new HttpError(401, 'მომხმარებელი ან პაროლი არასწორია');
         }
         $pdo->prepare('DELETE FROM tokens WHERE expires_at < ?')->execute([time()]);
         $token = bin2hex(random_bytes(32));

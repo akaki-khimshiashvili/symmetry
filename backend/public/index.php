@@ -17,9 +17,11 @@ if (PHP_SAPI === 'cli-server' && $path !== '/' && is_file(__DIR__ . $path)) {
 $config = require __DIR__ . '/../config.php';
 require __DIR__ . '/../src/Http.php';
 require __DIR__ . '/../src/Products.php';
+require __DIR__ . '/../src/Options.php';
+require __DIR__ . '/../src/Images.php';
 require __DIR__ . '/../src/Db.php';
 
-Http::cors($config['allowed_origins']);
+Http::cors($config['allowed_origins'], $config['allow_local_origins']);
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 if ($method === 'OPTIONS') {
     http_response_code(204);
@@ -119,7 +121,7 @@ try {
         // ---------- Admin ----------
         ['POST', '#^/admin/login$#', function () use ($pdo, $config) {
             $b = Http::body();
-            return ['token' => Auth::login($pdo, $config, (string) ($b['password'] ?? ''))];
+            return ['token' => Auth::login($pdo, $config, (string) ($b['username'] ?? ''), (string) ($b['password'] ?? ''))];
         }],
         ['POST', '#^/admin/logout$#', function () use ($pdo, $admin) {
             $admin();
@@ -139,6 +141,27 @@ try {
                 'orders_new' => $count("SELECT COUNT(*) FROM orders WHERE status = 'new'"),
                 'messages_new' => $count("SELECT COUNT(*) FROM messages WHERE status = 'new'"),
             ];
+        }],
+
+        // ---------- Dropdown options (material, size presets) ----------
+        ['GET', '#^/admin/options$#', function () use ($pdo, $admin) {
+            $admin();
+            return Options::all($pdo);
+        }],
+        ['POST', '#^/admin/options$#', function () use ($pdo, $admin) {
+            $admin();
+            $b = Http::body();
+            if ($errors = Options::validate($b)) {
+                throw new HttpError(422, 'შეამოწმეთ ველები', $errors);
+            }
+            return Options::create($pdo, $b);
+        }],
+        ['DELETE', '#^/admin/options/(\d+)$#', function ($id) use ($pdo, $admin) {
+            $admin();
+            if (!Options::delete($pdo, (int) $id)) {
+                throw new HttpError(404, 'ვარიანტი ვერ მოიძებნა');
+            }
+            return ['ok' => true];
         }],
 
         ['GET', '#^/admin/products$#', function () use ($pdo, $admin, $base) {
@@ -208,9 +231,21 @@ try {
                 if (!isset($allowed[$mime])) {
                     throw new HttpError(415, 'დაშვებულია მხოლოდ JPG, PNG, WEBP, AVIF');
                 }
-                $file = 'p' . (int) $id . '-' . bin2hex(random_bytes(8)) . '.' . $allowed[$mime];
-                if (!move_uploaded_file($tmp, $config['upload_dir'] . '/' . $file)) {
-                    throw new HttpError(500, 'ფაილის შენახვა ვერ მოხერხდა');
+                // Every photo is stored as an optimised WebP (see Images.php).
+                $stem = 'p' . (int) $id . '-' . bin2hex(random_bytes(8));
+                if (Images::supported()) {
+                    $file = $stem . '.webp';
+                    try {
+                        Images::toWebp($tmp, $mime, $config['upload_dir'] . '/' . $file);
+                    } catch (RuntimeException $e) {
+                        throw new HttpError(422, $e->getMessage());
+                    }
+                } else {
+                    // No GD/WebP on this server: keep the original file.
+                    $file = $stem . '.' . $allowed[$mime];
+                    if (!move_uploaded_file($tmp, $config['upload_dir'] . '/' . $file)) {
+                        throw new HttpError(500, 'ფაილის შენახვა ვერ მოხერხდა');
+                    }
                 }
                 $pdo->prepare('INSERT INTO product_images (product_id, path, sort) VALUES (?, ?, ?)')
                     ->execute([(int) $id, $config['upload_url'] . '/' . $file, $next++]);

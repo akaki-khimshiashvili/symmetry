@@ -1,14 +1,19 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { api, ApiError, type Product, type Size, type L10n, PATTERNS, ORIENTATIONS, SITE_URL, fmtPrice } from '../api';
+import { api, ApiError, type Product, type Size, type L10n, type OptionSet, ORIENTATIONS, SITE_URL, fmtPrice } from '../api';
 import { Icon, Loading, toast, confirmAction } from '../ui';
-import { Preview } from './Preview';
+import { OptionSelect, SizeSelect } from '../options';
+
+const fmtDuration = (min: number) => {
+  const h = Math.floor(min / 60), m = min % 60;
+  return [h ? `${h} სთ` : '', m ? `${m} წთ` : ''].filter(Boolean).join(' ');
+};
 
 const blankL = (): L10n => ({ ka: '', en: '' });
 const blank = (): Product => ({
   slug: '', pattern: 'wave', orientation: 'landscape', featured: false, published: true, sort: 0,
-  name: blankL(), short: blankL(), description: blankL(), material: blankL(), installation: blankL(),
-  delivery_days: { min: 14, max: 21 }, installation_days: 1,
-  sizes: [{ width: 1200, height: 800, price: 0 }], images: [],
+  name: blankL(), short: blankL(), description: blankL(), material: blankL(),
+  delivery_days: { min: 14, max: 21 }, installation_minutes: 240,
+  sizes: [{ width: 120, height: 80, price: 0 }], images: [],
 });
 
 type Errors = Record<string, string>;
@@ -48,10 +53,15 @@ export function ProductEdit({ id }: { id: string }) {
   const [uploading, setUploading] = useState(false);
   const [drag, setDrag] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [opts, setOpts] = useState<OptionSet | null>(null);
+  // Photos chosen before the product's first save: uploaded right after it is created.
+  const [pending, setPending] = useState<{ file: File; url: string }[]>([]);
 
   useEffect(() => {
     if (!isNew) api<Product>(`/admin/products/${id}`).then(setP).catch((e) => toast.err(e.message));
+    api<OptionSet>('/admin/options').then(setOpts).catch((e) => toast.err(e.message));
   }, [id]);
+  useEffect(() => () => pending.forEach((x) => URL.revokeObjectURL(x.url)), []);
 
   useEffect(() => {
     const warn = (e: BeforeUnloadEvent) => { if (dirty) { e.preventDefault(); } };
@@ -59,13 +69,16 @@ export function ProductEdit({ id }: { id: string }) {
     return () => removeEventListener('beforeunload', warn);
   }, [dirty]);
 
-  if (!p) return <Loading />;
+  if (!p || !opts) return <Loading />;
 
   const set = <K extends keyof Product>(k: K, v: Product[K]) => { setP({ ...p, [k]: v }); setDirty(true); };
   const setSize = (i: number, patch: Partial<Size>) => set('sizes', p.sizes.map((s, j) => (j === i ? { ...s, ...patch } : s)));
   const addSize = () => {
+    // Next saved size this product doesn't use yet; the dropdown can switch it or add a new one.
+    const used = new Set(p.sizes.map((s) => `${s.width}x${s.height}`));
+    const next = opts.size.find((o) => !used.has(`${o.width}x${o.height}`));
     const last = p.sizes[p.sizes.length - 1];
-    set('sizes', [...p.sizes, last ? { width: last.width + 300, height: last.height + 200, price: last.price } : { width: 1200, height: 800, price: 0 }]);
+    set('sizes', [...p.sizes, { width: next?.width ?? 0, height: next?.height ?? 0, price: last?.price ?? 0 }]);
   };
   const removeSize = (i: number) => set('sizes', p.sizes.filter((_, j) => j !== i));
 
@@ -74,7 +87,14 @@ export function ProductEdit({ id }: { id: string }) {
     setSaving(true);
     setErrors({});
     try {
-      const saved = await api<Product>(isNew ? '/admin/products' : `/admin/products/${p.id}`, { method: isNew ? 'POST' : 'PUT', body: p });
+      let saved = await api<Product>(isNew ? '/admin/products' : `/admin/products/${p.id}`, { method: isNew ? 'POST' : 'PUT', body: p });
+      if (pending.length && saved.id) {
+        try {
+          saved = { ...saved, images: (await sendFiles(saved.id, pending.map((x) => x.file))).images };
+          pending.forEach((x) => URL.revokeObjectURL(x.url));
+          setPending([]);
+        } catch (e: any) { toast.err(`პროდუქტი შეინახა, მაგრამ ფოტო ვერ აიტვირთა: ${e.message}`); }
+      }
       setP(saved);
       setDirty(false);
       toast.ok(isNew ? 'პროდუქტი დაემატა' : 'ცვლილებები შენახულია');
@@ -89,20 +109,34 @@ export function ProductEdit({ id }: { id: string }) {
     }
   };
 
+  const sendFiles = (pid: number, list: File[]) => {
+    const form = new FormData();
+    list.forEach((f) => form.append('images[]', f));
+    return api<Product>(`/admin/products/${pid}/images`, { form });
+  };
+
   const upload = async (files: FileList | File[] | null) => {
-    if (!files || !p.id) return;
+    if (!files) return;
     const list = [...files].filter((f) => /^image\/(jpeg|png|webp|avif)$/.test(f.type));
     if (!list.length) return toast.err('დაშვებულია მხოლოდ JPG, PNG, WEBP, AVIF');
     const big = list.find((f) => f.size > 8 * 1024 * 1024);
     if (big) return toast.err(`„${big.name}“ 8 MB-ზე დიდია`);
-    const form = new FormData();
-    list.forEach((f) => form.append('images[]', f));
+    if (!p.id) {
+      // Not saved yet: keep the photos here and upload them with the first save.
+      setPending([...pending, ...list.map((file) => ({ file, url: URL.createObjectURL(file) }))]);
+      setDirty(true);
+      return;
+    }
     setUploading(true);
     try {
-      const updated = await api<Product>(`/admin/products/${p.id}/images`, { form });
+      const updated = await sendFiles(p.id, list);
       setP({ ...p, images: updated.images });
       toast.ok(list.length > 1 ? `${list.length} ფოტო აიტვირთა` : 'ფოტო აიტვირთა');
     } catch (e: any) { toast.err(e.message); } finally { setUploading(false); }
+  };
+  const removePending = (i: number) => {
+    URL.revokeObjectURL(pending[i].url);
+    setPending(pending.filter((_, j) => j !== i));
   };
 
   const removeImage = async (imgId: number) => {
@@ -133,8 +167,6 @@ export function ProductEdit({ id }: { id: string }) {
       location.hash = '/products';
     } catch (e: any) { toast.err(e.message); }
   };
-
-  const ratio = p.sizes[0] && p.sizes[0].height > 0 ? p.sizes[0].width / p.sizes[0].height : 1.5;
 
   return (
     <form class="page edit" onSubmit={save} novalidate>
@@ -169,7 +201,7 @@ export function ProductEdit({ id }: { id: string }) {
             <Bilingual label="დასახელება" field="name" value={p.name} onChange={(v) => set('name', v)} errors={errors} />
             <Bilingual label="მოკლე აღწერა" hint="ჩანს კატალოგში" field="short" value={p.short} onChange={(v) => set('short', v)} errors={errors} />
             <Bilingual label="სრული აღწერა" field="description" value={p.description} onChange={(v) => set('description', v)} errors={errors} multiline />
-            <Bilingual label="მასალა" hint="რისგან მზადდება" field="material" value={p.material} onChange={(v) => set('material', v)} errors={errors} />
+            <OptionSelect kind="material" label="მასალა" hint="რისგან მზადდება" value={p.material} onChange={(v) => set('material', v)} opts={opts} setOpts={setOpts} error={errors['material.ka'] || errors['material.en']} />
           </section>
 
           <section class="card pad-lg">
@@ -180,11 +212,10 @@ export function ProductEdit({ id }: { id: string }) {
             <p class="muted small">თითოეულ ზომას აქვს საკუთარი ფასი. საიტზე მომხმარებელი ირჩევს ზომას და ფასი ავტომატურად იცვლება.</p>
             {errors.sizes && <p class="err">{errors.sizes}</p>}
             <div class="sizes">
-              <div class="sizes-head"><span>სიგანე, მმ</span><span>სიმაღლე, მმ</span><span>ფასი, ₾</span><span></span></div>
+              <div class="sizes-head"><span>ზომა (სიგანე × სიმაღლე, სმ)</span><span>ფასი, ₾</span><span></span></div>
               {p.sizes.map((s, i) => (
                 <div class="size-row" key={s.id ?? `n${i}`}>
-                  <input type="number" min="1" inputmode="numeric" value={s.width} aria-label="სიგანე" aria-invalid={!!errors[`sizes.${i}`]} onInput={(e) => setSize(i, { width: Number(e.currentTarget.value) })} />
-                  <input type="number" min="1" inputmode="numeric" value={s.height} aria-label="სიმაღლე" aria-invalid={!!errors[`sizes.${i}`]} onInput={(e) => setSize(i, { height: Number(e.currentTarget.value) })} />
+                  <SizeSelect width={s.width} height={s.height} opts={opts} setOpts={setOpts} invalid={!!errors[`sizes.${i}`]} onChange={(width, height) => setSize(i, { width, height })} />
                   <input type="number" min="0" step="10" inputmode="decimal" value={s.price} aria-label="ფასი" aria-invalid={!!errors[`sizes.${i}`]} onInput={(e) => setSize(i, { price: Number(e.currentTarget.value) })} />
                   <button class="icon-btn danger" type="button" onClick={() => removeSize(i)} disabled={p.sizes.length === 1} aria-label="ზომის წაშლა" title={p.sizes.length === 1 ? 'მინიმუმ ერთი ზომა საჭიროა' : 'წაშლა'}><Icon name="trash" /></button>
                   {errors[`sizes.${i}`] && <span class="err full">{errors[`sizes.${i}`]}</span>}
@@ -195,27 +226,31 @@ export function ProductEdit({ id }: { id: string }) {
 
           <section class="card pad-lg">
             <h2>მიტანა და მონტაჟი</h2>
-            <div class="row3">
+            <div class="row4">
               <label class="fld"><span>მიტანა, მინ. დღე</span>
                 <input type="number" min="0" value={p.delivery_days.min} onInput={(e) => set('delivery_days', { ...p.delivery_days, min: Number(e.currentTarget.value) })} />
               </label>
               <label class="fld"><span>მიტანა, მაქს. დღე</span>
                 <input type="number" min="0" value={p.delivery_days.max} onInput={(e) => set('delivery_days', { ...p.delivery_days, max: Number(e.currentTarget.value) })} />
               </label>
-              <label class="fld"><span>მონტაჟი, დღე</span>
-                <input type="number" min="0" value={p.installation_days} onInput={(e) => set('installation_days', Number(e.currentTarget.value))} />
+              <label class="fld"><span>მონტაჟი, საათი</span>
+                <input type="number" min="0" inputmode="numeric" value={Math.floor(p.installation_minutes / 60)}
+                  onInput={(e) => set('installation_minutes', Math.max(0, Number(e.currentTarget.value) || 0) * 60 + (p.installation_minutes % 60))} />
+              </label>
+              <label class="fld"><span>მონტაჟი, წუთი</span>
+                <input type="number" min="0" max="59" step="5" inputmode="numeric" value={p.installation_minutes % 60}
+                  onInput={(e) => set('installation_minutes', Math.floor(p.installation_minutes / 60) * 60 + Math.min(59, Math.max(0, Number(e.currentTarget.value) || 0)))} />
               </label>
             </div>
-            <Bilingual label="მონტაჟის აღწერა" field="installation" value={p.installation} onChange={(v) => set('installation', v)} errors={errors} />
+            <p class="muted small">საიტზე ჩანს, მაგ.: „{fmtDuration(p.installation_minutes) || '0 წთ'}“. შეიძლება მხოლოდ საათები, მხოლოდ წუთები ან ორივე.</p>
           </section>
         </div>
 
         <aside class="col-side">
           <section class="card pad-lg">
             <h2>ფოტოები</h2>
-            {isNew || !p.id ? (
-              <p class="muted small">ფოტოების ატვირთვა შესაძლებელია პროდუქტის პირველი შენახვის შემდეგ. მანამდე საიტზე გამოჩნდება ნიმუშის ილუსტრაცია.</p>
-            ) : (
+            {!p.id && <p class="muted small">ფოტოები აიტვირთება პროდუქტის შენახვისას.</p>}
+            {(
               <>
                 <div
                   class={`drop ${drag ? 'over' : ''}`}
@@ -229,6 +264,20 @@ export function ProductEdit({ id }: { id: string }) {
                   <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple hidden onChange={(e) => { upload(e.currentTarget.files); e.currentTarget.value = ''; }} />
                   <span class="muted small">JPG, PNG, WEBP, AVIF · მაქს. 8 MB</span>
                 </div>
+                {pending.length > 0 && (
+                  <ul class="imgs">
+                    {pending.map((x, i) => (
+                      <li key={x.url}>
+                        <img src={x.url} alt="" />
+                        {i === 0 && p.images.length === 0 && <span class="cover">მთავარი</span>}
+                        <span class="pending-tag">შენახვისას აიტვირთება</span>
+                        <div class="img-tools">
+                          <button type="button" class="icon-btn danger" onClick={() => removePending(i)} aria-label="წაშლა"><Icon name="trash" size={16} /></button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 {p.images.length > 0 && (
                   <ul class="imgs">
                     {p.images.map((img, i) => (
@@ -246,18 +295,6 @@ export function ProductEdit({ id }: { id: string }) {
                 )}
               </>
             )}
-          </section>
-
-          <section class="card pad-lg">
-            <h2>დროებითი ილუსტრაცია</h2>
-            <p class="muted small">გამოიყენება, სანამ ფოტო არ აიტვირთება.</p>
-            <Preview pattern={p.pattern} ratio={Math.min(2, Math.max(0.5, ratio))} />
-            <label class="fld">
-              <span>ილუსტრაციის სტილი</span>
-              <select value={p.pattern} onChange={(e) => set('pattern', e.currentTarget.value)}>
-                {Object.entries(PATTERNS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
-            </label>
           </section>
 
           <section class="card pad-lg">

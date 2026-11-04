@@ -16,9 +16,12 @@ const name = loc(p.name, lang);
 const first = p.sizes[0];
 const others = products.filter((x) => x.slug !== p.slug).slice(0, 3);
 const hasPhoto = p.images.length > 0;
-const sizeLabel = (w: number, h: number) => `${w} × ${h} ${t('p.mm')}`;
+const sizeLabel = (w: number, h: number) => `${w} × ${h} ${t('p.cm')}`;
 const days = p.delivery_days.min === p.delivery_days.max ? `${p.delivery_days.min}` : `${p.delivery_days.min}–${p.delivery_days.max}`;
 const waBase = `${t('p.waText')} «${name}»`;
+const installH = Math.floor((p.installation_minutes ?? 0) / 60);
+const installM = (p.installation_minutes ?? 0) % 60;
+const installTime = [installH ? `${installH} ${t('p.hours')}` : '', installM ? `${installM} ${t('p.minutes')}` : ''].filter(Boolean).join(' ') || '—';
 const socials = [
   { key: 'instagram', href: s.instagram, label: 'Instagram' },
   { key: 'facebook', href: s.facebook, label: 'Facebook' },
@@ -38,8 +41,8 @@ const socials = [
             <div class="frame">
               <Leaf product={p} alt={name} ratio={first ? first.width / first.height : 1.5} eager />
             </div>
-            <div class="dim dim-ends dim-top num"><span data-dim-w>{first?.width} {t('p.mm')}</span></div>
-            <div class="dim-side num"><span class="dim-v" data-dim-h>{first?.height} {t('p.mm')}</span></div>
+            <div class="dim dim-ends dim-top num"><span data-dim-w>{first?.width} {t('p.cm')}</span></div>
+            <div class="dim-side num"><span class="dim-v" data-dim-h>{first?.height} {t('p.cm')}</span></div>
           </div>
         </div>
         {!hasPhoto && <figcaption class="illus label">{t('p.illustration')}</figcaption>}
@@ -105,7 +108,7 @@ const socials = [
         <div><dt><Icon name="truck" size={18} />{t('p.delivery')}</dt><dd class="num">{days} {t('p.workingDays')}</dd></div>
         <div>
           <dt><Icon name="tool" size={18} />{t('p.installation')}</dt>
-          <dd><span class="num">{p.installation_days} {t('p.days')}</span>{loc(p.installation, lang) && <> · {loc(p.installation, lang)}</>}</dd>
+          <dd class="num">{installTime}</dd>
         </div>
       </dl>
 
@@ -307,14 +310,14 @@ const socials = [
     const form = drawer.querySelector<HTMLFormElement>('form')!;
     const sumSize = drawer.querySelector<HTMLElement>('[data-sum-size]')!;
     const sumPrice = drawer.querySelector<HTMLElement>('[data-sum-price]')!;
-    const mm = dimW?.textContent?.replace(/[\d\s]/g, '').trim() || 'mm';
+    const unit = dimW?.textContent?.replace(/[\d\s]/g, '').trim() || 'cm';
 
     const apply = (input: HTMLInputElement) => {
       const { w, h, price, label } = input.dataset;
       priceEl.textContent = `₾ ${fmt(Number(price))}`;
       if (frame) frame.style.setProperty('--r', String(Number(w) / Number(h)));
-      if (dimW) dimW.textContent = `${w} ${mm}`;
-      if (dimH) dimH.textContent = `${h} ${mm}`;
+      if (dimW) dimW.textContent = `${w} ${unit}`;
+      if (dimH) dimH.textContent = `${h} ${unit}`;
       sumSize.textContent = label || '';
       sumPrice.textContent = `₾ ${fmt(Number(price))}`;
       (form.elements.namedItem('size_id') as HTMLInputElement).value = input.value;

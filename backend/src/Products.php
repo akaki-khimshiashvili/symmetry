@@ -4,7 +4,7 @@ final class Products
 {
     public const PATTERNS = ['wave', 'dune', 'ripple', 'twist', 'prism', 'mosaic'];
     public const ORIENTATIONS = ['portrait', 'landscape'];
-    private const I18N = ['name', 'short', 'description', 'material', 'installation'];
+    private const I18N = ['name', 'short', 'description', 'material'];
 
     /** @return array<int, array> */
     public static function all(PDO $pdo, bool $includeHidden, string $baseUrl): array
@@ -25,7 +25,7 @@ final class Products
 
     private static function hydrate(PDO $pdo, array $r, string $baseUrl): array
     {
-        $sizes = $pdo->prepare('SELECT id, width_mm, height_mm, price FROM product_sizes WHERE product_id = ? ORDER BY sort ASC, id ASC');
+        $sizes = $pdo->prepare('SELECT id, width_cm, height_cm, price FROM product_sizes WHERE product_id = ? ORDER BY sort ASC, id ASC');
         $sizes->execute([$r['id']]);
         $images = $pdo->prepare('SELECT id, path FROM product_images WHERE product_id = ? ORDER BY sort ASC, id ASC');
         $images->execute([$r['id']]);
@@ -39,11 +39,11 @@ final class Products
             'published' => (bool) $r['published'],
             'sort' => (int) $r['sort'],
             'delivery_days' => ['min' => (int) $r['delivery_days_min'], 'max' => (int) $r['delivery_days_max']],
-            'installation_days' => (int) $r['installation_days'],
+            'installation_minutes' => (int) $r['installation_minutes'],
             'sizes' => array_map(fn ($s) => [
                 'id' => (int) $s['id'],
-                'width' => (int) $s['width_mm'],
-                'height' => (int) $s['height_mm'],
+                'width' => (int) $s['width_cm'],
+                'height' => (int) $s['height_cm'],
                 'price' => (float) $s['price'],
             ], $sizes->fetchAll()),
             'images' => array_map(fn ($img) => [
@@ -125,7 +125,8 @@ final class Products
             'slug' => $slug,
             'delivery_days_min' => max(0, (int) ($p['delivery_days']['min'] ?? 14)),
             'delivery_days_max' => max(0, (int) ($p['delivery_days']['max'] ?? 21)),
-            'installation_days' => max(0, (int) ($p['installation_days'] ?? 1)),
+            'installation_minutes' => max(0, min(100000, (int) ($p['installation_minutes']
+                ?? (isset($p['installation_days']) ? (int) $p['installation_days'] * 480 : 480)))),
             'pattern' => in_array($p['pattern'] ?? '', self::PATTERNS, true) ? $p['pattern'] : 'wave',
             'orientation' => in_array($p['orientation'] ?? '', self::ORIENTATIONS, true) ? $p['orientation'] : self::guessOrientation($p['sizes'] ?? []),
             'featured' => !empty($p['featured']) ? 1 : 0,
@@ -161,14 +162,14 @@ final class Products
             $sid = isset($s['id']) ? (int) $s['id'] : 0;
             $vals = [(int) $s['width'], (int) $s['height'], round((float) $s['price'], 2), $i];
             if ($sid > 0) {
-                $stmt = $pdo->prepare('UPDATE product_sizes SET width_mm = ?, height_mm = ?, price = ?, sort = ? WHERE id = ? AND product_id = ?');
+                $stmt = $pdo->prepare('UPDATE product_sizes SET width_cm = ?, height_cm = ?, price = ?, sort = ? WHERE id = ? AND product_id = ?');
                 $stmt->execute([...$vals, $sid, $productId]);
                 if ($stmt->rowCount() > 0) {
                     $keep[] = $sid;
                     continue;
                 }
             }
-            $pdo->prepare('INSERT INTO product_sizes (width_mm, height_mm, price, sort, product_id) VALUES (?, ?, ?, ?, ?)')
+            $pdo->prepare('INSERT INTO product_sizes (width_cm, height_cm, price, sort, product_id) VALUES (?, ?, ?, ?, ?)')
                 ->execute([...$vals, $productId]);
             $keep[] = (int) $pdo->lastInsertId();
         }

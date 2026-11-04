@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { api, type Settings } from '../api';
 import { Loading, toast } from '../ui';
+import { OptionLists } from '../options';
 
 const FIELDS: { key: string; label: string; hint?: string; type?: string }[] = [
   { key: 'phone', label: 'ტელეფონის ნომერი', hint: 'მაგ. +995 555 12 34 56', type: 'tel' },
@@ -52,6 +53,8 @@ export function SettingsPage() {
           ))}
         </div>
       </section>
+
+      <OptionLists />
     </form>
   );
 }

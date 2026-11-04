@@ -26,16 +26,18 @@ const useHash = () => {
 export const go = (to: string) => (location.hash = to);
 
 function Login({ onDone }: { onDone: () => void }) {
+  const [user, setUser] = useState('');
   const [pw, setPw] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const submit = async (e: Event) => {
     e.preventDefault();
+    if (!user.trim()) return setErr('შეიყვანეთ მომხმარებლის სახელი');
     if (!pw) return setErr('შეიყვანეთ პაროლი');
     setBusy(true);
     setErr('');
     try {
-      const { token } = await api<{ token: string }>('/admin/login', { body: { password: pw } });
+      const { token } = await api<{ token: string }>('/admin/login', { body: { username: user.trim(), password: pw } });
       auth.set(token);
       onDone();
     } catch (e) {
@@ -51,8 +53,12 @@ function Login({ onDone }: { onDone: () => void }) {
         <h1>ადმინისტრირება</h1>
         <p class="muted">შედით პროდუქციისა და შეკვეთების სამართავად.</p>
         <label class="fld">
+          <span>მომხმარებელი</span>
+          <input type="text" autoFocus autocomplete="username" autocapitalize="none" spellcheck={false} value={user} onInput={(e) => setUser(e.currentTarget.value)} aria-invalid={!!err} />
+        </label>
+        <label class="fld">
           <span>პაროლი</span>
-          <input type="password" autoFocus autocomplete="current-password" value={pw} onInput={(e) => setPw(e.currentTarget.value)} aria-invalid={!!err} />
+          <input type="password" autocomplete="current-password" value={pw} onInput={(e) => setPw(e.currentTarget.value)} aria-invalid={!!err} />
         </label>
         {err && <p class="err">{err}</p>}
         <button class="btn primary wide" disabled={busy}>{busy ? 'მოწმდება…' : 'შესვლა'}</button>

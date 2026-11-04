@@ -14,9 +14,8 @@ export interface Product {
   short: L10n;
   description: L10n;
   material: L10n;
-  installation: L10n;
   delivery_days: { min: number; max: number };
-  installation_days: number;
+  installation_minutes: number;
   sizes: Size[];
   images: { id: number; url: string }[];
 }

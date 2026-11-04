@@ -23,6 +23,7 @@ final class Db
         if ($fresh) {
             self::seed($pdo, $config['seed_path']);
         }
+        Options::backfill($pdo);
         return self::$pdo = $pdo;
     }
 
@@ -45,6 +46,7 @@ CREATE TABLE IF NOT EXISTS products (
     delivery_days_min INTEGER NOT NULL DEFAULT 14,
     delivery_days_max INTEGER NOT NULL DEFAULT 21,
     installation_days INTEGER NOT NULL DEFAULT 1,
+    installation_minutes INTEGER NOT NULL DEFAULT 480,
     pattern TEXT NOT NULL DEFAULT 'wave',
     orientation TEXT NOT NULL DEFAULT 'landscape',
     featured INTEGER NOT NULL DEFAULT 0,
@@ -56,8 +58,8 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE TABLE IF NOT EXISTS product_sizes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-    width_mm INTEGER NOT NULL,
-    height_mm INTEGER NOT NULL,
+    width_cm INTEGER NOT NULL,
+    height_cm INTEGER NOT NULL,
     price REAL NOT NULL,
     sort INTEGER NOT NULL DEFAULT 0
 );
@@ -104,6 +106,17 @@ CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS options (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL,
+    ka TEXT NOT NULL DEFAULT '',
+    en TEXT NOT NULL DEFAULT '',
+    width INTEGER,
+    height INTEGER,
+    sort INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS options_kind ON options(kind);
 CREATE TABLE IF NOT EXISTS tokens (
     token TEXT PRIMARY KEY,
     expires_at INTEGER NOT NULL
@@ -113,6 +126,22 @@ SQL);
         $cols = array_column($pdo->query('PRAGMA table_info(products)')->fetchAll(), 'name');
         if (!in_array('orientation', $cols, true)) {
             $pdo->exec("ALTER TABLE products ADD COLUMN orientation TEXT NOT NULL DEFAULT 'landscape'");
+        }
+        // Installation time moved from days to hours/minutes (a former "day" = 8 working hours).
+        if (!in_array('installation_minutes', $cols, true)) {
+            $pdo->exec('ALTER TABLE products ADD COLUMN installation_minutes INTEGER NOT NULL DEFAULT 480');
+            $pdo->exec('UPDATE products SET installation_minutes = installation_days * 480');
+        }
+        // The installation description and its dropdown list were retired.
+        $pdo->exec("DELETE FROM options WHERE kind = 'installation'");
+        // Sizes moved from millimetres to centimetres.
+        $sizeCols = array_column($pdo->query('PRAGMA table_info(product_sizes)')->fetchAll(), 'name');
+        if (in_array('width_mm', $sizeCols, true)) {
+            $pdo->beginTransaction();
+            $pdo->exec('ALTER TABLE product_sizes RENAME COLUMN width_mm TO width_cm');
+            $pdo->exec('ALTER TABLE product_sizes RENAME COLUMN height_mm TO height_cm');
+            $pdo->exec('UPDATE product_sizes SET width_cm = CAST(ROUND(width_cm / 10.0) AS INTEGER), height_cm = CAST(ROUND(height_cm / 10.0) AS INTEGER)');
+            $pdo->commit();
         }
     }
 

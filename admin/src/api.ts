@@ -15,9 +15,9 @@ export interface Product {
   short: L10n;
   description: L10n;
   material: L10n;
-  installation: L10n;
   delivery_days: { min: number; max: number };
-  installation_days: number;
+  /** Installation time in minutes (shown as hours + minutes). */
+  installation_minutes: number;
   sizes: Size[];
   images: { id: number; url: string }[];
   updated_at?: string;
@@ -32,6 +32,10 @@ export interface Message {
   channel: string; intent: string; message: string; lang: string; status: string; created_at: string;
 }
 export type Settings = Record<string, string>;
+export interface TextOption { id: number; ka: string; en: string }
+export interface SizeOption { id: number; width: number; height: number }
+/** Saved dropdown lists for the product editor. Sizes are in centimetres. */
+export interface OptionSet { material: TextOption[]; size: SizeOption[] }
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public fields: Record<string, string> = {}) {

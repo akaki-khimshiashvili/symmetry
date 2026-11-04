@@ -1,0 +1,4 @@
+data/*.sqlite*
+data/rebuild.log
+public/uploads/*
+!public/uploads/.gitkeep
