@@ -5,7 +5,7 @@ import Leaf from '../components/Leaf.astro';
 import SpecimenCard from '../components/SpecimenCard.astro';
 import Hero from '../components/Hero.astro';
 import { type Lang, useT, path } from '../i18n/ui';
-import { loadData, waLink, telLink, minPrice, priceFmt } from '../lib/data';
+import { loadData, kindOf, waLink, telLink, minPrice, priceFmt } from '../lib/data';
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
@@ -15,10 +15,13 @@ const { products, settings } = await loadData();
 
 // Up to 4 products marked "მთავარზე" in the admin; if fewer are marked, the rest of the catalogue fills the row.
 const featured = [...products.filter((p) => p.featured), ...products.filter((p) => !p.featured)].slice(0, 4);
-const types = (['portrait', 'landscape'] as const).map((key) => {
-  const items = products.filter((p) => p.orientation === key);
+const types = (['portrait', 'landscape', 'shelf', 'wall'] as const).map((key) => {
+  const items = products.filter((p) => kindOf(p) === key);
   return { key, items, cover: items.find((p) => p.featured) ?? items[0], from: items.length ? Math.min(...items.map(minPrice)) : 0 };
-}).filter((x) => x.cover);
+}).filter((x) => x.cover || x.key === 'wall');
+// Whole walls are always on show: until the first one is in the catalogue, the tile draws a wall
+// pattern and leads to the contact page (every whole wall starts as a custom project).
+const wallSketch = { slug: 'whole-wall', pattern: 'dune', images: [] } as unknown as (typeof products)[number];
 
 ---
 <Base lang={lang} current="home">
@@ -31,11 +34,17 @@ const types = (['portrait', 'landscape'] as const).map((key) => {
 
       <div class="types">
         {types.map((ty, i) => (
-          <a class={`tile tile-${ty.key}`} href={`${path(lang, '/products/')}?type=${ty.key}`} data-reveal style={`--d:${i};--r:${ty.key === 'portrait' ? 0.75 : 1.3333}`}>
-            <div class="tile-img lift"><Leaf product={ty.cover!} alt="" ratio={ty.key === 'portrait' ? 3 / 4 : 4 / 3} photo /></div>
+          <a class={`tile tile-${ty.key}`} href={ty.cover ? `${path(lang, '/products/')}?type=${ty.key}` : path(lang, '/contact/')} data-reveal style={`--d:${i}`}>
+            <div class="tile-img">
+              <Leaf product={ty.cover ?? wallSketch} alt="" ratio={4 / 5} photo={!!ty.cover} density={ty.cover ? 1 : 1.6} />
+              {ty.cover && <span class="tile-count num">{ty.items.length} {t('products.count')}</span>}
+            </div>
             <div class="tile-text">
-              <h3>{t(`type.${ty.key}` as any)}</h3>
-              <span class="num">{ty.items.length} {t('products.count')} · ₾ {priceFmt(ty.from)} {t('collection.from')}</span>
+              <h3>{t(`type.${ty.key}` as any)}<Icon name="arrow" size={18} class="tile-go" /></h3>
+              <p class="tile-d">{t(`type.${ty.key}.d` as any)}</p>
+              <span class="tile-meta num">
+                {ty.cover ? <>₾ {priceFmt(ty.from)} {t('collection.from')}</> : t('collection.custom')}
+              </span>
             </div>
           </a>
         ))}
@@ -81,15 +90,49 @@ const types = (['portrait', 'landscape'] as const).map((key) => {
   /* ---------- Collection ---------- */
   .sec-title { text-align: center; margin-bottom: var(--s-5); }
   .sec-title.sub { margin-top: var(--s-6); }
-  /* Justified rows: every picture in a row shares one height; widths follow each picture's shape.
-     flex-grow and flex-basis are both proportional to the ratio, so the row fills the width evenly. */
-  .types, .featured-grid { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
-  .types { gap: var(--s-4) calc(var(--gutter) * 2); }
-  .tile { flex: var(--r) 1 calc(var(--r) * 15rem); min-width: 0; display: grid; gap: 1.1rem; text-decoration: none; color: inherit; }
-  .tile-img { overflow: hidden; }
-  .tile-text { display: grid; gap: 0.3rem; }
-  .tile-text h3 { font-size: var(--t-xl); font-weight: 500; letter-spacing: -0.01em; }
-  .tile-text span { font-size: var(--t-sm); color: var(--ink-3); }
+  /* Collections: one even grid. Every picture has the same 4:5 frame, so pictures, titles,
+     descriptions and prices all sit on shared lines; the price row is pinned to the bottom. */
+  .types {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+    gap: var(--s-5) clamp(1rem, 0.5rem + 1.6vw, 2rem);
+  }
+  .tile { display: grid; grid-template-rows: auto 1fr; gap: 1.1rem; min-width: 0; text-decoration: none; color: inherit; }
+  .tile-img {
+    position: relative; overflow: hidden; border-radius: 4px; background: var(--ground-2);
+    box-shadow: 0 1px 2px rgb(40 22 10 / 0.06), 0 22px 40px -28px rgb(40 22 10 / 0.45);
+    transition: box-shadow 400ms var(--ease-out), transform 400ms var(--ease-out);
+  }
+  .tile-img :global(.leaf) { aspect-ratio: 4 / 5 !important; transition: transform 900ms var(--ease-out); }
+  .tile-count {
+    position: absolute; left: 0.75rem; top: 0.75rem; padding: 0.3rem 0.7rem; border-radius: 999px;
+    font-size: var(--t-xs); font-weight: 600; letter-spacing: 0.02em; color: var(--ink);
+    background: color-mix(in oklab, var(--ground) 86%, transparent);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  }
+  .tile-text { display: grid; grid-template-rows: auto auto 1fr; gap: 0.45rem; align-content: start; }
+  .tile-text h3 {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+    font-size: var(--t-xl); font-weight: 500; letter-spacing: -0.01em; line-height: 1.2;
+  }
+  .tile-text h3 :global(.tile-go) { flex: none; color: var(--ink-3); transition: transform 300ms var(--ease-out), color 200ms ease; }
+  .tile-d {
+    margin: 0; font-size: var(--t-sm); line-height: 1.55; color: var(--ink-2); text-wrap: pretty;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .tile-meta {
+    align-self: end; padding-top: 0.8rem; border-top: 1px solid var(--line);
+    font-size: var(--t-sm); font-weight: 600; color: var(--ink);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .tile:hover .tile-img { transform: translateY(-4px); box-shadow: 0 1px 2px rgb(40 22 10 / 0.06), 0 30px 50px -26px rgb(40 22 10 / 0.5); }
+    .tile:hover .tile-img :global(.leaf) { transform: scale(1.04); }
+    .tile:hover h3 :global(.tile-go) { transform: translateX(4px); color: var(--ink); }
+  }
+  .tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; border-radius: 6px; }
+  @media (prefers-reduced-motion: reduce) {
+    .tile-img, .tile-img :global(.leaf), .tile-text h3 :global(.tile-go) { transition: none; }
+  }
+  .featured-grid { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
   .featured-grid { gap: var(--s-4) calc(var(--gutter) * 1.25); }
   .cell { flex: var(--r) 1 calc(var(--r) * 10rem); min-width: 0; }
   .all { display: flex; justify-content: center; margin-top: var(--s-5); }
@@ -152,10 +195,14 @@ const types = (['portrait', 'landscape'] as const).map((key) => {
     .actions { justify-content: flex-start; }
   }
   @media (max-width: 620px) {
-    /* On phones each type sits on its own row; the tall one is kept narrower so it never towers. */
-    /* Phones: both types full width on one left edge; the upright one is cropped to 4:5 so it doesn't tower. */
-    .tile, .tile-portrait { flex: 1 1 100%; }
-    .tile-portrait .tile-img :global(.leaf) { aspect-ratio: 4 / 5 !important; }
+    /* Phones: two collections per row, with a shorter description. */
+    .types { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-4) 0.9rem; }
+    .tile { gap: 0.8rem; }
+    .tile-text h3 { font-size: var(--t-base); font-weight: 600; }
+    .tile-text h3 :global(.tile-go) { display: none; }
+    .tile-d { -webkit-line-clamp: 2; font-size: var(--t-xs); }
+    .tile-meta { font-size: var(--t-xs); padding-top: 0.6rem; }
+    .tile-count { left: 0.5rem; top: 0.5rem; padding: 0.2rem 0.55rem; }
     .featured-grid { gap: var(--s-4) 0.9rem; }
     .cell { flex-basis: calc(var(--r) * 7rem); }
     .close-cta { width: 100%; justify-items: stretch; }

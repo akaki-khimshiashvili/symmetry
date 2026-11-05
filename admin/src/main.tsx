@@ -1,12 +1,13 @@
 import { render } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import '@fontsource-variable/noto-sans-georgian';
 import '@fontsource-variable/noto-serif-georgian';
 import '@fontsource-variable/manrope';
 import '@fontsource/montserrat/latin-800.css';
 import './styles.css';
 import { api, auth, setUnauthorizedHandler, SITE_URL, ApiError } from './api';
-import { Icon, Toaster, ConfirmHost, toast } from './ui';
+import { Icon, Toaster, ConfirmHost, toast, cap } from './ui';
+import { announce } from './live';
 import { Dashboard } from './pages/Dashboard';
 import { ProductsPage } from './pages/Products';
 import { ProductEdit } from './pages/ProductEdit';
@@ -75,12 +76,51 @@ const NAV = [
   { to: '/settings', label: 'პარამეტრები', icon: 'gear' },
 ];
 
+type Counts = { orders_new: number; messages_new: number; orders_last: number; messages_last: number; orders_rev: string };
+/** How often the admin checks for new orders and messages while the tab is visible. */
+const POLL_MS = 15000;
+const BASE_TITLE = document.title;
+
 function Shell() {
   const hash = useHash();
-  const [counts, setCounts] = useState<{ orders_new: number; messages_new: number } | null>(null);
+  const [counts, setCounts] = useState<Counts | null>(null);
   const [navOpen, setNavOpen] = useState(false);
-  const refreshCounts = () => api<{ orders_new: number; messages_new: number }>('/admin/stats').then(setCounts).catch(() => {});
+  const last = useRef<Counts | null>(null);
+
+  // Check what is new; tell the open pages to reload and say so in a toast.
+  const refreshCounts = () => api<Counts>('/admin/stats').then((c) => {
+    const prev = last.current;
+    if (prev) {
+      const newOrders = c.orders_last - prev.orders_last;
+      const newMessages = c.messages_last - prev.messages_last;
+      if (newOrders > 0 || c.orders_rev !== prev.orders_rev) announce('orders');
+      if (newMessages > 0) announce('messages');
+      if (newOrders > 0) toast.ok(newOrders > 1 ? `${newOrders} ახალი შეკვეთა` : 'ახალი შეკვეთა შემოვიდა');
+      if (newMessages > 0) toast.ok(newMessages > 1 ? `${newMessages} ახალი შეტყობინება` : 'ახალი შეტყობინება შემოვიდა');
+    }
+    last.current = c;
+    setCounts(c);
+  }).catch(() => {});
+
   useEffect(() => { refreshCounts(); setNavOpen(false); }, [hash]);
+
+  // Poll while the tab is visible; check at once when the admin comes back to it.
+  useEffect(() => {
+    let timer = 0;
+    const tick = () => { if (!document.hidden) refreshCounts(); };
+    const start = () => { clearInterval(timer); timer = window.setInterval(tick, POLL_MS); };
+    const onVisible = () => { if (!document.hidden) { tick(); start(); } };
+    start();
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('focus', onVisible); };
+  }, []);
+
+  // Unhandled items show in the browser tab title, e.g. "(3) Symmetry | ადმინისტრირება".
+  useEffect(() => {
+    const n = (counts?.orders_new ?? 0) + (counts?.messages_new ?? 0);
+    document.title = n ? `(${cap(n)}) ${BASE_TITLE}` : BASE_TITLE;
+  }, [counts?.orders_new, counts?.messages_new]);
 
   const logout = async () => {
     await api('/admin/logout', { method: 'POST' }).catch(() => {});
@@ -109,7 +149,7 @@ function Shell() {
             <a key={n.to} href={`#${n.to}`} class={active(n.to) ? 'on' : ''} aria-current={active(n.to) ? 'page' : undefined}>
               <Icon name={n.icon} />
               <span>{n.label}</span>
-              {!!badge(n.to) && <b class="badge">{badge(n.to)}</b>}
+              {!!badge(n.to) && <b class="badge">{cap(badge(n.to) ?? 0)}</b>}
             </a>
           ))}
         </nav>

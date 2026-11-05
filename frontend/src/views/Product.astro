@@ -52,6 +52,13 @@ const socials = [
             <div class="frame">
               <Leaf product={p} alt={name} ratio={first ? first.width / first.height : 1.5} eager />
             </div>
+            {p.images.length > 1 && (
+              <>
+                <button type="button" class="nav nav-prev" data-nav="-1" aria-label={t('p.prev')}><Icon name="chevron-left" size={20} /></button>
+                <button type="button" class="nav nav-next" data-nav="1" aria-label={t('p.next')}><Icon name="chevron-right" size={20} /></button>
+                <span class="count num" aria-live="polite"><span data-count>1</span> / {p.images.length}</span>
+              </>
+            )}
             <div class="dim dim-ends dim-top num"><span data-dim-w>{first?.width} {t('p.cm')}</span></div>
             <div class="dim-side num"><span class="dim-v" data-dim-h>{first?.height} {t('p.cm')}</span></div>
           </div>
@@ -140,7 +147,7 @@ const socials = [
       </div>
 
       <dl class="specs" data-reveal style="--d:4">
-        <div><dt><Icon name="shape" size={18} />{t('p.type')}</dt><dd>{t(`type.${p.orientation}` as any)}</dd></div>
+        <div><dt><Icon name="shape" size={18} />{t('p.type')}</dt><dd>{t((p.category === 'shelf' || p.category === 'wall' ? `type.${p.category}.s` : `type.${p.orientation}`) as any)}</dd></div>
         <div><dt><Icon name="grain" size={18} />{t('p.material')}</dt><dd>{loc(p.material, lang)}</dd></div>
         <div><dt><Icon name="truck" size={18} />{t('p.delivery')}</dt><dd class="num">{days} {t('p.workingDays')}</dd></div>
         <div>
@@ -262,17 +269,48 @@ const socials = [
   .frame { position: absolute; inset: 0; overflow: hidden; box-shadow: 0 40px 60px -35px rgb(0 0 0 / 0.55); }
   .frame :global(.leaf) { height: 100%; aspect-ratio: auto !important; }
   .dim-top { position: absolute; left: 0; right: 0; bottom: calc(100% + 0.9rem); }
+  /* Height callout: line, label, line (the label sits in a gap, so no background is needed),
+     with end ticks drawn as background strokes at the top and bottom. */
   .dim-side {
     position: absolute; top: 0; bottom: 0; left: calc(100% + 0.9rem); width: 1rem;
-    display: flex; justify-content: center; color: var(--ink-3); font-size: var(--t-xs); letter-spacing: 0.08em;
+    display: flex; flex-direction: column; align-items: center; gap: 0.6rem;
+    color: var(--ink-3); font-size: var(--t-xs); letter-spacing: 0.08em;
+    --tick: linear-gradient(color-mix(in oklab, currentColor 80%, transparent), color-mix(in oklab, currentColor 80%, transparent));
+    background: var(--tick) top center / 0.5rem 1px no-repeat, var(--tick) bottom center / 0.5rem 1px no-repeat;
+    padding-block: 0.5rem;
   }
-  .dim-side::before { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: currentColor; opacity: 0.55; }
-  .dim-side::after { content: ''; position: absolute; left: 25%; right: 25%; top: 0; bottom: 0; border-block: 1px solid currentColor; opacity: 0.8; }
-  .dim-side span { position: relative; align-self: center; background: var(--ground); padding-block: 0.5rem; }
-  .dim-top span { background: var(--ground); }
+  .dim-side::before, .dim-side::after { content: ''; flex: 1; width: 1px; background: currentColor; opacity: 0.55; margin-block: -0.5rem; }
+  .dim-side::before { margin-bottom: 0; }
+  .dim-side::after { margin-top: 0; }
+  .dim-side span { white-space: nowrap; }
   .illus { color: var(--ink-3); }
-  .thumbs { display: flex; gap: 0.6rem; margin-top: var(--s-2); }
-  .thumb { width: 4.5rem; height: 4.5rem; padding: 0; border: 1px solid var(--line); background: none; cursor: pointer; overflow: hidden; transition: border-color 200ms ease, transform 160ms var(--ease-out); }
+  /* Gallery: arrows on the picture's edges, a counter in its corner; swipe works on touch. */
+  .frame { touch-action: pan-y; }
+  .frame :global(img) { user-select: none; -webkit-user-drag: none; }
+  .nav {
+    position: absolute; top: 50%; z-index: 2; translate: 0 -50%;
+    display: grid; place-items: center; width: 2.75rem; height: 2.75rem; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
+    background: color-mix(in oklab, var(--ground) 82%, transparent); color: var(--ink);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    box-shadow: 0 2px 10px rgb(0 0 0 / 0.14);
+    transition: background-color 160ms ease, opacity 200ms ease, transform 160ms var(--ease-out);
+  }
+  .nav-prev { left: 0.75rem; }
+  .nav-next { right: 0.75rem; }
+  .nav:active { transform: scale(0.94); }
+  @media (hover: hover) and (pointer: fine) {
+    .nav { opacity: 0; }
+    .piece:hover .nav, .nav:focus-visible { opacity: 1; }
+    .nav:hover { background: var(--ground); }
+  }
+  .count {
+    position: absolute; right: 0.75rem; bottom: 0.75rem; z-index: 2; padding: 0.2rem 0.6rem; border-radius: 999px;
+    font-size: var(--t-xs); letter-spacing: 0.06em; color: var(--ink);
+    background: color-mix(in oklab, var(--ground) 82%, transparent);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  }
+  .thumbs { display: flex; gap: 0.6rem; margin-top: var(--s-2); overflow-x: auto; padding: 2px; scrollbar-width: thin; }
+  .thumb { flex: 0 0 auto; width: 4.5rem; height: 4.5rem; padding: 0; border: 1px solid var(--line); background: none; cursor: pointer; overflow: hidden; transition: border-color 200ms ease, transform 160ms var(--ease-out); }
   .thumb:active { transform: scale(0.96); }
   .thumb[aria-pressed='true'] { border-color: var(--accent); }
   .thumb img { width: 100%; height: 100%; object-fit: cover; }
@@ -409,7 +447,6 @@ const socials = [
         const pctEl = pill.querySelector('[data-sale-pct]');
         if (pctEl && input.dataset.pct) pctEl.textContent = `−${input.dataset.pct}%`;
       }
-      if (frame) frame.style.setProperty('--r', String(Number(w) / Number(h)));
       if (dimW) dimW.textContent = `${w} ${unit}`;
       if (dimH) dimH.textContent = `${h} ${unit}`;
       sumSize.textContent = label || '';
@@ -443,15 +480,66 @@ const socials = [
 
     // Gallery thumbs
     const mainImg = root.querySelector<HTMLImageElement>('.frame img');
-    root.querySelectorAll<HTMLButtonElement>('[data-thumb]').forEach((b) =>
-      b.addEventListener('click', () => {
-        if (mainImg && mainImg.src !== new URL(b.dataset.thumb!, location.href).href) {
-          mainImg.src = b.dataset.thumb!;
-          mainImg.animate([{ opacity: 0.25 }, { opacity: 1 }], { duration: 220, easing: 'ease' });
-        }
-        root.querySelectorAll('[data-thumb]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-      }),
+    // The picture is always shown whole, in its own proportions; choosing a size only changes the
+    // dimension labels, never the crop.
+    const fitPhoto = (animate: boolean) => {
+      if (!frame || !mainImg?.naturalWidth) return;
+      if (!animate) frame.style.transition = 'none';
+      frame.style.setProperty('--r', String(mainImg.naturalWidth / mainImg.naturalHeight));
+      if (!animate) { frame.offsetWidth; frame.style.transition = ''; }
+    };
+    if (mainImg) {
+      if (mainImg.complete) fitPhoto(false);
+      let first = !mainImg.complete;
+      mainImg.addEventListener('load', () => { fitPhoto(!first); first = false; });
+    }
+    // Gallery: thumbs, arrows, keyboard and swipe all go through show(). The first photo is the cover.
+    const thumbs = [...root.querySelectorAll<HTMLButtonElement>('[data-thumb]')];
+    const countEl = root.querySelector<HTMLElement>('[data-count]');
+    const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let cur = 0;
+    const show = (i: number, dir: number) => {
+      const n = thumbs.length;
+      if (!mainImg || n < 2) return;
+      i = (i + n) % n;
+      if (i === cur) return;
+      cur = i;
+      mainImg.src = thumbs[i].dataset.thumb!;
+      mainImg.animate(
+        reduceMotion
+          ? [{ opacity: 0.3 }, { opacity: 1 }]
+          : [{ opacity: 0, transform: `translateX(${dir * 28}px)` }, { opacity: 1, transform: 'none' }],
+        { duration: reduceMotion ? 200 : 360, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' },
+      );
+      thumbs.forEach((x, j) => x.setAttribute('aria-pressed', String(j === i)));
+      const strip = thumbs[i].parentElement!;
+      strip.scrollTo({ left: thumbs[i].offsetLeft - strip.clientWidth / 2 + thumbs[i].offsetWidth / 2, behavior: reduceMotion ? 'auto' : 'smooth' });
+      if (countEl) countEl.textContent = String(i + 1);
+      // Warm up the neighbours so the next step is instant.
+      for (const k of [i + 1, i - 1]) new Image().src = thumbs[(k + n) % n].dataset.thumb!;
+    };
+    thumbs.forEach((b, j) => b.addEventListener('click', () => show(j, Math.sign(j - cur))));
+    root.querySelectorAll<HTMLButtonElement>('[data-nav]').forEach((b) =>
+      b.addEventListener('click', () => { const d = Number(b.dataset.nav); show(cur + d, d); }),
     );
+    const media = root.querySelector<HTMLElement>('.media');
+    media?.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); show(cur - 1, -1); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); show(cur + 1, 1); }
+    });
+    const frameEl = root.querySelector<HTMLElement>('.frame');
+    if (frameEl && thumbs.length > 1) {
+      let sx = 0, sy = 0, sid = -1;
+      frameEl.addEventListener('pointerdown', (e) => { sx = e.clientX; sy = e.clientY; sid = e.pointerId; });
+      const end = (e: PointerEvent) => {
+        if (e.pointerId !== sid) return;
+        sid = -1;
+        const dx = e.clientX - sx, dy = e.clientY - sy;
+        if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.2) show(cur - Math.sign(dx), -Math.sign(dx));
+      };
+      frameEl.addEventListener('pointerup', end);
+      frameEl.addEventListener('pointercancel', () => { sid = -1; });
+    }
 
     // Switch between "buy" and "ask when available". The block that appears skipped the scroll-reveal
     // while it was hidden, so it is marked as revealed straight away.

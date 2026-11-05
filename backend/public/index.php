@@ -269,6 +269,11 @@ try {
                 'orders_new' => $count("SELECT COUNT(*) FROM orders WHERE status = 'new'"),
                 'messages_new' => $count("SELECT COUNT(*) FROM messages WHERE status = 'new'"),
                 'orders_held' => $count("SELECT COUNT(*) FROM orders WHERE payment_status = 'held'"),
+                // Change markers for the admin's live refresh: newest ids, plus the latest payment update
+                // (payments change orders after they arrive, through the provider's callback).
+                'orders_last' => $count('SELECT COALESCE(MAX(id), 0) FROM orders'),
+                'messages_last' => $count('SELECT COALESCE(MAX(id), 0) FROM messages'),
+                'orders_rev' => (string) $pdo->query("SELECT COALESCE(MAX(payment_updated_at), '') FROM orders")->fetchColumn(),
             ];
         }],
 

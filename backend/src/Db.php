@@ -143,6 +143,10 @@ SQL);
         if (!in_array('in_stock', $cols, true)) {
             $pdo->exec('ALTER TABLE products ADD COLUMN in_stock INTEGER NOT NULL DEFAULT 1');
         }
+        // Category: wall panels vs shelves (existing products are panels).
+        if (!in_array('category', $cols, true)) {
+            $pdo->exec("ALTER TABLE products ADD COLUMN category TEXT NOT NULL DEFAULT 'panel'");
+        }
         if (!in_array('orientation', $cols, true)) {
             $pdo->exec("ALTER TABLE products ADD COLUMN orientation TEXT NOT NULL DEFAULT 'landscape'");
         }

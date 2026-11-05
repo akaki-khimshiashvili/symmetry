@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
+import { useLive } from '../live';
 import { api, type Order, type Message, fmtDate, fmtPrice, CHANNELS } from '../api';
 import { Icon, Loading, toast } from '../ui';
 
@@ -10,11 +11,12 @@ export function Dashboard() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [rebuilding, setRebuilding] = useState(false);
 
-  useEffect(() => {
+  const load = (quiet = false) =>
     Promise.all([api<Stats>('/admin/stats'), api<Order[]>('/admin/orders'), api<Message[]>('/admin/messages')])
       .then(([s, o, m]) => { setStats(s); setOrders(o.slice(0, 5)); setMessages(m.slice(0, 5)); })
-      .catch((e) => toast.err(e.message));
-  }, []);
+      .catch((e) => { if (!quiet) toast.err(e.message); });
+  useEffect(() => { load(); }, []);
+  useLive(['orders', 'messages'], () => load(true));
 
   const rebuild = async () => {
     setRebuilding(true);

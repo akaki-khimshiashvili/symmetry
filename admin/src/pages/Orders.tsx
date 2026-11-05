@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
+import { useLive } from '../live';
 import { api, type Order, type PaymentConfig, PAYMENT, fmtDate, fmtPrice, CLIENT_TYPES, CHANNELS, SITE_URL } from '../api';
-import { Icon, Loading, Empty, toast, confirmAction } from '../ui';
+import { Icon, Loading, Empty, toast, confirmAction, cap } from '../ui';
 
 const STATUS: Record<string, string> = { new: 'ახალი', in_progress: 'მუშავდება', done: 'დასრულებული', cancelled: 'გაუქმებული' };
 const HELD = 'held';
@@ -123,6 +124,7 @@ export function OrdersPage({ onChange }: { onChange: () => void }) {
     setTimeout(() => setFlash((f) => (f === id ? null : f)), 2400);
   };
   const load = () => api<Order[]>('/admin/orders').then(setItems).catch((e) => toast.err(e.message));
+  useLive('orders', () => api<Order[]>('/admin/orders').then(setItems).catch(() => {})); // new orders / payments appear by themselves
   useEffect(() => {
     load();
     api<PaymentConfig>('/admin/payments').then(setPay).catch(() => {});
@@ -206,7 +208,7 @@ export function OrdersPage({ onChange }: { onChange: () => void }) {
       <div class="tabs" role="tablist">
         {tabs.map(([k, v]) => (
           <button key={k} type="button" role="tab" aria-selected={filter === k} class={filter === k ? 'on' : ''} onClick={() => setFilter(k)}>
-            {v}{items && <span class="count">{items.filter((o) => matches(o, k)).length}</span>}
+            {v}{items && <span class="count">{cap(items.filter((o) => matches(o, k)).length)}</span>}
           </button>
         ))}
       </div>

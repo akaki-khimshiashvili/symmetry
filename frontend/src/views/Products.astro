@@ -2,7 +2,7 @@
 import Base from '../layouts/Base.astro';
 import SpecimenCard from '../components/SpecimenCard.astro';
 import { type Lang, useT } from '../i18n/ui';
-import { loadData } from '../lib/data';
+import { loadData, kindOf } from '../lib/data';
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
@@ -14,8 +14,9 @@ const { products } = await loadData();
     <h1 class="display t-4xl" data-reveal>{t('products.title')}</h1>
     <p class="lead" data-reveal style="--d:1">{t('products.lead')}</p>
     <div class="filter" role="group" aria-label={t('type.filter')} data-filter>
-      {(['all', 'portrait', 'landscape'] as const).map((k) => {
-        const n = k === 'all' ? products.length : products.filter((p) => p.orientation === k).length;
+      {(['all', 'portrait', 'landscape', 'shelf', 'wall'] as const).map((k) => {
+        const n = k === 'all' ? products.length : products.filter((p) => kindOf(p) === k).length;
+        if (k !== 'all' && n === 0) return null;
         return (
           <button type="button" data-f={k} aria-pressed={k === 'all' ? 'true' : 'false'}>
             <span class="notch" aria-hidden="true"></span>
@@ -35,7 +36,7 @@ const { products } = await loadData();
         {products.map((p, i) => {
           const r = p.orientation === 'portrait' ? 0.75 : 1.3333;
           return (
-            <div class="cell" data-type={p.orientation} style={`--r:${r}`}>
+            <div class="cell" data-type={kindOf(p)} style={`--r:${r}`}>
               <SpecimenCard product={p} index={i} lang={lang} ratio={r} d={i % 3} heading="h2" />
             </div>
           );
@@ -46,7 +47,7 @@ const { products } = await loadData();
 </Base>
 
 <style>
-  .intro { padding-block: var(--s-5) var(--s-6); }
+  .intro { padding-block: var(--s-5) var(--s-3); }
   .filter { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-top: var(--s-2); }
   .filter button {
     display: inline-flex; align-items: center; gap: 0.6rem; padding: 0.7rem 1.1rem; cursor: pointer;
@@ -63,13 +64,17 @@ const { products } = await loadData();
   /* Justified rows: every picture in a row shares one height and its width follows its shape
      (flex-grow and flex-basis ∝ aspect ratio). max-width ∝ ratio too, so a short last row keeps
      the same height instead of ballooning. Rows are centred. */
-  .cat { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: var(--s-5) calc(var(--gutter) * 1.5); }
+  .cat { --gap: calc(var(--gutter) * 1.5); container-type: inline-size; display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: var(--s-5) var(--gap); }
   .cell { flex: var(--r) 1 calc(var(--r) * 15rem); max-width: calc(var(--r) * 26rem); min-width: 0; }
   .cell[hidden] { display: none; }
-  /* Wider screens: one shared picture height for the whole catalogue; widths follow each shape. */
+  /* Wider screens: one shared picture height for the whole catalogue; widths follow each shape.
+     The height comes from the grid's own width so whole rows fit: 2 landscape pieces per row on
+     tablets, 3 on larger screens (portrait pieces are narrower, so their rows hold more). */
   @media (min-width: 621px) {
-    .cat { --h: clamp(12rem, 17vw, 18rem); }
-    .cell { flex: 0 0 calc(var(--r) * var(--h)); max-width: none; }
+    .cell { --h: calc((100cqw - var(--gap) - 1px) / (2 * 1.3333)); flex: 0 0 calc(var(--r) * var(--h)); max-width: none; }
+  }
+  @container (min-width: 900px) {
+    .cell { --h: calc((100cqw - 2 * var(--gap) - 1px) / (3 * 1.3333)); }
   }
   .empty { padding-block: var(--s-6); }
   @media (max-width: 620px) {
@@ -116,6 +121,6 @@ const { products } = await loadData();
       if (b && b.getAttribute('aria-pressed') !== 'true') apply(b.dataset.f!, true);
     });
     const initial = new URLSearchParams(location.search).get('type');
-    if (initial === 'portrait' || initial === 'landscape') apply(initial);
+    if (initial === 'portrait' || initial === 'landscape' || initial === 'shelf' || initial === 'wall') apply(initial);
   }
 </script>

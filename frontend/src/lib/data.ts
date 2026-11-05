@@ -12,6 +12,8 @@ export interface Product {
   slug: string;
   pattern: string;
   orientation: 'portrait' | 'landscape';
+  /** Wall panel, shelf or whole wall. Missing (older API / seed data) counts as a panel. */
+  category?: 'panel' | 'shelf' | 'wall';
   featured: boolean;
   /** Missing (seed data) counts as in stock. */
   in_stock?: boolean;
@@ -56,7 +58,7 @@ function fromSeed() {
     sizes: p.sizes.map((s: any) => ({ id: sizeId++, ...s })),
   }));
   products.forEach((p) => (p.orientation ||= orientationOf(p)));
-  return { products, settings: seed.settings as Settings };
+  return { products: stockLast(products), settings: seed.settings as Settings };
 }
 
 /**
@@ -75,6 +77,7 @@ export async function loadData() {
     if (!p.ok || !s.ok) throw new Error(`API responded ${p.status}/${s.status}`);
     cache = { products: await p.json(), settings: await s.json() };
     cache.products.forEach((p) => (p.orientation ||= orientationOf(p)));
+    cache.products = stockLast(cache.products);
     console.log(`[symmetry] loaded ${cache.products.length} products from ${API_URL}`);
   } catch (err) {
     console.warn(`[symmetry] API unavailable (${(err as Error).message}); using backend/data/seed.json`);
@@ -83,10 +86,18 @@ export async function loadData() {
   return cache;
 }
 
+/** Products that can't be ordered go to the end of every list; otherwise the admin's order is kept (stable sort). */
+const stockLast = (list: Product[]) => [...list].sort((a, b) => Number(a.in_stock === false) - Number(b.in_stock === false));
+
 export function orientationOf(p: Pick<Product, 'sizes'>): 'portrait' | 'landscape' {
   const s = p.sizes[0];
   return s && s.height > s.width ? 'portrait' : 'landscape';
 }
+
+/** The catalogue section a product belongs to: shelves are one group, panels split by shape. */
+export type Kind = 'portrait' | 'landscape' | 'shelf' | 'wall';
+export const kindOf = (p: Pick<Product, 'category' | 'orientation'>): Kind =>
+  p.category === 'shelf' || p.category === 'wall' ? p.category : p.orientation;
 
 export const priceFmt = (n: number) =>
   new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(n).replace(/,/g, ' ');

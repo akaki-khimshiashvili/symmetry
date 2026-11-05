@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { api, ApiError, type Product, type Size, type L10n, type OptionSet, ORIENTATIONS, SITE_URL, fmtPrice, FEATURED_MAX } from '../api';
+import { api, ApiError, type Product, type Size, type L10n, type OptionSet, PRODUCT_TYPES, typeOf, type ProductType, SITE_URL, fmtPrice, FEATURED_MAX } from '../api';
 import { Icon, Loading, toast, confirmAction } from '../ui';
 import { OptionSelect, SizeSelect } from '../options';
+import { CropDialog } from '../crop';
 
 const fmtDuration = (min: number) => {
   const h = Math.floor(min / 60), m = min % 60;
@@ -10,7 +11,7 @@ const fmtDuration = (min: number) => {
 
 const blankL = (): L10n => ({ ka: '', en: '' });
 const blank = (): Product => ({
-  slug: '', pattern: 'wave', orientation: 'landscape', featured: false, in_stock: true, sale: { ends_at: '' }, published: true, sort: 0,
+  slug: '', pattern: 'wave', orientation: 'landscape', category: 'panel', featured: false, in_stock: true, sale: { ends_at: '' }, published: true, sort: 0,
   name: blankL(), short: blankL(), description: blankL(), material: blankL(),
   delivery_days: { min: 14, max: 21 }, installation_minutes: 240,
   sizes: [{ width: 120, height: 80, price: 0, sale_percent: 0 }], images: [],
@@ -57,10 +58,14 @@ export function ProductEdit({ id }: { id: string }) {
   /** How many OTHER products are already on the home page. */
   const [othersFeatured, setOthersFeatured] = useState(0);
   // Photos chosen before the product's first save: uploaded right after it is created.
+  const [popped, setPopped] = useState<string | null>(null); // the photo that just became the cover (plays a pop)
   const [pending, setPending] = useState<{ file: File; url: string }[]>([]);
+  // Photos waiting in the crop step (every photo is framed to the product's shape before upload).
+  const [toCrop, setToCrop] = useState<File[]>([]);
+  const savedOrientation = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!isNew) api<Product>(`/admin/products/${id}`).then(setP).catch((e) => toast.err(e.message));
+    if (!isNew) api<Product>(`/admin/products/${id}`).then((x) => { savedOrientation.current = x.orientation; setP(x); }).catch((e) => toast.err(e.message));
     api<OptionSet>('/admin/options').then(setOpts).catch((e) => toast.err(e.message));
     api<Product[]>('/admin/products')
       .then((all) => setOthersFeatured(all.filter((x) => x.featured && String(x.id) !== String(id)).length))
@@ -77,6 +82,11 @@ export function ProductEdit({ id }: { id: string }) {
   if (!p || !opts) return <Loading />;
 
   const set = <K extends keyof Product>(k: K, v: Product[K]) => { setP({ ...p, [k]: v }); setDirty(true); };
+  /** Panels are split by shape; shelves and whole walls keep their photo format (chosen when cropping). */
+  const setType = (ty: ProductType) => {
+    setP(ty === 'portrait' || ty === 'landscape' ? { ...p, category: 'panel', orientation: ty } : { ...p, category: ty });
+    setDirty(true);
+  };
   const setSize = (i: number, patch: Partial<Size>) => set('sizes', p.sizes.map((s, j) => (j === i ? { ...s, ...patch } : s)));
   const addSize = () => {
     // Next saved size this product doesn't use yet; the dropdown can switch it or add a new one.
@@ -102,6 +112,7 @@ export function ProductEdit({ id }: { id: string }) {
         } catch (e: any) { toast.err(`პროდუქტი შეინახა, მაგრამ ფოტო ვერ აიტვირთა: ${e.message}`); }
       }
       setP(saved);
+      savedOrientation.current = saved.orientation;
       setDirty(false);
       toast.ok(isNew ? 'პროდუქტი დაემატა' : 'ცვლილებები შენახულია');
       if (isNew) location.hash = `/products/${saved.id}`;
@@ -127,6 +138,13 @@ export function ProductEdit({ id }: { id: string }) {
     if (!list.length) return toast.err('დაშვებულია მხოლოდ JPG, PNG, WEBP, AVIF');
     const big = list.find((f) => f.size > 8 * 1024 * 1024);
     if (big) return toast.err(`„${big.name}“ 8 MB-ზე დიდია`);
+    setToCrop(list);
+  };
+
+  /** Upload the cropped photos (or keep them until the first save). */
+  const sendCropped = async (list: File[]) => {
+    setToCrop([]);
+    if (!list.length) return;
     if (!p.id) {
       // Not saved yet: keep the photos here and upload them with the first save.
       setPending([...pending, ...list.map((file) => ({ file, url: URL.createObjectURL(file) }))]);
@@ -138,7 +156,20 @@ export function ProductEdit({ id }: { id: string }) {
       const updated = await sendFiles(p.id, list);
       setP({ ...p, images: updated.images });
       toast.ok(list.length > 1 ? `${list.length} ფოტო აიტვირთა` : 'ფოტო აიტვირთა');
+      if (savedOrientation.current && savedOrientation.current !== p.orientation) {
+        toast.ok('ფორმატი შეიცვალა: დააჭირეთ „შენახვას“, რომ საიტზეც აისახოს');
+      }
     } catch (e: any) { toast.err(e.message); } finally { setUploading(false); }
+  };
+  /** Not uploaded yet: they upload in this order, so the first one becomes the cover. */
+  const makePendingCover = (i: number) => {
+    if (i === 0) return;
+    const list = [...pending];
+    const [x] = list.splice(i, 1);
+    list.unshift(x);
+    setPending(list);
+    setPopped(x.url);
+    setDirty(true);
   };
   const removePending = (i: number) => {
     URL.revokeObjectURL(pending[i].url);
@@ -161,6 +192,20 @@ export function ProductEdit({ id }: { id: string }) {
     setP({ ...p, images: imgs });
     try {
       await api(`/admin/products/${p.id}/images/order`, { method: 'PUT', body: { ids: imgs.map((i) => i.id) } });
+    } catch (e: any) { toast.err(e.message); }
+  };
+
+  /** The cover is the first photo: it shows in the catalogue and opens the product page gallery. */
+  const makeCover = async (idx: number) => {
+    if (idx === 0) return;
+    const imgs = [...p.images];
+    const [img] = imgs.splice(idx, 1);
+    imgs.unshift(img);
+    setP({ ...p, images: imgs });
+    setPopped(`i${img.id}`);
+    try {
+      await api(`/admin/products/${p.id}/images/order`, { method: 'PUT', body: { ids: imgs.map((i) => i.id) } });
+      toast.ok('მთავარი ფოტო შეიცვალა');
     } catch (e: any) { toast.err(e.message); }
   };
 
@@ -194,15 +239,19 @@ export function ProductEdit({ id }: { id: string }) {
             <h2>ძირითადი ინფორმაცია</h2>
             <fieldset class="seg-field">
               <legend>პროდუქტის ტიპი</legend>
-              <div class="seg">
-                {Object.entries(ORIENTATIONS).map(([k, v]) => (
-                  <label key={k} class={p.orientation === k ? 'on' : ''}>
-                    <input type="radio" name="orientation" value={k} checked={p.orientation === k} onChange={() => set('orientation', k as Product['orientation'])} />
-                    {v}
+              <div class="seg type-seg">
+                {PRODUCT_TYPES.map((ty) => (
+                  <label key={ty.key} class={typeOf(p) === ty.key ? 'on' : ''}>
+                    <input type="radio" name="ptype" value={ty.key} checked={typeOf(p) === ty.key} onChange={() => setType(ty.key)} />
+                    <span class={`type-ico ${ty.key}`} aria-hidden="true" />
+                    <span class="type-txt"><b>{ty.label}</b><small>{ty.hint}</small></span>
                   </label>
                 ))}
               </div>
-              {errors.orientation && <span class="err">{errors.orientation}</span>}
+              {(typeOf(p) === 'shelf' || typeOf(p) === 'wall') && (
+                <span class="muted small">ფოტოს ფორმატს (ვერტიკალური 3:4 თუ ჰორიზონტალური 4:3) ატვირთვისას, კადრირების ფანჯარაში აირჩევთ.</span>
+              )}
+              {(errors.category || errors.orientation) && <span class="err">{errors.category || errors.orientation}</span>}
             </fieldset>
             <Bilingual label="დასახელება" field="name" value={p.name} onChange={(v) => set('name', v)} errors={errors} />
             <Bilingual label="მოკლე აღწერა" hint="ჩანს კატალოგში" field="short" value={p.short} onChange={(v) => set('short', v)} errors={errors} />
@@ -269,6 +318,15 @@ export function ProductEdit({ id }: { id: string }) {
           </section>
         </div>
 
+        {toCrop.length > 0 && (
+          <CropDialog
+            files={toCrop}
+            orientation={p.orientation}
+            onOrientation={(o) => set('orientation', o)}
+            onDone={sendCropped}
+            onClose={() => setToCrop([])}
+          />
+        )}
         <aside class="col-side">
           <section class="card pad-lg">
             <h2>ფოტოები</h2>
@@ -285,16 +343,16 @@ export function ProductEdit({ id }: { id: string }) {
                   <p>{uploading ? 'იტვირთება…' : 'ჩააგდეთ ფოტოები აქ'}</p>
                   <button class="btn ghost sm" type="button" disabled={uploading} onClick={() => fileRef.current?.click()}>ფაილის არჩევა</button>
                   <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple hidden onChange={(e) => { upload(e.currentTarget.files); e.currentTarget.value = ''; }} />
-                  <span class="muted small">JPG, PNG, WEBP, AVIF · მაქს. 8 MB</span>
+                  <span class="muted small">JPG, PNG, WEBP, AVIF · მაქს. 8 MB · ატვირთვამდე დაკადრირდება {p.orientation === 'portrait' ? '3:4' : '4:3'} ფორმატში</span>
                 </div>
                 {pending.length > 0 && (
-                  <ul class="imgs">
+                  <ul class={`imgs ${p.orientation}`}>
                     {pending.map((x, i) => (
-                      <li key={x.url}>
+                      <li key={x.url} class={`${p.images.length === 0 && i === 0 ? 'is-cover' : ''} ${popped === x.url && i === 0 ? 'pop' : ''}`}>
                         <img src={x.url} alt="" />
-                        {i === 0 && p.images.length === 0 && <span class="cover">მთავარი</span>}
-                        <span class="pending-tag">შენახვისას აიტვირთება</span>
+                        {p.images.length === 0 && <CoverStar on={i === 0} onPick={() => makePendingCover(i)} />}
                         <div class="img-tools">
+                          <span class="pending-tag" title="ფოტო აიტვირთება პროდუქტის შენახვისას">შენახვისას</span>
                           <button type="button" class="icon-btn danger" onClick={() => removePending(i)} aria-label="წაშლა"><Icon name="trash" size={16} /></button>
                         </div>
                       </li>
@@ -302,11 +360,11 @@ export function ProductEdit({ id }: { id: string }) {
                   </ul>
                 )}
                 {p.images.length > 0 && (
-                  <ul class="imgs">
+                  <ul class={`imgs ${p.orientation}`}>
                     {p.images.map((img, i) => (
-                      <li key={img.id}>
+                      <li key={img.id} class={`${i === 0 ? 'is-cover' : ''} ${popped === `i${img.id}` && i === 0 ? 'pop' : ''}`}>
                         <img src={img.url} alt="" />
-                        {i === 0 && <span class="cover">მთავარი</span>}
+                        <CoverStar on={i === 0} onPick={() => makeCover(i)} />
                         <div class="img-tools">
                           <button type="button" class="icon-btn" onClick={() => moveImage(i, -1)} disabled={i === 0} aria-label="მარცხნივ"><Icon name="left" size={16} /></button>
                           <button type="button" class="icon-btn" onClick={() => moveImage(i, 1)} disabled={i === p.images.length - 1} aria-label="მარჯვნივ"><Icon name="right" size={16} /></button>
@@ -344,9 +402,6 @@ export function ProductEdit({ id }: { id: string }) {
                 : `მთავარ გვერდზე: ${othersFeatured + (p.featured ? 1 : 0)} / ${FEATURED_MAX}`}
             </p>
             {errors.featured && <span class="err">{errors.featured}</span>}
-            <label class="fld"><span>რიგითობა</span>
-              <input type="number" value={p.sort} onInput={(e) => set('sort', Number(e.currentTarget.value))} />
-            </label>
             <label class="fld"><span>ბმული (slug)</span>
               <input value={p.slug} placeholder="ავტომატურად ინგლისური სახელიდან" onInput={(e) => set('slug', e.currentTarget.value)} />
             </label>
@@ -359,5 +414,21 @@ export function ProductEdit({ id }: { id: string }) {
         </aside>
       </div>
     </form>
+  );
+}
+
+/** Cover toggle on a photo tile: a filled star + label on the cover, an outlined star elsewhere. */
+function CoverStar({ on, onPick }: { on: boolean; onPick: () => void }) {
+  return (
+    <button
+      type="button"
+      class={`cover-star ${on ? 'on' : ''}`}
+      aria-pressed={on}
+      onClick={on ? undefined : onPick}
+      title={on ? 'მთავარი ფოტო: ჩანს კატალოგში და პირველი პროდუქტის გვერდზე' : 'მთავარ ფოტოდ დაყენება'}
+    >
+      <Icon name="star" size={15} />
+      <span class="cs-label">{on ? 'მთავარი' : 'მთავარად'}</span>
+    </button>
   );
 }

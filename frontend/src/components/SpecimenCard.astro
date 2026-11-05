@@ -1,7 +1,7 @@
 ---
 import Leaf from './Leaf.astro';
 import { type Lang, useT, path } from '../i18n/ui';
-import { type Product, loc, minPrice, minListPrice, onSale, saleUniform, priceFmt } from '../lib/data';
+import { type Product, kindOf, loc, minPrice, minListPrice, onSale, saleUniform, priceFmt } from '../lib/data';
 
 interface Props { product: Product; index: number; lang: Lang; ratio?: number; d?: number; class?: string; heading?: 'h2' | 'h3'; compact?: boolean }
 const { product: p, index, lang, ratio = 0.8, d = 0, class: cls = '', heading = 'h3', compact = false } = Astro.props;
@@ -13,7 +13,7 @@ const sale = onSale(p);
 const saleText = sale ? (saleUniform(p) ? `−${p.sale!.percent}%` : t('sale.upTo').replace('{p}', `−${p.sale!.percent}%`)) : '';
 const was = minListPrice(p);
 ---
-<a class:list={['spec', cls, { compact }]} href={path(lang, `/products/${p.slug}/`)} data-reveal data-type={p.orientation} style={`--d:${d}`}>
+<a class:list={['spec', cls, { compact }]} href={path(lang, `/products/${p.slug}/`)} data-reveal data-type={kindOf(p)} style={`--d:${d}`}>
   <div class="frame lift">
     <Leaf product={p} alt={loc(p.name, lang)} ratio={ratio} />
     {p.in_stock === false && <span class="stock-out">{t('p.outOfStock')}</span>}
@@ -39,7 +39,7 @@ const was = minListPrice(p);
         {lang === 'en' && <span class="from">{t('collection.from')} </span>}{was && <s class="was">₾ {priceFmt(was)}</s>}₾ {priceFmt(minPrice(p))}{lang === 'ka' && <span class="from"> {t('collection.from')}</span>}
       </span>
     </div>
-    <span class="sizes">{t(`type.${p.orientation}.s` as any)} · {sizes} {t('products.sizes')}</span>
+    <span class="sizes">{t(`type.${kindOf(p)}.s` as any)} · {sizes} {t('products.sizes')}</span>
   </div>
   )}
 </a>

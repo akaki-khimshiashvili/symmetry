@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { api, type Product, fmtPrice, ORIENTATIONS, SITE_URL, FEATURED_MAX } from '../api';
+import { api, type Product, fmtPrice, typeLabel, SITE_URL, FEATURED_MAX } from '../api';
 import { Icon, Loading, Empty, toast, confirmAction } from '../ui';
 import { Preview } from './Preview';
 
@@ -67,7 +67,7 @@ export function ProductsPage() {
                       <a class="strong" href={`#/products/${p.id}`}>{p.name.ka}</a>
                       <div class="muted small">{p.name.en} · /{p.slug}</div>
                     </td>
-                    <td>{ORIENTATIONS[p.orientation] ?? ''}</td>
+                    <td>{typeLabel(p)}</td>
                     <td class="num">{p.sizes.length}</td>
                     <td class="num nowrap">
                       {prices.length ? `${fmtPrice(Math.min(...prices))}${prices.length > 1 ? ` – ${fmtPrice(Math.max(...prices))}` : ''}` : 'ფასი არ არის'}

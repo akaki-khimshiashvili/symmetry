@@ -142,10 +142,15 @@ const intents = [
   </button>
   {pays && <p class="pay-note">{t('order.payNote')}</p>}
 
-  <div class="done" data-done hidden tabindex="-1">
-    <span class="done-mark"><Icon name="check" size={22} /></span>
+  <div class="done" data-done hidden tabindex="-1" role="status">
+    <span class="done-mark" aria-hidden="true">
+      <svg viewBox="0 0 52 52" width="52" height="52"><path class="done-tick" d="M15 27.5 22.5 35 37.5 18" /></svg>
+    </span>
     <p class="done-t">{kind === 'order' ? t('order.success.t') : t('f.success.t')}</p>
     <p class="done-d">{kind === 'order' ? t('order.success.d') : t('f.success.d')}</p>
+    {kind === 'contact' && (
+      <button type="button" class="btn btn-line done-again" data-again>{t('f.again')}</button>
+    )}
   </div>
 </form>
 
@@ -281,24 +286,51 @@ const intents = [
   .submit { justify-self: start; min-width: 12rem; gap: 0.6rem; }
   .submit:active { transform: scale(0.97); }
 
-  /* ---------- Sent ---------- */
+  /* ---------- Sent ----------
+     The form steps aside (kept in place, so the card keeps its height) and a centred confirmation
+     takes its spot: a ring that blooms, a tick that draws itself, then the words rise in. */
+  .lead:has(.done:not([hidden])) > :not(.done) { visibility: hidden; }
   .done {
-    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 0.5rem;
-    background: var(--ground); outline: none;
-    opacity: 1; transform: none; transition: opacity 250ms var(--ease-out), transform 250ms var(--ease-out);
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 1rem; text-align: center; outline: none;
   }
   .done[hidden] { display: none; }
-  @starting-style { .done:not([hidden]) { opacity: 0; transform: translateY(8px); } }
-  .done-mark { display: inline-flex; width: 3rem; height: 3rem; align-items: center; justify-content: center; border-radius: 50%; background: var(--accent); color: var(--accent-ink); margin-bottom: 0.75rem; }
-  .done-t { font-family: var(--f-display); font-size: var(--t-2xl); line-height: 1.15; }
-  .done-d { color: var(--ink-2); }
+  .done-mark {
+    position: relative; display: grid; place-items: center; width: 5.5rem; height: 5.5rem; margin-bottom: 1.5rem;
+    border-radius: 50%; background: var(--accent); color: var(--accent-ink);
+    box-shadow: 0 0 0 10px color-mix(in oklab, var(--accent) 9%, transparent), 0 18px 34px -14px rgb(40 22 10 / 0.5);
+    animation: done-bloom 600ms var(--ease-out) both;
+  }
+  .done-mark::after {
+    content: ''; position: absolute; inset: 0; border-radius: 50%;
+    border: 1.5px solid color-mix(in oklab, var(--accent) 45%, transparent);
+    animation: done-ring 1100ms var(--ease-out) 250ms both;
+  }
+  .done-mark svg { width: 2.6rem; height: 2.6rem; overflow: visible; }
+  .done-tick {
+    fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round;
+    stroke-dasharray: 36; stroke-dashoffset: 36; animation: done-draw 420ms var(--ease-out) 330ms forwards;
+  }
+  .done-t {
+    margin: 0; max-width: 20ch; font-family: var(--f-display); font-size: var(--t-xl); line-height: 1.2; text-wrap: balance;
+    animation: done-rise 600ms var(--ease-out) 420ms both;
+  }
+  .done-d { margin: 0.6rem 0 0; max-width: 32ch; color: var(--ink-2); text-wrap: pretty; animation: done-rise 600ms var(--ease-out) 500ms both; }
+  .done-again { margin-top: 1.75rem; animation: done-rise 600ms var(--ease-out) 600ms both; }
+  .done-again:active { transform: scale(0.97); }
+  @keyframes done-bloom { from { opacity: 0; transform: scale(0.6); } 60% { opacity: 1; transform: scale(1.06); } to { transform: none; } }
+  @keyframes done-ring { from { opacity: 0.9; transform: scale(1); } to { opacity: 0; transform: scale(1.7); } }
+  @keyframes done-draw { to { stroke-dashoffset: 0; } }
+  @keyframes done-rise { from { opacity: 0; transform: translateY(10px); } }
 
   @media (max-width: 620px) {
     .fields { grid-template-columns: 1fr; }
     .submit { width: 100%; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .done { transform: none; }
+    .done-mark, .done-mark::after, .done-t, .done-d, .done-again { animation: none; }
+    .done-mark::after { display: none; }
+    .done-tick { animation: none; stroke-dashoffset: 0; }
     .dd-list, .dd[data-open] .dd-list { transform: none; }
   }
 </style>
@@ -373,6 +405,15 @@ const intents = [
       };
       const open = () => { dd.setAttribute('data-open', ''); btn.setAttribute('aria-expanded', 'true'); setActive(Math.max(0, selected())); };
       const close = () => { dd.removeAttribute('data-open'); btn.setAttribute('aria-expanded', 'false'); setActive(-1); };
+      const placeholder = label.textContent;
+      // "Send another message": back to the empty choice.
+      form.addEventListener('reset', () => {
+        opts.forEach((o) => o.setAttribute('aria-selected', 'false'));
+        input.value = '';
+        label.textContent = placeholder;
+        btn.setAttribute('data-empty', '');
+        close();
+      });
       const choose = (i: number) => {
         opts.forEach((o, j) => o.setAttribute('aria-selected', String(j === i)));
         input.value = opts[i].dataset.value || '';
@@ -473,6 +514,7 @@ const intents = [
         }
         done.hidden = false;
         done.focus();
+        formErr.hidden = true;
         form.dispatchEvent(new CustomEvent('lead:sent', { bubbles: true }));
       } catch (err) {
         const m = err instanceof Error && (err.message === msgs.generic || err.message === msgs.outOfStock) ? err.message : msgs.network;
@@ -484,6 +526,14 @@ const intents = [
           btnLabel.textContent = btn.dataset.label || '';
         }
       }
+    });
+
+    // "Send another message": clear the form and bring it back.
+    done.querySelector<HTMLButtonElement>('[data-again]')?.addEventListener('click', () => {
+      form.reset();
+      syncChannel();
+      done.hidden = true;
+      form.querySelector<HTMLElement>('input:not([type=hidden]):not(.hp input)')?.focus();
     });
   });
 </script>
