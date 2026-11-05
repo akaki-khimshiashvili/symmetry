@@ -122,8 +122,27 @@ CREATE TABLE IF NOT EXISTS tokens (
     expires_at INTEGER NOT NULL
 );
 SQL);
+        Payments::migrate($pdo);
         // Upgrade databases created before product types existed.
         $cols = array_column($pdo->query('PRAGMA table_info(products)')->fetchAll(), 'name');
+        // Stock flag: products out of stock can't be ordered (existing products start in stock).
+        // Sale: a percentage off every size, optionally until a date (inclusive, Tbilisi time).
+        if (!in_array('sale_percent', $cols, true)) {
+            $pdo->exec('ALTER TABLE products ADD COLUMN sale_percent INTEGER NOT NULL DEFAULT 0');
+            $pdo->exec("ALTER TABLE products ADD COLUMN sale_ends_at TEXT NOT NULL DEFAULT ''");
+        }
+        // Sale per size: each size has its own percentage (the end date stays per product).
+        $sizeCols = array_column($pdo->query('PRAGMA table_info(product_sizes)')->fetchAll(), 'name');
+        if (!in_array('sale_percent', $sizeCols, true)) {
+            $pdo->exec('ALTER TABLE product_sizes ADD COLUMN sale_percent INTEGER NOT NULL DEFAULT 0');
+            // Carry over product-wide sales to every size of that product.
+            if (in_array('sale_percent', array_column($pdo->query('PRAGMA table_info(products)')->fetchAll(), 'name'), true)) {
+                $pdo->exec('UPDATE product_sizes SET sale_percent = (SELECT sale_percent FROM products WHERE products.id = product_sizes.product_id)');
+            }
+        }
+        if (!in_array('in_stock', $cols, true)) {
+            $pdo->exec('ALTER TABLE products ADD COLUMN in_stock INTEGER NOT NULL DEFAULT 1');
+        }
         if (!in_array('orientation', $cols, true)) {
             $pdo->exec("ALTER TABLE products ADD COLUMN orientation TEXT NOT NULL DEFAULT 'landscape'");
         }

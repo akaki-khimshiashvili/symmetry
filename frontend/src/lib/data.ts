@@ -3,13 +3,19 @@ import path from 'node:path';
 import type { Lang } from '../i18n/ui';
 
 export type L10n = { ka: string; en: string };
-export interface Size { id: number; width: number; height: number; price: number }
+/** `price` is the regular price; `sale_price` (from the API) is what the customer pays today. */
+export interface Size { id: number; width: number; height: number; price: number; sale_percent?: number; sale_price?: number }
+/** Summary of the per-size sale: biggest / smallest discount, shared end date, running today. */
+export interface Sale { percent: number; min_percent?: number; ends_at: string; active: boolean }
 export interface Product {
   id: number;
   slug: string;
   pattern: string;
   orientation: 'portrait' | 'landscape';
   featured: boolean;
+  /** Missing (seed data) counts as in stock. */
+  in_stock?: boolean;
+  sale?: Sale;
   name: L10n;
   short: L10n;
   description: L10n;
@@ -31,6 +37,8 @@ export interface Settings {
   hours_ka: string;
   hours_en: string;
   default_palette: string;
+  /** Online payment (Flitt) is switched on in the API. */
+  payments?: boolean;
 }
 
 export const API_URL = (import.meta.env.PUBLIC_API_URL || 'http://localhost:8000/api').replace(/\/$/, '');
@@ -56,7 +64,8 @@ function fromSeed() {
  * Falls back to the seed file so the site always builds, even with the API offline.
  */
 export async function loadData() {
-  if (cache) return cache;
+  // The build reads the API once; the dev server re-reads it so admin/config changes show on reload.
+  if (cache && !import.meta.env.DEV) return cache;
   try {
     const ctrl = AbortSignal.timeout(4000);
     const [p, s] = await Promise.all([
@@ -82,7 +91,19 @@ export function orientationOf(p: Pick<Product, 'sizes'>): 'portrait' | 'landscap
 export const priceFmt = (n: number) =>
   new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(n).replace(/,/g, ' ');
 
-export const minPrice = (p: Product) => Math.min(...p.sizes.map((s) => s.price));
+export const nowPrice = (s: Size) => s.sale_price ?? s.price;
+export const onSale = (p: Product) => !!p.sale?.active && p.sale.percent > 0;
+/** Is this size discounted today? */
+export const sizeOnSale = (s: Size) => nowPrice(s) < s.price;
+/** Do all discounted sizes share one percentage? (Otherwise cards say "up to".) */
+export const saleUniform = (p: Product) => !p.sale?.min_percent || p.sale.min_percent === p.sale.percent;
+/** Lowest price a customer pays today (sale included). */
+export const minPrice = (p: Product) => Math.min(...p.sizes.map(nowPrice));
+/** Regular price of the size that is cheapest today (crossed out when that size is on sale). */
+export const minListPrice = (p: Product) => {
+  const cheapest = p.sizes.reduce((a, b) => (nowPrice(b) < nowPrice(a) ? b : a), p.sizes[0]);
+  return cheapest && sizeOnSale(cheapest) ? cheapest.price : null;
+};
 
 export const loc = (v: L10n, lang: Lang) => v[lang] || v.ka || v.en;
 

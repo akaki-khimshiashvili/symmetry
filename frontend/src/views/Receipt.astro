@@ -1,0 +1,238 @@
+---
+import Base from '../layouts/Base.astro';
+import Icon from '../components/Icon.astro';
+import { type Lang, useT, path } from '../i18n/ui';
+import { API_URL } from '../lib/data';
+
+/**
+ * Printable receipt, opened from the customer's private payment link (?t=<payment token>) or from the admin.
+ * "Download PDF" uses the browser's print dialog (Save as PDF); the layout also works as a phone screenshot.
+ */
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = useT(lang);
+const states = ['held', 'captured', 'released', 'refunded', 'expired'];
+const text = {
+  title: Object.fromEntries(states.map((s) => [s, t(`rc.title.${s}` as any)])),
+  state: Object.fromEntries(states.map((s) => [s, t(`rc.state.${s}` as any)])),
+  cardOnline: t('rc.cardOnline'),
+  sale: t('sale.badge'),
+  scan: t('rc.scan'),
+};
+---
+<Base lang={lang} title={t('rc.title')} noindex>
+  <section class="wrap rc-page" data-rc data-api={API_URL} data-lang={lang} data-text={JSON.stringify(text)}>
+    <p class="rc-msg" data-loading>{t('rc.loading')}</p>
+    <div class="rc-msg" data-missing hidden>
+      <h1 class="display t-2xl">{t('rc.notfound.t')}</h1>
+      <p class="lead">{t('rc.notfound.d')}</p>
+      <a class="btn btn-line" href={path(lang, '/contact/')}>{t('pay.contact')}</a>
+    </div>
+
+    <div class="rc-tools no-print" data-tools hidden>
+      <button class="btn btn-solid" type="button" data-print><span>{t('rc.download')}</span><Icon name="arrow" size={18} /></button>
+      <p class="hint">{t('rc.downloadHint')}</p>
+    </div>
+
+    <article class="rc" data-receipt hidden>
+      <header class="rc-head">
+        <div>
+          <p class="rc-brand">Symmetry</p>
+          <h1 class="rc-title" data-title></h1>
+        </div>
+        <dl class="rc-ids">
+          <div><dt>{t('rc.number')}</dt><dd class="num" data-number></dd></div>
+          <div><dt>{t('rc.issued')}</dt><dd data-issued></dd></div>
+          <div data-charged-row hidden><dt>{t('rc.charged')}</dt><dd data-charged></dd></div>
+          <div data-closed-row hidden><dt>{t('rc.closed')}</dt><dd data-closed></dd></div>
+        </dl>
+      </header>
+
+      <p class="rc-state" data-state></p>
+      <p class="rc-test" data-test hidden>{t('rc.test')}</p>
+
+      <div class="rc-parties">
+        <section>
+          <h2>{t('rc.seller')}</h2>
+          <p data-seller></p>
+        </section>
+        <section>
+          <h2>{t('rc.buyer')}</h2>
+          <p data-buyer></p>
+        </section>
+      </div>
+
+      <table class="rc-items">
+        <thead>
+          <tr><th>{t('rc.item')}</th><th>{t('rc.size')}</th><th class="r">{t('rc.qty')}</th><th class="r">{t('rc.price')}</th></tr>
+        </thead>
+        <tbody>
+          <tr><td data-product></td><td class="num" data-size></td><td class="r num">1</td><td class="r num" data-price></td></tr>
+          <tr class="rc-sale" data-sale-row hidden><td colspan="3" data-sale-label></td><td class="r num" data-sale-amount></td></tr>
+        </tbody>
+        <tfoot>
+          <tr><td colspan="3">{t('rc.total')}</td><td class="r num" data-total></td></tr>
+        </tfoot>
+      </table>
+
+      <dl class="rc-pay">
+        <div><dt>{t('rc.order')}</dt><dd class="num" data-order></dd></div>
+        <div><dt>{t('rc.method')}</dt><dd data-method></dd></div>
+        <div><dt>{t('rc.flittOrder')}</dt><dd class="num" data-flitt-order></dd></div>
+        <div data-flitt-payment-row hidden><dt>{t('rc.flittPayment')}</dt><dd class="num" data-flitt-payment></dd></div>
+      </dl>
+
+      <footer class="rc-verify">
+        <div class="rc-qr" data-qr></div>
+        <div>
+          <p class="k">{t('rc.code')}</p>
+          <p class="rc-code num" data-code></p>
+          <p class="small" data-scan></p>
+          <p class="small url" data-url></p>
+        </div>
+      </footer>
+      <p class="rc-disclaimer">{t('rc.disclaimer')}</p>
+    </article>
+  </section>
+</Base>
+
+<style>
+  /* Layout rules below set display; keep the hidden attribute winning. */
+  .rc-page [hidden] { display: none !important; }
+  .rc-page { padding-block: var(--s-5) var(--s-6); display: grid; gap: var(--s-3); justify-items: center; }
+  .rc-msg { max-width: 40rem; display: grid; gap: var(--s-3); justify-items: start; padding-block: var(--s-5); }
+  .rc-tools { width: 100%; max-width: 46rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem; }
+  .hint { font-size: var(--t-sm); color: var(--ink-3); }
+
+  /* The receipt itself is plain black on white in every palette: it is a document, and it must print and scan. */
+  .rc {
+    width: 100%; max-width: 46rem; background: #fff; color: #1b1712;
+    border: 1px solid #ddd5ca; border-radius: 14px; padding: clamp(1.25rem, 4vw, 2.5rem);
+    display: grid; gap: 1.5rem; font-size: 0.95rem; line-height: 1.5;
+    box-shadow: 0 30px 60px -40px rgb(0 0 0 / 0.35);
+  }
+  .rc h2 { font-family: inherit; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: #6f665b; margin: 0 0 0.35rem; font-weight: 600; }
+  .rc-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem 2rem; padding-bottom: 1.25rem; border-bottom: 2px solid #1b1712; }
+  .rc-brand { font-weight: 600; letter-spacing: 0.04em; color: #6f665b; margin: 0; }
+  .rc-title { font-size: clamp(1.4rem, 4vw, 1.9rem); margin: 0.15rem 0 0; color: #1b1712; }
+  .rc-ids { margin: 0; display: grid; gap: 0.2rem; font-size: 0.85rem; }
+  .rc-ids div { display: flex; gap: 0.6rem; justify-content: space-between; }
+  .rc-ids dt { color: #6f665b; }
+  .rc-ids dd { margin: 0; font-weight: 600; text-align: right; }
+  .rc-state { margin: 0; padding: 0.75rem 1rem; border-radius: 8px; background: #f4efe7; border-left: 4px solid #8a6a3f; }
+  .rc[data-status='captured'] .rc-state { background: #eef6ef; border-left-color: #2f7a44; }
+  .rc[data-status='released'] .rc-state, .rc[data-status='refunded'] .rc-state, .rc[data-status='expired'] .rc-state { background: #f3f1ee; border-left-color: #8d8579; }
+  .rc-test { margin: 0; font-size: 0.85rem; padding: 0.5rem 0.8rem; border: 1px dashed #b9ab97; border-radius: 8px; }
+  .rc-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem 2rem; }
+  .rc-parties p { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
+  .rc-items { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  .rc-items th { text-align: left; font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: #6f665b; font-weight: 600; padding: 0.5rem 0.4rem; border-bottom: 1px solid #ddd5ca; }
+  .rc-items td { padding: 0.7rem 0.4rem; border-bottom: 1px solid #eee8df; vertical-align: top; }
+  .rc-items tfoot td { font-weight: 700; font-size: 1.05rem; border-bottom: 0; border-top: 2px solid #1b1712; }
+  .rc-items .r { text-align: right; white-space: nowrap; }
+  .rc-items .rc-sale td { color: #6b4a2b; font-weight: 600; }
+  .rc-pay { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem 2rem; font-size: 0.85rem; }
+  .rc-pay dt { color: #6f665b; }
+  .rc-pay dd { margin: 0; overflow-wrap: anywhere; }
+  .rc-verify { display: grid; grid-template-columns: auto 1fr; gap: 1.25rem; align-items: center; padding-top: 1.25rem; border-top: 1px solid #ddd5ca; }
+  .rc-qr { width: 8.5rem; height: 8.5rem; }
+  .rc-qr :global(svg) { display: block; width: 100%; height: 100%; }
+  .rc-verify .k { margin: 0; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: #6f665b; font-weight: 600; }
+  .rc-code { margin: 0.1rem 0 0.4rem; font-size: 1.35rem; font-weight: 700; letter-spacing: 0.06em; }
+  .rc-verify .small { margin: 0; font-size: 0.8rem; color: #5c544a; }
+  .rc-verify .url { overflow-wrap: anywhere; margin-top: 0.3rem; }
+  .rc-disclaimer { margin: 0; font-size: 0.75rem; color: #6f665b; }
+
+  @media (max-width: 560px) {
+    .rc-parties, .rc-pay { grid-template-columns: 1fr; }
+    .rc-verify { grid-template-columns: 1fr; justify-items: start; }
+  }
+
+  @media print {
+    @page { margin: 14mm; }
+    :global(.site-header), :global(.footer), .no-print { display: none !important; }
+    :global(body) { background: #fff !important; }
+    .rc-page { padding: 0; }
+    .rc { max-width: none; border: 0; box-shadow: none; padding: 0; }
+    .rc-state, .rc-items, .rc-verify { break-inside: avoid; }
+  }
+</style>
+
+<script>
+  import { qrSvg, fmtWhen, fmtGel } from '../lib/qr';
+
+  type Receipt = {
+    number: string; code: string; verify_url: string; status: string; issued_at: string; captured_at: string | null; released_at: string | null;
+    order_id: number; lang: string; test: boolean;
+    seller: { name: string; tax_id: string; address: { ka: string; en: string }; phone: string; email: string };
+    customer: { name: string; phone: string; email: string };
+    item: { product: string; size: string; qty: number }; amount: number; currency: string; card: string;
+    list_price: number | null; sale_percent: number;
+    flitt_order_id: string; flitt_payment_id: string;
+  };
+  const root = document.querySelector<HTMLElement>('[data-rc]')!;
+  const lang = root.dataset.lang || 'ka';
+  const text = JSON.parse(root.dataset.text || '{}');
+  const $ = (s: string) => root.querySelector<HTMLElement>(s)!;
+  const set = (s: string, v: string) => ($(s).textContent = v);
+  const token = new URLSearchParams(location.search).get('t') || '';
+
+  const show = (r: Receipt) => {
+    const rc = $('[data-receipt]');
+    rc.dataset.status = r.status;
+    set('[data-title]', text.title[r.status] || '');
+    set('[data-state]', text.state[r.status] || '');
+    set('[data-number]', r.number);
+    set('[data-issued]', fmtWhen(r.issued_at, lang));
+    $('[data-charged-row]').hidden = !r.captured_at;
+    set('[data-charged]', fmtWhen(r.captured_at, lang));
+    $('[data-closed-row]').hidden = !r.released_at;
+    set('[data-closed]', fmtWhen(r.released_at, lang));
+    $('[data-test]').hidden = !r.test;
+    const s = r.seller;
+    const taxLabel = lang === 'en' ? 'ID' : 'ს/კ';
+    set('[data-seller]', [s.name, s.tax_id && `${taxLabel} ${s.tax_id}`, lang === 'en' ? s.address.en || s.address.ka : s.address.ka, s.phone, s.email].filter(Boolean).join('\n'));
+    set('[data-buyer]', [r.customer.name, r.customer.phone, r.customer.email].filter(Boolean).join('\n'));
+    set('[data-product]', r.item.product);
+    set('[data-size]', r.item.size);
+    // On sale: the line shows the regular price, then the discount, so the total adds up.
+    set('[data-price]', fmtGel(r.list_price ?? r.amount));
+    $('[data-sale-row]').hidden = !r.list_price;
+    if (r.list_price) {
+      set('[data-sale-label]', `${text.sale} −${r.sale_percent}%`);
+      set('[data-sale-amount]', `− ${fmtGel(r.list_price - r.amount).replace('₾ ', '₾ ')}`);
+    }
+    set('[data-total]', fmtGel(r.amount));
+    set('[data-order]', `#${r.order_id}`);
+    set('[data-method]', [text.cardOnline, r.card].filter(Boolean).join(' · '));
+    set('[data-flitt-order]', r.flitt_order_id);
+    $('[data-flitt-payment-row]').hidden = !r.flitt_payment_id;
+    set('[data-flitt-payment]', r.flitt_payment_id);
+    set('[data-code]', r.code);
+    set('[data-scan]', text.scan);
+    set('[data-url]', r.verify_url);
+    $('[data-qr]').innerHTML = qrSvg(r.verify_url, r.number);
+    document.title = `${r.number} | Symmetry`;
+    $('[data-loading]').hidden = true;
+    rc.hidden = false;
+    $('[data-tools]').hidden = false;
+  };
+
+  const missing = () => {
+    $('[data-loading]').hidden = true;
+    $('[data-missing]').hidden = false;
+  };
+
+  $('[data-print]').addEventListener('click', () => window.print());
+
+  (async () => {
+    if (!/^[a-f0-9]{32}$/.test(token)) return missing();
+    try {
+      const res = await fetch(`${root.dataset.api}/receipts/${token}`);
+      if (!res.ok) return missing();
+      show(await res.json());
+    } catch {
+      missing();
+    }
+  })();
+</script>

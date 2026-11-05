@@ -61,14 +61,15 @@ export function Toaster() {
 }
 
 /* ---------- Confirm dialog ---------- */
-let ask: (msg: string, action: string) => Promise<boolean> = async () => false;
-export const confirmAction = (msg: string, action = 'წაშლა') => ask(msg, action);
+type Tone = 'danger' | 'primary';
+let ask: (msg: string, action: string, tone: Tone) => Promise<boolean> = async () => false;
+export const confirmAction = (msg: string, action = 'წაშლა', tone: Tone = 'danger') => ask(msg, action, tone);
 export function ConfirmHost() {
   const ref = useRef<HTMLDialogElement>(null);
-  const [state, setState] = useState<{ msg: string; action: string; resolve?: (v: boolean) => void }>({ msg: '', action: '' });
+  const [state, setState] = useState<{ msg: string; action: string; tone: Tone; resolve?: (v: boolean) => void }>({ msg: '', action: '', tone: 'danger' });
   useEffect(() => {
-    ask = (msg, action) => new Promise((resolve) => {
-      setState({ msg, action, resolve });
+    ask = (msg, action, tone) => new Promise((resolve) => {
+      setState({ msg, action, tone, resolve });
       ref.current?.showModal();
     });
   }, []);
@@ -81,7 +82,7 @@ export function ConfirmHost() {
       <p>{state.msg}</p>
       <div class="row-end">
         <button class="btn ghost" type="button" onClick={() => done(false)}>გაუქმება</button>
-        <button class="btn danger" type="button" onClick={() => done(true)}>{state.action}</button>
+        <button class={`btn ${state.tone}`} type="button" onClick={() => done(true)}>{state.action}</button>
       </div>
     </dialog>
   );

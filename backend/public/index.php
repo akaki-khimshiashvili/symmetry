@@ -20,6 +20,9 @@ require __DIR__ . '/../src/Products.php';
 require __DIR__ . '/../src/Options.php';
 require __DIR__ . '/../src/Images.php';
 require __DIR__ . '/../src/Db.php';
+require __DIR__ . '/../src/Flitt.php';
+require __DIR__ . '/../src/Receipts.php';
+require __DIR__ . '/../src/Mailer.php';
 
 Http::cors($config['allowed_origins'], $config['allow_local_origins']);
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -36,12 +39,64 @@ if ($route === null) {
 const SETTING_KEYS = [
     'phone', 'whatsapp', 'email', 'instagram', 'facebook', 'tiktok',
     'address_ka', 'address_en', 'hours_ka', 'hours_en', 'default_palette',
+    // Seller details printed on receipts.
+    'legal_name', 'tax_id',
 ];
 
 try {
     $pdo = Db::get($config);
     $base = Http::baseUrl($config);
     $admin = fn () => Auth::require($pdo);
+    $config['api_public_url'] = rtrim($config['api_public_url'] ?: $base . '/api', '/');
+    $flitt = Flitt::fromConfig($config);
+
+    $orderOr404 = function (string $id) use ($pdo): array {
+        $o = Payments::byId($pdo, (int) $id);
+        if (!$o) {
+            throw new HttpError(404, 'შეკვეთა ვერ მოიძებნა');
+        }
+        return $o;
+    };
+    $tokenOr404 = function (string $token) use ($pdo): array {
+        $o = Payments::byToken($pdo, $token);
+        if (!$o) {
+            throw new HttpError(404, 'Payment not found');
+        }
+        return $o;
+    };
+    // After any payment change: email the receipt for the new status (once per status), return the fresh order.
+    $notify = function (array $o) use ($pdo, $config): array {
+        if (ReceiptMail::notify($pdo, $config, $o)) {
+            return Payments::byId($pdo, (int) $o['id']);
+        }
+        return $o;
+    };
+    // Flitt problems are shown to staff as a readable error instead of a generic 500.
+    $flittCall = function (callable $fn) {
+        try {
+            return $fn();
+        } catch (FlittError $e) {
+            throw new HttpError(502, $e->getMessage());
+        }
+    };
+    // Customer's result page on the public site (Georgian at /payment/, English at /en/payment/).
+    $resultUrl = fn (array $o) => rtrim($config['site_url'], '/') . ($o['lang'] === 'en' ? '/en' : '') . '/payment/?t=' . $o['pay_token'];
+    $paymentReturn = function () use ($pdo, $flitt, $resultUrl, $notify) {
+        $o = Payments::byToken($pdo, (string) ($_GET['t'] ?? ''));
+        if (!$o) {
+            throw new HttpError(404, 'Payment not found');
+        }
+        $data = Flitt::readPayload();
+        try {
+            // The redirect carries a signed result; otherwise ask Flitt directly.
+            $o = $data && $flitt->verify($data) ? Payments::apply($pdo, $o, $data, 'return') : Payments::sync($pdo, $flitt, $o);
+            $o = $notify($o);
+        } catch (FlittError $e) {
+            error_log('[symmetry] payment return: ' . $e->getMessage());
+        }
+        header('Location: ' . $resultUrl($o), true, 303);
+        exit;
+    };
 
     $settings = function () use ($pdo): array {
         $rows = $pdo->query('SELECT key, value FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
@@ -65,7 +120,7 @@ try {
         ['GET', '#^/health$#', fn () => ['ok' => true]],
         ['GET', '#^/products$#', fn () => Products::all($pdo, false, $base)],
         ['GET', '#^/products/([\w-]+)$#', fn ($id) => $productOr404($id, false)],
-        ['GET', '#^/settings$#', fn () => $settings()],
+        ['GET', '#^/settings$#', fn () => $settings() + ['payments' => (bool) $config['flitt_enabled']]],
 
         ['POST', '#^/contact$#', function () use ($pdo) {
             $b = Http::body();
@@ -86,12 +141,16 @@ try {
             return ['ok' => true, 'id' => (int) $pdo->lastInsertId()];
         }],
 
-        ['POST', '#^/orders$#', function () use ($pdo, $base) {
+        ['POST', '#^/orders$#', function () use ($pdo, $base, $config, $flitt) {
             $b = Http::body();
             if (!empty($b['website'])) {
                 return ['ok' => true];
             }
             $errors = Leads::validate($b);
+            // The receipt is emailed, so orders need an address.
+            if (trim((string) ($b['email'] ?? '')) === '') {
+                $errors['email'] = 'required';
+            }
             $product = Products::find($pdo, (string) (int) ($b['product_id'] ?? 0), false, $base);
             $size = null;
             foreach ($product['sizes'] ?? [] as $s) {
@@ -101,6 +160,8 @@ try {
             }
             if (!$product) {
                 $errors['product_id'] = 'invalid';
+            } elseif (empty($product['in_stock'])) {
+                $errors['product_id'] = 'out_of_stock';
             } elseif (!$size) {
                 $errors['size_id'] = 'invalid';
             }
@@ -108,14 +169,81 @@ try {
                 throw new HttpError(422, 'Validation failed', $errors);
             }
             $c = Leads::clean($b);
-            $pdo->prepare('INSERT INTO orders (product_id, size_id, product_name, size_label, price, first_name, last_name, phone, email, client_type, channel, message, lang) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            // The price is always worked out here (sale included), never taken from the browser.
+            $onSale = $size['sale_price'] < $size['price'];
+            $pdo->prepare('INSERT INTO orders (product_id, size_id, product_name, size_label, price, list_price, sale_percent, first_name, last_name, phone, email, client_type, channel, message, lang) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
                 ->execute([
                     $product['id'], $size['id'], $product['name']['ka'],
-                    $size['width'] . ' × ' . $size['height'] . ' მმ', $size['price'],
+                    $size['width'] . ' × ' . $size['height'] . ' სმ', $size['sale_price'],
+                    $onSale ? $size['price'] : null, $onSale ? (int) $size['sale_percent'] : 0,
                     $c['first_name'], $c['last_name'], $c['phone'], $c['email'], $c['client_type'], $c['channel'], $c['message'], $c['lang'],
                 ]);
-            // Payment (Flitt) is a later phase: orders are stored with payment_status = 'unpaid'.
-            return ['ok' => true, 'id' => (int) $pdo->lastInsertId()];
+            $id = (int) $pdo->lastInsertId();
+            if (!$config['flitt_enabled']) {
+                return ['ok' => true, 'id' => $id];
+            }
+            // The order is saved first, so a Flitt outage never loses the request: staff still see it.
+            try {
+                return ['ok' => true, 'id' => $id, 'checkout_url' => Payments::start($pdo, $flitt, $config, Payments::byId($pdo, $id))];
+            } catch (FlittError $e) {
+                error_log('[symmetry] checkout for order ' . $id . ': ' . $e->getMessage());
+                $pdo->prepare('UPDATE orders SET payment_error = ? WHERE id = ?')->execute([mb_substr($e->getMessage(), 0, 300), $id]);
+                return ['ok' => true, 'id' => $id];
+            }
+        }],
+
+        // ---------- Payments (Flitt) ----------
+        ['POST', '#^/payments/callback$#', function () use ($pdo, $flitt, $notify) {
+            $data = Flitt::readPayload();
+            if (!$flitt->verify($data)) {
+                error_log('[symmetry] Flitt callback with an invalid signature');
+                throw new HttpError(400, 'Invalid signature');
+            }
+            $stmt = $pdo->prepare('SELECT * FROM orders WHERE flitt_order_id = ?');
+            $stmt->execute([(string) ($data['order_id'] ?? '')]);
+            $o = $stmt->fetch();
+            if ($o) {
+                $notify(Payments::apply($pdo, $o, $data, 'callback'));
+            }
+            return ['ok' => true]; // HTTP 200 tells Flitt to stop retrying
+        }],
+        ['GET', '#^/payments/return$#', $paymentReturn],
+        ['POST', '#^/payments/return$#', $paymentReturn],
+        ['GET', '#^/payments/([a-f0-9]{32})$#', function ($token) use ($pdo, $flitt, $config, $tokenOr404, $notify) {
+            $o = $tokenOr404($token);
+            if ($o['payment_status'] === 'pending') {
+                try {
+                    $o = $notify(Payments::sync($pdo, $flitt, $o));
+                } catch (FlittError $e) {
+                    error_log('[symmetry] payment status: ' . $e->getMessage());
+                }
+            }
+            return Payments::publicView($o, $config);
+        }],
+        // ---------- Receipts ----------
+        // Anyone holding a receipt (or its QR) can check it is genuine and see the order's live status.
+        ['GET', '#^/receipts/verify$#', function () use ($pdo, $config) {
+            $o = Receipts::check($pdo, $config, (string) ($_GET['n'] ?? ''), (string) ($_GET['c'] ?? ''));
+            if (!$o) {
+                usleep(300000); // slow down guessing
+                return ['valid' => false];
+            }
+            return Receipts::publicCheck($pdo, $o);
+        }],
+        // The full receipt, for the customer's private payment link.
+        ['GET', '#^/receipts/([a-f0-9]{32})$#', function ($token) use ($pdo, $config, $tokenOr404) {
+            $o = $tokenOr404($token);
+            if (!Receipts::has($o)) {
+                throw new HttpError(404, 'No receipt for this order yet');
+            }
+            return Receipts::full($pdo, $config, $o);
+        }],
+        ['POST', '#^/payments/([a-f0-9]{32})/retry$#', function ($token) use ($pdo, $flitt, $config, $tokenOr404, $flittCall) {
+            $o = $tokenOr404($token);
+            if (!$config['flitt_enabled'] || !in_array($o['payment_status'], ['pending', 'declined', 'expired'], true)) {
+                throw new HttpError(409, 'This order cannot be paid again');
+            }
+            return ['checkout_url' => $flittCall(fn () => Payments::start($pdo, $flitt, $config, $o))];
         }],
 
         // ---------- Admin ----------
@@ -140,6 +268,7 @@ try {
                 'published' => $count('SELECT COUNT(*) FROM products WHERE published = 1'),
                 'orders_new' => $count("SELECT COUNT(*) FROM orders WHERE status = 'new'"),
                 'messages_new' => $count("SELECT COUNT(*) FROM messages WHERE status = 'new'"),
+                'orders_held' => $count("SELECT COUNT(*) FROM orders WHERE payment_status = 'held'"),
             ];
         }],
 
@@ -178,6 +307,9 @@ try {
             if ($errors = Products::validate($b)) {
                 throw new HttpError(422, 'შეამოწმეთ ველები', $errors);
             }
+            if ($msg = Products::featuredError($pdo, $b)) {
+                throw new HttpError(422, $msg, ['featured' => $msg]);
+            }
             $pdo->beginTransaction();
             $id = Products::save($pdo, $b);
             $pdo->commit();
@@ -189,6 +321,9 @@ try {
             $b = Http::body();
             if ($errors = Products::validate($b)) {
                 throw new HttpError(422, 'შეამოწმეთ ველები', $errors);
+            }
+            if ($msg = Products::featuredError($pdo, $b, (int) $id)) {
+                throw new HttpError(422, $msg, ['featured' => $msg]);
             }
             $pdo->beginTransaction();
             Products::save($pdo, $b, (int) $id);
@@ -278,6 +413,85 @@ try {
             $admin();
             return $pdo->query('SELECT * FROM orders ORDER BY id DESC')->fetchAll();
         }],
+        ['GET', '#^/admin/payments$#', function () use ($admin, $config, $flitt) {
+            $admin();
+            return [
+                'enabled' => (bool) $config['flitt_enabled'], 'test' => $flitt->isTest(), 'hold_days' => (int) $config['flitt_hold_days'],
+                'mail' => (new Mailer($config))->configured() ? 'smtp' : 'outbox',
+            ];
+        }],
+        // Ask Flitt for the latest state (needed locally, where Flitt's callbacks cannot reach the API).
+        ['POST', '#^/admin/orders/(\d+)/sync$#', function ($id) use ($pdo, $admin, $flitt, $orderOr404, $flittCall, $notify) {
+            $admin();
+            return $notify($flittCall(fn () => Payments::sync($pdo, $flitt, $orderOr404($id))));
+        }],
+        // Accept: charge the held money.
+        ['POST', '#^/admin/orders/(\d+)/accept$#', function ($id) use ($pdo, $admin, $flitt, $orderOr404, $flittCall, $notify) {
+            $admin();
+            $o = $flittCall(fn () => Payments::sync($pdo, $flitt, $orderOr404($id)));
+            if ($o['payment_status'] !== 'held') {
+                throw new HttpError(409, 'შეკვეთაზე დაბლოკილი თანხა არ არის (სტატუსი: ' . $o['payment_status'] . ')');
+            }
+            $res = $flittCall(fn () => $flitt->capture($o['flitt_order_id'], (int) $o['amount'], $o['currency']));
+            Payments::log($pdo, (int) $o['id'], 'capture', $res);
+            if (($res['capture_status'] ?? '') !== 'captured') {
+                throw new HttpError(502, 'Flitt-მა თანხის ჩამოჭრა ვერ შეასრულა' . (!empty($res['response_description']) ? ': ' . $res['response_description'] : ''));
+            }
+            $pdo->prepare("UPDATE orders SET payment_status = 'captured', captured_at = CURRENT_TIMESTAMP, payment_updated_at = CURRENT_TIMESTAMP, status = CASE WHEN status = 'new' THEN 'in_progress' ELSE status END WHERE id = ?")
+                ->execute([(int) $id]);
+            return $notify(Payments::byId($pdo, (int) $id));
+        }],
+        // Decline: release the hold (nothing is charged). Orders without a hold are simply cancelled.
+        ['POST', '#^/admin/orders/(\d+)/decline$#', function ($id) use ($pdo, $admin, $flitt, $orderOr404, $flittCall, $notify) {
+            $admin();
+            $o = $orderOr404($id);
+            if ($o['flitt_order_id'] !== '') {
+                $o = $flittCall(fn () => Payments::sync($pdo, $flitt, $o));
+            }
+            if ($o['payment_status'] === 'captured') {
+                throw new HttpError(409, 'თანხა უკვე ჩამოჭრილია — გამოიყენეთ „თანხის დაბრუნება“');
+            }
+            if ($o['payment_status'] === 'held') {
+                $res = $flittCall(fn () => $flitt->reverse($o['flitt_order_id'], (int) $o['amount'], $o['currency']));
+                Payments::log($pdo, (int) $o['id'], 'reverse', $res);
+                if (($res['reverse_status'] ?? '') !== 'approved') {
+                    throw new HttpError(502, 'Flitt-მა დაბლოკილი თანხის გათავისუფლება ვერ შეასრულა');
+                }
+                $pdo->prepare("UPDATE orders SET payment_status = 'released', released_at = CURRENT_TIMESTAMP, payment_updated_at = CURRENT_TIMESTAMP WHERE id = ?")->execute([(int) $id]);
+            }
+            $pdo->prepare("UPDATE orders SET status = 'cancelled' WHERE id = ?")->execute([(int) $id]);
+            return $notify(Payments::byId($pdo, (int) $id));
+        }],
+        // Send the receipt for the current status again (e.g. the customer can't find it).
+        ['POST', '#^/admin/orders/(\d+)/email-receipt$#', function ($id) use ($pdo, $admin, $config, $orderOr404) {
+            $admin();
+            $o = $orderOr404($id);
+            if (!Receipts::has($o)) {
+                throw new HttpError(409, 'ამ შეკვეთას ჯერ ქვითარი არ აქვს');
+            }
+            if (trim((string) $o['email']) === '') {
+                throw new HttpError(409, 'მომხმარებელს ელ-ფოსტა არ აქვს მითითებული');
+            }
+            if (!ReceiptMail::notify($pdo, $config, $o, true)) {
+                throw new HttpError(502, 'წერილის გაგზავნა ვერ მოხერხდა — შეამოწმეთ ელ-ფოსტის (SMTP) პარამეტრები');
+            }
+            return Payments::byId($pdo, (int) $id);
+        }],
+        // Refund: return money that was already charged (Flitt's commission is usually not returned).
+        ['POST', '#^/admin/orders/(\d+)/refund$#', function ($id) use ($pdo, $admin, $flitt, $orderOr404, $flittCall, $notify) {
+            $admin();
+            $o = $orderOr404($id);
+            if ($o['payment_status'] !== 'captured') {
+                throw new HttpError(409, 'დასაბრუნებელი თანხა არ არის');
+            }
+            $res = $flittCall(fn () => $flitt->reverse($o['flitt_order_id'], (int) $o['amount'], $o['currency']));
+            Payments::log($pdo, (int) $o['id'], 'refund', $res);
+            if (($res['reverse_status'] ?? '') !== 'approved') {
+                throw new HttpError(502, 'Flitt-მა თანხის დაბრუნება ვერ შეასრულა');
+            }
+            $pdo->prepare("UPDATE orders SET payment_status = 'refunded', released_at = CURRENT_TIMESTAMP, payment_updated_at = CURRENT_TIMESTAMP, status = 'cancelled' WHERE id = ?")->execute([(int) $id]);
+            return $notify(Payments::byId($pdo, (int) $id));
+        }],
         ['PATCH', '#^/admin/orders/(\d+)$#', function ($id) use ($pdo, $admin) {
             $admin();
             $status = Http::body()['status'] ?? '';
@@ -289,6 +503,10 @@ try {
         }],
         ['DELETE', '#^/admin/orders/(\d+)$#', function ($id) use ($pdo, $admin) {
             $admin();
+            $o = Payments::byId($pdo, (int) $id);
+            if ($o && in_array($o['payment_status'], ['held', 'captured'], true)) {
+                throw new HttpError(409, 'შეკვეთას აქვს დაბლოკილი ან გადახდილი თანხა — ჯერ უარყავით ან დააბრუნეთ თანხა');
+            }
             $pdo->prepare('DELETE FROM orders WHERE id = ?')->execute([(int) $id]);
             return ['ok' => true];
         }],

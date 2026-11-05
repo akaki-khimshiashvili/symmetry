@@ -1,0 +1,140 @@
+---
+import Base from '../layouts/Base.astro';
+import Icon from '../components/Icon.astro';
+import { type Lang, useT, path } from '../i18n/ui';
+import { API_URL } from '../lib/data';
+
+/**
+ * Where the customer lands after Flitt's checkout (the API redirects here with ?t=<payment token>).
+ * The page is static, so the status is read from the API in the browser.
+ */
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = useT(lang);
+const states = ['held', 'captured', 'released', 'refunded', 'declined', 'pending', 'expired', 'notfound'] as const;
+const text = Object.fromEntries(states.map((s) => [s, { t: t(`pay.${s}.t` as any), d: t(`pay.${s}.d` as any) }]));
+const icons: Record<string, string> = {
+  held: 'clock', captured: 'check', released: 'close', refunded: 'check',
+  declined: 'alert', pending: 'clock', expired: 'alert', notfound: 'alert',
+};
+---
+<Base lang={lang} title={t('pay.title')} noindex>
+  <section class="wrap pay" data-pay data-api={API_URL} data-text={JSON.stringify(text)} data-lang={lang}>
+    <div class="pay-card" aria-live="polite">
+      <p class="pay-loading" data-loading>{t('pay.loading')}</p>
+
+      <div class="pay-body" data-body hidden>
+        {states.map((s) => (
+          <span class={`mark mark-${icons[s]}`} data-mark={s} hidden><Icon name={icons[s]} size={22} /></span>
+        ))}
+        <h1 class="display t-2xl" data-title tabindex="-1"></h1>
+        <p class="lead" data-desc></p>
+
+        <dl class="facts" data-facts hidden>
+          <div><dt>{t('pay.order')}</dt><dd data-f-order></dd></div>
+          <div><dt>{t('pay.amount')}</dt><dd class="num" data-f-amount></dd></div>
+          <div data-f-card-row hidden><dt>{t('pay.card')}</dt><dd class="num" data-f-card></dd></div>
+        </dl>
+
+        <p class="test" data-test hidden>{t('pay.test')}</p>
+        <p class="err" role="alert" data-err hidden>{t('f.error.network')}</p>
+
+        <div class="actions">
+          <a class="btn btn-solid" href={path(lang, '/receipt/')} data-receipt-link hidden><span>{t('pay.receipt')}</span><Icon name="arrow" size={18} /></a>
+          <button class="btn btn-solid" type="button" data-retry hidden><span>{t('pay.retry')}</span><Icon name="arrow" size={18} /></button>
+          <a class="btn btn-line" href={path(lang, '/contact/')}>{t('pay.contact')}</a>
+          <a class="btn btn-line" href={path(lang, '/')}>{t('pay.home')}</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .pay [hidden] { display: none !important; }
+  .pay { min-height: 70vh; display: grid; align-content: center; padding-block: var(--s-6); }
+  .pay-card { max-width: 40rem; display: grid; gap: var(--s-3); }
+  .pay-loading { color: var(--ink-2); }
+  .pay-body { display: grid; gap: var(--s-3); justify-items: start; }
+  .pay-body h1:focus { outline: none; }
+  .mark {
+    display: inline-flex; width: 3rem; height: 3rem; align-items: center; justify-content: center;
+    border-radius: 50%; background: var(--accent); color: var(--accent-ink);
+  }
+  .mark-alert, .mark-close { background: color-mix(in oklab, var(--ink) 12%, var(--ground)); color: var(--ink); }
+  .mark-clock { background: color-mix(in oklab, var(--accent) 18%, var(--ground)); color: var(--accent); }
+  .facts { display: grid; width: 100%; margin: 0; border-top: 1px solid var(--line); }
+  .facts div { display: grid; grid-template-columns: 8rem 1fr; gap: 1rem; padding-block: 0.8rem; border-bottom: 1px solid var(--line); font-size: var(--t-sm); }
+  .facts dt { color: var(--ink-3); }
+  .facts dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
+  .test { font-size: var(--t-sm); color: var(--ink-2); padding: 0.6rem 0.9rem; border: 1px dashed var(--line); border-radius: 10px; }
+  .err { font-size: var(--t-sm); color: oklch(0.55 0.16 30); }
+  .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: var(--s-2); }
+  @media (max-width: 480px) { .actions .btn { width: 100%; justify-content: center; } }
+</style>
+
+<script>
+  type View = { id: number; status: string; product: string; size: string; price: number; card: string; test: boolean; can_retry: boolean; has_receipt: boolean };
+  const root = document.querySelector<HTMLElement>('[data-pay]')!;
+  const api = root.dataset.api!;
+  const text: Record<string, { t: string; d: string }> = JSON.parse(root.dataset.text || '{}');
+  const $ = <T extends HTMLElement = HTMLElement>(s: string) => root.querySelector<T>(s)!;
+  const token = new URLSearchParams(location.search).get('t') || '';
+  const fmt = (n: number) => `₾ ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(n).replace(/,/g, ' ')}`;
+  let shown = '';
+
+  const render = (state: string, v?: View) => {
+    $('[data-loading]').hidden = true;
+    $('[data-body]').hidden = false;
+    root.querySelectorAll<HTMLElement>('[data-mark]').forEach((m) => (m.hidden = m.dataset.mark !== state));
+    const msg = text[state] || text.notfound;
+    $('[data-title]').textContent = msg.t;
+    $('[data-desc]').textContent = msg.d;
+    $('[data-facts]').hidden = !v;
+    $('[data-test]').hidden = !v?.test;
+    $('[data-retry]').hidden = !v?.can_retry;
+    const rl = $<HTMLAnchorElement>('[data-receipt-link]');
+    rl.hidden = !v?.has_receipt;
+    if (v?.has_receipt) rl.href = `${rl.getAttribute('href')!.split('?')[0]}?t=${token}`;
+    if (v) {
+      $('[data-f-order]').textContent = `#${v.id} · ${v.product} · ${v.size}`;
+      $('[data-f-amount]').textContent = fmt(v.price);
+      $('[data-f-card-row]').hidden = !v.card;
+      $('[data-f-card]').textContent = v.card;
+    }
+    if (state !== shown) { shown = state; $('[data-title]').focus(); }
+  };
+
+  const load = async (attempt = 0): Promise<void> => {
+    if (!/^[a-f0-9]{32}$/.test(token)) return render('notfound');
+    try {
+      const res = await fetch(`${api}/payments/${token}`);
+      if (res.status === 404) return render('notfound');
+      if (!res.ok) throw new Error(String(res.status));
+      const v: View = await res.json();
+      render(v.status, v);
+      // Flitt's confirmation can land a moment after the customer is back: check again a few times.
+      if (v.status === 'pending' && attempt < 5) setTimeout(() => load(attempt + 1), 2500);
+    } catch {
+      render('notfound');
+      $('[data-err]').hidden = false;
+    }
+  };
+
+  $('[data-retry]').addEventListener('click', async (e) => {
+    const btn = e.currentTarget as HTMLButtonElement;
+    btn.disabled = true;
+    $('[data-err]').hidden = true;
+    try {
+      const res = await fetch(`${api}/payments/${token}/retry`, { method: 'POST' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || typeof body.checkout_url !== 'string' || !body.checkout_url.startsWith('https://')) throw new Error();
+      location.assign(body.checkout_url);
+    } catch {
+      $('[data-err]').hidden = false;
+      btn.disabled = false;
+    }
+  });
+
+  load();
+</script>

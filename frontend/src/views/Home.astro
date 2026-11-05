@@ -13,8 +13,8 @@ const t = useT(lang);
 const { products, settings } = await loadData();
 
 
-const pool = (products.filter((p) => p.featured).length >= 4 ? products.filter((p) => p.featured) : products).slice(0, 4);
-const featured = pool;
+// Up to 4 products marked "მთავარზე" in the admin; if fewer are marked, the rest of the catalogue fills the row.
+const featured = [...products.filter((p) => p.featured), ...products.filter((p) => !p.featured)].slice(0, 4);
 const types = (['portrait', 'landscape'] as const).map((key) => {
   const items = products.filter((p) => p.orientation === key);
   return { key, items, cover: items.find((p) => p.featured) ?? items[0], from: items.length ? Math.min(...items.map(minPrice)) : 0 };

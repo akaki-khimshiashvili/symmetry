@@ -4,8 +4,8 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import { type Lang, useT, altPath } from '../i18n/ui';
 
-interface Props { lang: Lang; title?: string; description?: string; current?: string }
-const { lang, title, description, current = '' } = Astro.props;
+interface Props { lang: Lang; title?: string; description?: string; current?: string; noindex?: boolean }
+const { lang, title, description, current = '', noindex = false } = Astro.props;
 const t = useT(lang);
 const pageTitle = title ? `${title} | Symmetry` : t('meta.title');
 const desc = description ?? t('meta.description');
@@ -19,6 +19,7 @@ const site = Astro.site ?? new URL('https://symmetry.ge');
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{pageTitle}</title>
     <meta name="description" content={desc} />
+    {noindex && <meta name="robots" content="noindex" />}
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="canonical" href={new URL(here, site)} />
     <link rel="alternate" hreflang="ka" href={new URL(altPath(here, 'ka'), site)} />

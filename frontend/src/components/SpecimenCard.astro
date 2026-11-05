@@ -1,22 +1,32 @@
 ---
 import Leaf from './Leaf.astro';
 import { type Lang, useT, path } from '../i18n/ui';
-import { type Product, loc, minPrice, priceFmt } from '../lib/data';
+import { type Product, loc, minPrice, minListPrice, onSale, saleUniform, priceFmt } from '../lib/data';
 
 interface Props { product: Product; index: number; lang: Lang; ratio?: number; d?: number; class?: string; heading?: 'h2' | 'h3'; compact?: boolean }
 const { product: p, index, lang, ratio = 0.8, d = 0, class: cls = '', heading = 'h3', compact = false } = Astro.props;
 const t = useT(lang);
 const H = heading;
 const sizes = p.sizes.length;
+const sale = onSale(p);
+// One percentage for every discounted size, or "up to" the biggest one.
+const saleText = sale ? (saleUniform(p) ? `−${p.sale!.percent}%` : t('sale.upTo').replace('{p}', `−${p.sale!.percent}%`)) : '';
+const was = minListPrice(p);
 ---
 <a class:list={['spec', cls, { compact }]} href={path(lang, `/products/${p.slug}/`)} data-reveal data-type={p.orientation} style={`--d:${d}`}>
   <div class="frame lift">
     <Leaf product={p} alt={loc(p.name, lang)} ratio={ratio} />
+    {p.in_stock === false && <span class="stock-out">{t('p.outOfStock')}</span>}
+    {sale && (
+      <span class="sale-tag" aria-label={`${t('sale.badge')} ${saleText}`}>
+        <span class="sale-pct num">{saleText}</span>
+      </span>
+    )}
   </div>
   {compact ? (
     <div class="c-meta">
       <H class="name">{loc(p.name, lang)}</H>
-      <span class="price num">{lang === 'en' && <span class="from">{t('collection.from')} </span>}₾ {priceFmt(minPrice(p))}{lang === 'ka' && <span class="from"> {t('collection.from')}</span>}</span>
+      <span class="price num">{lang === 'en' && <span class="from">{t('collection.from')} </span>}{was && <s class="was">₾ {priceFmt(was)}</s>}₾ {priceFmt(minPrice(p))}{lang === 'ka' && <span class="from"> {t('collection.from')}</span>}</span>
     </div>
   ) : (
   <div class="meta">
@@ -26,7 +36,7 @@ const sizes = p.sizes.length;
     <div class="row sub">
       <span class="mat">{loc(p.material, lang)}</span>
       <span class="price num">
-        {lang === 'en' && <span class="from">{t('collection.from')} </span>}₾ {priceFmt(minPrice(p))}{lang === 'ka' && <span class="from"> {t('collection.from')}</span>}
+        {lang === 'en' && <span class="from">{t('collection.from')} </span>}{was && <s class="was">₾ {priceFmt(was)}</s>}₾ {priceFmt(minPrice(p))}{lang === 'ka' && <span class="from"> {t('collection.from')}</span>}
       </span>
     </div>
     <span class="sizes">{t(`type.${p.orientation}.s` as any)} · {sizes} {t('products.sizes')}</span>
@@ -37,6 +47,23 @@ const sizes = p.sizes.length;
 <style>
   .spec { min-width: 0; display: flex; flex-direction: column; gap: 1.1rem; text-decoration: none; color: inherit; }
   .frame { position: relative; overflow: hidden; }
+  /* Sale tag: the site's own accent (wood) colours, sitting on the corner of the piece. */
+  .sale-tag {
+    position: absolute; right: 0.75rem; top: 0.75rem; z-index: 1;
+    display: grid; justify-items: end; gap: 0.3rem;
+  }
+  .sale-tag .sale-pct {
+    padding: 0.45rem 0.85rem; border-radius: 12px; font-size: var(--t-lg); font-weight: 800; line-height: 1; letter-spacing: -0.01em;
+    background: var(--accent); color: var(--accent-ink);
+    box-shadow: 0 10px 22px -10px color-mix(in oklab, var(--accent) 85%, transparent);
+  }
+  .was { color: var(--ink-3); font-weight: 400; margin-right: 0.4rem; text-decoration-thickness: 1px; }
+  .stock-out {
+    position: absolute; left: 0.75rem; top: 0.75rem; z-index: 1;
+    padding: 0.3rem 0.7rem; border-radius: 999px; font-size: var(--t-xs); font-weight: 600; letter-spacing: 0.02em;
+    background: color-mix(in oklab, var(--ground) 92%, transparent); color: var(--ink); border: 1px solid var(--line);
+    backdrop-filter: blur(6px);
+  }
   .meta { display: grid; gap: 0.3rem; }
   .compact { gap: 0.9rem; }
   .c-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 0.25rem 0.75rem; flex-wrap: wrap; }

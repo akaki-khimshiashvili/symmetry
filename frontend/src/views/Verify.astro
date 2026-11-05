@@ -1,0 +1,168 @@
+---
+import Base from '../layouts/Base.astro';
+import Icon from '../components/Icon.astro';
+import { type Lang, useT } from '../i18n/ui';
+import { API_URL } from '../lib/data';
+
+/**
+ * Receipt check: the QR on every receipt opens this page with ?n=<number>&c=<code>.
+ * The API recomputes the code with its secret and returns the order's live status, so a forged or
+ * edited receipt fails, and an old screenshot can't hide a later decline or refund.
+ */
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = useT(lang);
+const states = ['held', 'captured', 'released', 'refunded', 'expired'];
+const text = {
+  state: Object.fromEntries(states.map((s) => [s, t(`rc.state.${s}` as any)])),
+  title: Object.fromEntries(states.map((s) => [s, t(`rc.title.${s}` as any)])),
+  check: t('vf.check'),
+  checking: t('vf.checking'),
+};
+---
+<Base lang={lang} title={t('vf.title')} noindex>
+  <section class="wrap vf" data-vf data-api={API_URL} data-lang={lang} data-text={JSON.stringify(text)}>
+    <div class="vf-in">
+      <h1 class="display t-2xl">{t('vf.title')}</h1>
+      <p class="lead">{t('vf.lead')}</p>
+
+      <form class="vf-form" data-form novalidate>
+        <label>
+          <span>{t('rc.number')}</span>
+          <input name="n" autocomplete="off" spellcheck="false" placeholder="SYM-2026-00012" required />
+        </label>
+        <label>
+          <span>{t('rc.code')}</span>
+          <input name="c" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX" required />
+        </label>
+        <button class="btn btn-solid" type="submit" data-submit><span>{t('vf.check')}</span><Icon name="arrow" size={18} /></button>
+      </form>
+
+      <div class="vf-result ok" data-ok hidden tabindex="-1">
+        <div class="vf-head"><span class="mark"><Icon name="check" size={22} /></span><div><p class="vf-t">{t('vf.valid')}</p><p class="vf-d">{t('vf.validD')}</p></div></div>
+        <dl class="vf-facts">
+          <div><dt>{t('rc.number')}</dt><dd class="num" data-number></dd></div>
+          <div><dt>{t('vf.status')}</dt><dd><b data-status-title></b><br /><span data-status></span></dd></div>
+          <div><dt>{t('rc.issued')}</dt><dd data-issued></dd></div>
+          <div data-charged-row hidden><dt>{t('rc.charged')}</dt><dd data-charged></dd></div>
+          <div data-closed-row hidden><dt>{t('rc.closed')}</dt><dd data-closed></dd></div>
+          <div><dt>{t('rc.item')}</dt><dd data-item></dd></div>
+          <div><dt>{t('rc.total')}</dt><dd class="num" data-amount></dd></div>
+          <div><dt>{t('vf.customer')}</dt><dd data-customer></dd></div>
+          <div data-phone-row hidden><dt>{t('vf.phoneEnd')}</dt><dd class="num" data-phone></dd></div>
+          <div data-card-row hidden><dt>{t('vf.cardEnd')}</dt><dd class="num" data-card></dd></div>
+        </dl>
+        <p class="vf-test" data-test hidden>{t('rc.test')}</p>
+      </div>
+
+      <div class="vf-result bad" data-bad hidden tabindex="-1" role="alert">
+        <div class="vf-head"><span class="mark"><Icon name="close" size={22} /></span><div><p class="vf-t">{t('vf.invalid')}</p><p class="vf-d">{t('vf.invalidD')}</p></div></div>
+      </div>
+      <p class="err" role="alert" data-err hidden>{t('f.error.network')}</p>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .vf [hidden] { display: none !important; }
+  .vf { padding-block: var(--s-6); }
+  .vf-in { max-width: 40rem; display: grid; gap: var(--s-3); }
+  .vf-form { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem 1rem; align-items: end; }
+  .vf-form label { display: grid; gap: 0.4rem; min-width: 0; font-size: var(--t-sm); color: var(--ink-2); }
+  .vf-form input {
+    width: 100%; min-width: 0; height: 3.25rem; padding: 0 1rem; border-radius: 10px; font: inherit; font-size: var(--t-base); color: var(--ink);
+    background: color-mix(in oklab, var(--ground) 55%, white); border: 1px solid color-mix(in oklab, var(--ink) 13%, transparent);
+    font-variant-numeric: tabular-nums; letter-spacing: 0.03em; text-transform: uppercase;
+  }
+  .vf-form input:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 25%, transparent); }
+  .vf-form .btn { grid-column: 1 / -1; justify-self: start; }
+  .vf-result { display: grid; gap: 1rem; padding: 1.25rem 1.4rem; border-radius: 14px; border: 1px solid var(--line); background: var(--ground-2); }
+  .vf-result:focus { outline: none; }
+  .vf-head { display: flex; gap: 1rem; align-items: flex-start; }
+  .mark { flex: none; display: inline-flex; width: 2.75rem; height: 2.75rem; align-items: center; justify-content: center; border-radius: 50%; }
+  .ok .mark { background: oklch(0.55 0.11 150); color: #fff; }
+  .bad { border-color: color-mix(in oklab, oklch(0.55 0.16 30) 45%, var(--line)); }
+  .bad .mark { background: oklch(0.55 0.16 30); color: #fff; }
+  .vf-t { font-weight: 600; font-size: var(--t-lg); margin: 0; color: var(--ink); }
+  .vf-d { margin: 0.2rem 0 0; color: var(--ink-2); font-size: var(--t-sm); }
+  .vf-facts { margin: 0; display: grid; border-top: 1px solid var(--line); }
+  .vf-facts div { display: grid; grid-template-columns: 10rem 1fr; gap: 1rem; padding-block: 0.7rem; border-bottom: 1px solid var(--line); font-size: var(--t-sm); }
+  .vf-facts dt { color: var(--ink-3); }
+  .vf-facts dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
+  .vf-test { font-size: var(--t-sm); color: var(--ink-2); margin: 0; }
+  .err { font-size: var(--t-sm); color: oklch(0.55 0.16 30); }
+  @media (max-width: 560px) {
+    .vf-form { grid-template-columns: 1fr; }
+    .vf-form .btn { width: 100%; justify-content: center; }
+    .vf-facts div { grid-template-columns: 1fr; gap: 0.2rem; }
+  }
+</style>
+
+<script>
+  import { fmtWhen, fmtGel } from '../lib/qr';
+
+  const root = document.querySelector<HTMLElement>('[data-vf]')!;
+  const lang = root.dataset.lang || 'ka';
+  const text = JSON.parse(root.dataset.text || '{}');
+  const $ = (s: string) => root.querySelector<HTMLElement>(s)!;
+  const set = (s: string, v: string) => ($(s).textContent = v);
+  const form = $('[data-form]') as HTMLFormElement;
+  const btn = $('[data-submit]') as HTMLButtonElement;
+  const field = (n: string) => form.elements.namedItem(n) as HTMLInputElement;
+
+  const check = async (n: string, c: string) => {
+    $('[data-ok]').hidden = true;
+    $('[data-bad]').hidden = true;
+    $('[data-err]').hidden = true;
+    btn.disabled = true;
+    btn.querySelector('span')!.textContent = text.checking;
+    try {
+      const res = await fetch(`${root.dataset.api}/receipts/verify?n=${encodeURIComponent(n)}&c=${encodeURIComponent(c)}`);
+      if (!res.ok) throw new Error();
+      const r = await res.json();
+      if (!r.valid) {
+        $('[data-bad]').hidden = false;
+        $('[data-bad]').focus();
+        return;
+      }
+      set('[data-number]', r.number);
+      set('[data-status-title]', text.title[r.status] || r.status);
+      set('[data-status]', text.state[r.status] || '');
+      set('[data-issued]', fmtWhen(r.issued_at, lang));
+      $('[data-charged-row]').hidden = !r.captured_at;
+      set('[data-charged]', fmtWhen(r.captured_at, lang));
+      $('[data-closed-row]').hidden = !r.released_at;
+      set('[data-closed]', fmtWhen(r.released_at, lang));
+      set('[data-item]', `${r.item.product} · ${r.item.size}`);
+      set('[data-amount]', fmtGel(r.amount));
+      set('[data-customer]', r.customer);
+      $('[data-phone-row]').hidden = !r.phone_end;
+      set('[data-phone]', `••${r.phone_end}`);
+      $('[data-card-row]').hidden = !r.card_end;
+      set('[data-card]', `•••• ${r.card_end}`);
+      $('[data-test]').hidden = !r.test;
+      $('[data-ok]').hidden = false;
+      $('[data-ok]').focus();
+    } catch {
+      $('[data-err]').hidden = false;
+    } finally {
+      btn.disabled = false;
+      btn.querySelector('span')!.textContent = text.check;
+    }
+  };
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const n = field('n').value.trim();
+    const c = field('c').value.trim();
+    if (n && c) check(n, c);
+  });
+
+  // Opened from a receipt's QR code: check straight away.
+  const q = new URLSearchParams(location.search);
+  if (q.get('n') && q.get('c')) {
+    field('n').value = q.get('n')!;
+    field('c').value = q.get('c')!;
+    check(q.get('n')!, q.get('c')!);
+  }
+</script>

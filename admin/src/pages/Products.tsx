@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { api, type Product, fmtPrice, ORIENTATIONS, SITE_URL } from '../api';
+import { api, type Product, fmtPrice, ORIENTATIONS, SITE_URL, FEATURED_MAX } from '../api';
 import { Icon, Loading, Empty, toast, confirmAction } from '../ui';
 import { Preview } from './Preview';
 
@@ -17,7 +17,10 @@ export function ProductsPage() {
     } catch (e: any) { toast.err(e.message); }
   };
 
-  const toggle = async (p: Product, field: 'published' | 'featured') => {
+  const featuredCount = items?.filter((p) => p.featured).length ?? 0;
+  const featuredFull = featuredCount >= FEATURED_MAX;
+
+  const toggle = async (p: Product, field: 'published' | 'featured' | 'in_stock') => {
     try {
       await api(`/admin/products/${p.id}`, { method: 'PUT', body: { ...p, [field]: !p[field] } });
       load();
@@ -30,6 +33,12 @@ export function ProductsPage() {
         <div>
           <h1>პროდუქცია</h1>
           <p class="muted">დაამატეთ, შეცვალეთ ან წაშალეთ კედლის პანელები.</p>
+          {items && items.length > 0 && (
+            <p class={`small featured-count ${featuredFull ? 'full' : ''}`}>
+              <Icon name="star" size={13} />მთავარ გვერდზე: <b class="num">{featuredCount} / {FEATURED_MAX}</b>
+              {featuredFull && ' · ახლის დასამატებლად ჯერ მოხსენით რომელიმე'}
+            </p>
+          )}
         </div>
         <a class="btn primary" href="#/products/new"><Icon name="plus" />ახალი პროდუქტი</a>
       </header>
@@ -60,13 +69,26 @@ export function ProductsPage() {
                     </td>
                     <td>{ORIENTATIONS[p.orientation] ?? ''}</td>
                     <td class="num">{p.sizes.length}</td>
-                    <td class="num nowrap">{prices.length ? `${fmtPrice(Math.min(...prices))}${prices.length > 1 ? ` – ${fmtPrice(Math.max(...prices))}` : ''}` : 'ფასი არ არის'}</td>
+                    <td class="num nowrap">
+                      {prices.length ? `${fmtPrice(Math.min(...prices))}${prices.length > 1 ? ` – ${fmtPrice(Math.max(...prices))}` : ''}` : 'ფასი არ არის'}
+                      {p.sale?.active && <div class="small sale-text">ფასდაკლებით {p.sizes.filter((x) => (x.sale_percent ?? 0) > 0).length}/{p.sizes.length} ზომაზე</div>}
+                    </td>
                     <td>
                       <div class="chips">
                         <button type="button" class={`chip ${p.published ? 'on' : ''}`} onClick={() => toggle(p, 'published')} title="გამოქვეყნება / დამალვა">
                           {p.published ? 'გამოქვეყნებული' : 'დამალული'}
                         </button>
-                        <button type="button" class={`chip ${p.featured ? 'on' : ''}`} onClick={() => toggle(p, 'featured')} title="მთავარ გვერდზე ჩვენება">
+                        {(p.sale?.percent ?? 0) > 0 && (
+                          <a class={`chip sale-chip ${p.sale.active ? '' : 'expired'}`} href={`#/products/${p.id}`} title={p.sale.active ? (p.sale.ends_at ? `მოქმედებს ${p.sale.ends_at}-მდე` : 'ფასდაკლება მოქმედებს') : 'ფასდაკლების ვადა ამოიწურა'}>
+                            −{p.sale.min_percent && p.sale.min_percent !== p.sale.percent ? `${p.sale.min_percent}–` : ''}{p.sale.percent}%{!p.sale.active && ' (ვადაგასული)'}
+                          </a>
+                        )}
+                        <button type="button" class={`chip ${p.in_stock !== false ? 'on' : 'off-stock'}`} onClick={() => toggle(p, 'in_stock')} title="მარაგის სტატუსის შეცვლა">
+                          {p.in_stock !== false ? 'მარაგშია' : 'არ არის მარაგში'}
+                        </button>
+                        <button type="button" class={`chip ${p.featured ? 'on' : ''}`} onClick={() => toggle(p, 'featured')}
+                          disabled={!p.featured && featuredFull}
+                          title={!p.featured && featuredFull ? `მთავარ გვერდზე უკვე ${FEATURED_MAX} პროდუქტია` : 'მთავარ გვერდზე ჩვენება'}>
                           <Icon name="star" size={13} />მთავარზე
                         </button>
                       </div>

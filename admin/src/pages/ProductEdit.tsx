@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { api, ApiError, type Product, type Size, type L10n, type OptionSet, ORIENTATIONS, SITE_URL, fmtPrice } from '../api';
+import { api, ApiError, type Product, type Size, type L10n, type OptionSet, ORIENTATIONS, SITE_URL, fmtPrice, FEATURED_MAX } from '../api';
 import { Icon, Loading, toast, confirmAction } from '../ui';
 import { OptionSelect, SizeSelect } from '../options';
 
@@ -10,10 +10,10 @@ const fmtDuration = (min: number) => {
 
 const blankL = (): L10n => ({ ka: '', en: '' });
 const blank = (): Product => ({
-  slug: '', pattern: 'wave', orientation: 'landscape', featured: false, published: true, sort: 0,
+  slug: '', pattern: 'wave', orientation: 'landscape', featured: false, in_stock: true, sale: { ends_at: '' }, published: true, sort: 0,
   name: blankL(), short: blankL(), description: blankL(), material: blankL(),
   delivery_days: { min: 14, max: 21 }, installation_minutes: 240,
-  sizes: [{ width: 120, height: 80, price: 0 }], images: [],
+  sizes: [{ width: 120, height: 80, price: 0, sale_percent: 0 }], images: [],
 });
 
 type Errors = Record<string, string>;
@@ -54,12 +54,17 @@ export function ProductEdit({ id }: { id: string }) {
   const [drag, setDrag] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [opts, setOpts] = useState<OptionSet | null>(null);
+  /** How many OTHER products are already on the home page. */
+  const [othersFeatured, setOthersFeatured] = useState(0);
   // Photos chosen before the product's first save: uploaded right after it is created.
   const [pending, setPending] = useState<{ file: File; url: string }[]>([]);
 
   useEffect(() => {
     if (!isNew) api<Product>(`/admin/products/${id}`).then(setP).catch((e) => toast.err(e.message));
     api<OptionSet>('/admin/options').then(setOpts).catch((e) => toast.err(e.message));
+    api<Product[]>('/admin/products')
+      .then((all) => setOthersFeatured(all.filter((x) => x.featured && String(x.id) !== String(id)).length))
+      .catch(() => {});
   }, [id]);
   useEffect(() => () => pending.forEach((x) => URL.revokeObjectURL(x.url)), []);
 
@@ -78,9 +83,10 @@ export function ProductEdit({ id }: { id: string }) {
     const used = new Set(p.sizes.map((s) => `${s.width}x${s.height}`));
     const next = opts.size.find((o) => !used.has(`${o.width}x${o.height}`));
     const last = p.sizes[p.sizes.length - 1];
-    set('sizes', [...p.sizes, { width: next?.width ?? 0, height: next?.height ?? 0, price: last?.price ?? 0 }]);
+    set('sizes', [...p.sizes, { width: next?.width ?? 0, height: next?.height ?? 0, price: last?.price ?? 0, sale_percent: 0 }]);
   };
   const removeSize = (i: number) => set('sizes', p.sizes.filter((_, j) => j !== i));
+  const clampPct = (v: unknown) => Math.max(0, Math.min(90, Math.round(Number(v) || 0)));
 
   const save = async (e?: Event) => {
     e?.preventDefault();
@@ -209,19 +215,36 @@ export function ProductEdit({ id }: { id: string }) {
               <h2>ზომები და ფასები</h2>
               <button class="btn ghost sm" type="button" onClick={addSize}><Icon name="plus" size={16} />ზომის დამატება</button>
             </div>
-            <p class="muted small">თითოეულ ზომას აქვს საკუთარი ფასი. საიტზე მომხმარებელი ირჩევს ზომას და ფასი ავტომატურად იცვლება.</p>
+            <p class="muted small">თითოეულ ზომას აქვს საკუთარი ფასი. ფასდაკლებისთვის ჩაწერეთ პროცენტი — 0 ნიშნავს, რომ ფასდაკლება არ არის.</p>
             {errors.sizes && <p class="err">{errors.sizes}</p>}
             <div class="sizes">
-              <div class="sizes-head"><span>ზომა (სიგანე × სიმაღლე, სმ)</span><span>ფასი, ₾</span><span></span></div>
-              {p.sizes.map((s, i) => (
-                <div class="size-row" key={s.id ?? `n${i}`}>
-                  <SizeSelect width={s.width} height={s.height} opts={opts} setOpts={setOpts} invalid={!!errors[`sizes.${i}`]} onChange={(width, height) => setSize(i, { width, height })} />
-                  <input type="number" min="0" step="10" inputmode="decimal" value={s.price} aria-label="ფასი" aria-invalid={!!errors[`sizes.${i}`]} onInput={(e) => setSize(i, { price: Number(e.currentTarget.value) })} />
-                  <button class="icon-btn danger" type="button" onClick={() => removeSize(i)} disabled={p.sizes.length === 1} aria-label="ზომის წაშლა" title={p.sizes.length === 1 ? 'მინიმუმ ერთი ზომა საჭიროა' : 'წაშლა'}><Icon name="trash" /></button>
-                  {errors[`sizes.${i}`] && <span class="err full">{errors[`sizes.${i}`]}</span>}
-                </div>
-              ))}
+              <div class="sizes-head"><span>ზომა (სმ)</span><span>ფასი, ₾</span><span>ფასდაკლება, %</span><span>საბოლოო ფასი</span><span></span></div>
+              {p.sizes.map((s, i) => {
+                const pct = s.sale_percent ?? 0;
+                return (
+                  <div class="size-row" key={s.id ?? `n${i}`}>
+                    <SizeSelect width={s.width} height={s.height} opts={opts} setOpts={setOpts} invalid={!!errors[`sizes.${i}`]} onChange={(width, height) => setSize(i, { width, height })} />
+                    <input type="number" min="0" step="10" inputmode="decimal" value={s.price} aria-label="ფასი" aria-invalid={!!errors[`sizes.${i}`]} onInput={(e) => setSize(i, { price: Number(e.currentTarget.value) })} />
+                    <input type="number" min="0" max="90" step="1" inputmode="numeric" value={pct} aria-label="ფასდაკლება, %"
+                      class={pct > 0 ? 'has-sale' : ''} onInput={(e) => setSize(i, { sale_percent: clampPct(e.currentTarget.value) })} />
+                    <span class={`final num ${pct > 0 ? 'on-sale' : ''}`}>
+                      {pct > 0 ? <><s>{fmtPrice(s.price)}</s> {fmtPrice(Math.round(s.price * (100 - pct) / 100))}</> : fmtPrice(s.price)}
+                    </span>
+                    <button class="icon-btn danger" type="button" onClick={() => removeSize(i)} disabled={p.sizes.length === 1} aria-label="ზომის წაშლა" title={p.sizes.length === 1 ? 'მინიმუმ ერთი ზომა საჭიროა' : 'წაშლა'}><Icon name="trash" /></button>
+                    {errors[`sizes.${i}`] && <span class="err full">{errors[`sizes.${i}`]}</span>}
+                  </div>
+                );
+              })}
             </div>
+            {p.sizes.some((x) => (x.sale_percent ?? 0) > 0) && (
+              <div class="sale-end">
+                <label class="fld"><span>ფასდაკლება მოქმედებს (ჩათვლით)</span>
+                  <input type="date" value={p.sale?.ends_at ?? ''} onInput={(e) => set('sale', { ...(p.sale ?? {}), ends_at: e.currentTarget.value })} />
+                </label>
+                <p class="muted small">ცარიელი = ვადის გარეშე. ვადის შემდეგ ფასდაკლება თავისით ითიშება.</p>
+                {p.sale?.active === false && p.sale.ends_at && <p class="small warn">ვადა ამოიწურა ({p.sale.ends_at}) — ფასდაკლება საიტზე აღარ ჩანს.</p>}
+              </div>
+            )}
           </section>
 
           <section class="card pad-lg">
@@ -304,9 +327,23 @@ export function ProductEdit({ id }: { id: string }) {
               <span class="track" aria-hidden="true" /><span>გამოქვეყნებულია საიტზე</span>
             </label>
             <label class="switch">
-              <input type="checkbox" checked={p.featured} onChange={(e) => set('featured', e.currentTarget.checked)} />
+              <input type="checkbox" checked={p.in_stock !== false} onChange={(e) => set('in_stock', e.currentTarget.checked)} />
+              <span class="track" aria-hidden="true" /><span>მარაგშია</span>
+            </label>
+            {p.in_stock === false && (
+              <p class="small muted">საიტზე გამოჩნდება „მარაგში არ არის“. ყიდვის ღილაკის ნაცვლად მომხმარებელს შეეძლება დაგიკავშირდეთ და იკითხოს, როდის იქნება ხელმისაწვდომი.</p>
+            )}
+            <label class="switch">
+              <input type="checkbox" checked={p.featured} disabled={!p.featured && othersFeatured >= FEATURED_MAX}
+                onChange={(e) => set('featured', e.currentTarget.checked)} />
               <span class="track" aria-hidden="true" /><span>მთავარ გვერდზე ჩვენება</span>
             </label>
+            <p class={`small ${!p.featured && othersFeatured >= FEATURED_MAX ? 'warn' : 'muted'}`}>
+              {!p.featured && othersFeatured >= FEATURED_MAX
+                ? `მთავარ გვერდზე უკვე ${FEATURED_MAX} პროდუქტია. ჯერ მოხსენით მონიშვნა სხვას.`
+                : `მთავარ გვერდზე: ${othersFeatured + (p.featured ? 1 : 0)} / ${FEATURED_MAX}`}
+            </p>
+            {errors.featured && <span class="err">{errors.featured}</span>}
             <label class="fld"><span>რიგითობა</span>
               <input type="number" value={p.sort} onInput={(e) => set('sort', Number(e.currentTarget.value))} />
             </label>

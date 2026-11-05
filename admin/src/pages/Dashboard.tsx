@@ -2,7 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { api, type Order, type Message, fmtDate, fmtPrice, CHANNELS } from '../api';
 import { Icon, Loading, toast } from '../ui';
 
-type Stats = { products: number; published: number; orders_new: number; messages_new: number };
+type Stats = { products: number; published: number; orders_new: number; messages_new: number; orders_held: number };
 
 export function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
@@ -42,6 +42,7 @@ export function Dashboard() {
       </header>
 
       <div class="stats">
+        {stats.orders_held > 0 && <a class="stat stat-alert" href="#/orders"><span class="stat-n">{stats.orders_held}</span><span>დასადასტურებელი გადახდა</span></a>}
         <a class="stat" href="#/orders"><span class="stat-n">{stats.orders_new}</span><span>ახალი შეკვეთა</span></a>
         <a class="stat" href="#/messages"><span class="stat-n">{stats.messages_new}</span><span>ახალი შეტყობინება</span></a>
         <a class="stat" href="#/products"><span class="stat-n">{stats.published}<small> / {stats.products}</small></span><span>გამოქვეყნებული პროდუქტი</span></a>

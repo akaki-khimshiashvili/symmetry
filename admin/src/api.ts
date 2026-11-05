@@ -2,13 +2,19 @@ export const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000/a
 export const SITE_URL = (import.meta.env.VITE_SITE_URL || 'http://localhost:4321').replace(/\/$/, '');
 
 export type L10n = { ka: string; en: string };
-export interface Size { id?: number; width: number; height: number; price: number }
+/** `sale_percent` is this size's own discount (0 = none). */
+export interface Size { id?: number; width: number; height: number; price: number; sale_percent?: number; sale_price?: number }
+/** Product-wide sale info: the end date (YYYY-MM-DD, inclusive) is shared by all sizes; percent / min_percent / active come from the API. */
+export interface Sale { ends_at: string; percent?: number; min_percent?: number; active?: boolean }
 export interface Product {
   id?: number;
   slug: string;
   pattern: string;
   orientation: 'portrait' | 'landscape';
   featured: boolean;
+  /** Out-of-stock products are shown on the site but can't be ordered. */
+  in_stock: boolean;
+  sale: Sale;
   published: boolean;
   sort: number;
   name: L10n;
@@ -25,8 +31,25 @@ export interface Product {
 export interface Order {
   id: number; product_id: number; product_name: string; size_label: string; price: number;
   first_name: string; last_name: string; phone: string; email: string; client_type: string;
-  channel: string; message: string; lang: string; status: string; payment_status: string; created_at: string;
+  channel: string; message: string; lang: string; status: string; payment_status: PaymentStatus; created_at: string;
+  /** Amount in tetri (GEL × 100). */
+  amount: number; currency: string; list_price: number | null; sale_percent: number; card_mask: string; card_type: string; payment_error: string; payment_test: number;
+  flitt_order_id: string; pay_token: string; held_at: string | null;
+  /** Payment statuses whose receipt has been emailed, comma-separated. */
+  receipt_emailed: string; receipt_emailed_at: string | null; captured_at: string | null; released_at: string | null;
 }
+export type PaymentStatus = 'unpaid' | 'pending' | 'held' | 'captured' | 'released' | 'refunded' | 'declined' | 'expired';
+export interface PaymentConfig { enabled: boolean; test: boolean; hold_days: number; mail: 'smtp' | 'outbox' }
+export const PAYMENT: Record<PaymentStatus, { label: string; hint: string }> = {
+  unpaid: { label: 'გადახდის გარეშე', hint: 'მოთხოვნა ონლაინ გადახდის გარეშე.' },
+  pending: { label: 'გადახდა არ დასრულებულა', hint: 'მომხმარებელი გადავიდა გადახდის გვერდზე, მაგრამ გადახდა ჯერ არ დაუსრულებია.' },
+  held: { label: 'თანხა დაბლოკილია', hint: 'თანხა ბარათზე დაბლოკილია, მაგრამ ჯერ არ ჩამოჭრილა. დაადასტურეთ ან უარყავით შეკვეთა.' },
+  captured: { label: 'გადახდილია', hint: 'შეკვეთა დადასტურდა და თანხა ჩამოიჭრა.' },
+  released: { label: 'უარყოფილი, თანხა გათავისუფლდა', hint: 'დაბლოკილი თანხა დაუბრუნდა მომხმარებელს. არაფერი ჩამოჭრილა.' },
+  refunded: { label: 'თანხა დაბრუნებულია', hint: 'ჩამოჭრილი თანხა დაუბრუნდა მომხმარებელს.' },
+  declined: { label: 'გადახდა უარყო ბანკმა', hint: 'ბარათით გადახდა ვერ შესრულდა. მომხმარებელს შეუძლია თავიდან სცადოს.' },
+  expired: { label: 'ვადა გავიდა', hint: 'გადახდის ან დაბლოკვის ვადა ამოიწურა. თანხა არ ჩამოჭრილა.' },
+};
 export interface Message {
   id: number; first_name: string; last_name: string; phone: string; email: string; client_type: string;
   channel: string; intent: string; message: string; lang: string; status: string; created_at: string;
@@ -36,6 +59,9 @@ export interface TextOption { id: number; ka: string; en: string }
 export interface SizeOption { id: number; width: number; height: number }
 /** Saved dropdown lists for the product editor. Sizes are in centimetres. */
 export interface OptionSet { material: TextOption[]; size: SizeOption[] }
+
+/** The home page shows this many featured products (same limit as the API). */
+export const FEATURED_MAX = 4;
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public fields: Record<string, string> = {}) {

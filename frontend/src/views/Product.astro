@@ -5,20 +5,31 @@ import Leaf from '../components/Leaf.astro';
 import SpecimenCard from '../components/SpecimenCard.astro';
 import LeadForm from '../components/LeadForm.astro';
 import { type Lang, useT, path } from '../i18n/ui';
-import { type Product, loadData, loc, priceFmt, waLink, telLink } from '../lib/data';
+import { saleEndText } from '../lib/saleDate';
+import { type Product, loadData, loc, priceFmt, waLink, telLink, API_URL, nowPrice, onSale, sizeOnSale } from '../lib/data';
 
 interface Props { lang: Lang; product: Product }
 const { lang, product: p } = Astro.props;
 const t = useT(lang);
 const { products, settings: s } = await loadData();
+// With online payment on, the order flow is a purchase: contact details, then Flitt's checkout.
+const pays = !!s.payments;
+// Out of stock: no buying, only ways to ask when it will be available. Re-checked live in the browser below.
+const inStock = p.in_stock !== false;
+// Sale (per size): shown on build, then re-checked live (a sale can start or end after the site was built).
+const sale = onSale(p);
+const saleUntil = sale ? saleEndText(p.sale!.ends_at, lang) : '';
 const index = products.findIndex((x) => x.slug === p.slug);
 const name = loc(p.name, lang);
 const first = p.sizes[0];
+// The sale pill starts with the first (pre-selected) size's own discount.
+const firstPct = first && sizeOnSale(first) ? first.sale_percent ?? 0 : 0;
 const others = products.filter((x) => x.slug !== p.slug).slice(0, 3);
 const hasPhoto = p.images.length > 0;
 const sizeLabel = (w: number, h: number) => `${w} × ${h} ${t('p.cm')}`;
 const days = p.delivery_days.min === p.delivery_days.max ? `${p.delivery_days.min}` : `${p.delivery_days.min}–${p.delivery_days.max}`;
 const waBase = `${t('p.waText')} «${name}»`;
+const waStock = `${t('p.waStock')} «${name}»?`;
 const installH = Math.floor((p.installation_minutes ?? 0) / 60);
 const installM = (p.installation_minutes ?? 0) % 60;
 const installTime = [installH ? `${installH} ${t('p.hours')}` : '', installM ? `${installM} ${t('p.minutes')}` : ''].filter(Boolean).join(' ') || '—';
@@ -33,7 +44,7 @@ const socials = [
     <a class="back" href={path(lang, '/products/')}><Icon name="arrow-left" size={18} />{t('p.back')}</a>
   </div>
 
-  <section class="wrap grid pdp" data-pdp data-product-id={p.id} data-wa={s.whatsapp} data-wa-base={waBase}>
+  <section class="wrap grid pdp" data-pdp data-lang={lang} data-product-id={p.id} data-slug={p.slug} data-api={API_URL} data-stock={inStock ? 'in' : 'out'} data-wa={s.whatsapp} data-wa-base={waBase}>
     <div class="media">
       <figure class="stage" data-stage>
         <div class="frame-box">
@@ -60,7 +71,16 @@ const socials = [
 
     <div class="info">
       <div class="title" data-reveal>
-        <h1 class="display t-3xl">{name}</h1>
+        <h1 class="display t-2xl">{name}</h1>
+        <span class="sale-pill num" data-sale-pill hidden={!firstPct}>
+          <span class="sale-pct" data-sale-pct>−{firstPct}%</span>
+          <span class="sale-txt">
+            <span class="sale-name">{t('sale.badge')}</span>
+            <span class="sale-until" data-sale-until hidden={!saleUntil}>{saleUntil}</span>
+          </span>
+        </span>
+        <span class="stock-badge in" data-when="in">{t('p.inStock')}</span>
+        <span class="stock-badge out" data-when="out">{t('p.outOfStock')}</span>
       </div>
       <p class="lead" data-reveal style="--d:1">{loc(p.short, lang)}</p>
 
@@ -75,23 +95,40 @@ const socials = [
               checked={i === 0}
               data-w={sz.width}
               data-h={sz.height}
-              data-price={sz.price}
+              data-price={nowPrice(sz)}
+              data-old={sizeOnSale(sz) ? sz.price : ''}
+              data-pct={sizeOnSale(sz) ? sz.sale_percent : ''}
               data-label={sizeLabel(sz.width, sz.height)}
             />
             <span class="notch" aria-hidden="true"></span>
             <span class="sz num">{sizeLabel(sz.width, sz.height)}</span>
-            <span class="pr num">₾ {priceFmt(sz.price)}</span>
+            <span class="pr num">{sizeOnSale(sz) && <><s class="was">₾ {priceFmt(sz.price)}</s><span class="sz-pct">−{sz.sale_percent}%</span></>}<span data-pr>₾ {priceFmt(nowPrice(sz))}</span></span>
           </label>
         ))}
       </fieldset>
 
-      <div class="buy" data-reveal style="--d:3">
-        <div class="price-row">
-          <span class="label">{t('p.price')}</span>
-          <span class="price display num" data-price aria-live="polite">₾ {first ? priceFmt(first.price) : ''}</span>
+      <div class="stock-box" data-when="out" data-reveal style="--d:3">
+        <p class="stock-t">{t('p.outTitle')}</p>
+        <p class="stock-d">{t('p.outText')}</p>
+        <div class="quick">
+          {s.whatsapp && (
+            <a class="btn btn-solid" href={waLink(s.whatsapp, waStock)} target="_blank" rel="noopener"><Icon name="whatsapp" />{t('p.outAsk')}</a>
+          )}
+          {s.phone && <a class="btn btn-line num" href={telLink(s.phone)}><Icon name="phone" />{s.phone}</a>}
+          <a class="btn btn-line" href={path(lang, '/contact/')}><Icon name="mail" />{t('p.contactUs')}</a>
         </div>
-        <button class="btn btn-solid order-btn" type="button" data-order-open>{t('p.order')}</button>
-        <p class="note">{t('p.orderNote')}</p>
+      </div>
+
+      <div class="buy" data-when="in" data-reveal style="--d:3">
+        <div class="price-row">
+          <div class="price-box">
+            <span class="label">{t('p.price')}</span>
+            <s class="was was-lg num" data-was hidden={!firstPct}>{first && firstPct ? `₾ ${priceFmt(first.price)}` : ''}</s>
+            <span class="price display num" data-price aria-live="polite">₾ {first ? priceFmt(nowPrice(first)) : ''}</span>
+          </div>
+          <button class="btn btn-solid order-btn" type="button" data-order-open>{t(pays ? 'p.buy' : 'p.order')}</button>
+        </div>
+        <p class="note">{t(pays ? 'p.buyNote' : 'p.orderNote')}</p>
         <div class="quick">
           {s.whatsapp && (
             <a class="btn btn-line" data-wa-link href={waLink(s.whatsapp, `${waBase}, ${first ? sizeLabel(first.width, first.height) : ''}`)} target="_blank" rel="noopener">
@@ -146,16 +183,16 @@ const socials = [
   <dialog class="drawer" data-order aria-labelledby="order-title">
     <div class="drawer-in">
       <div class="drawer-head">
-        <h2 id="order-title" class="display t-2xl">{t('order.title')}</h2>
+        <h2 id="order-title" class="display t-2xl">{t(pays ? 'order.buyTitle' : 'order.title')}</h2>
         <button class="x" type="button" data-order-close aria-label={t('nav.close')}><Icon name="close" size={22} /></button>
       </div>
-      <p class="drawer-lead">{t('order.lead')}</p>
+      <p class="drawer-lead">{t(pays ? 'order.buyLead' : 'order.lead')}</p>
       <div class="summary">
         <span class="label">{t('order.summary')}</span>
         <div class="sum-row">
           <span class="sum-name">{name}</span>
           <span class="num" data-sum-size>{first ? sizeLabel(first.width, first.height) : ''}</span>
-          <span class="num sum-price" data-sum-price>₾ {first ? priceFmt(first.price) : ''}</span>
+          <span class="num sum-price" data-sum-price>₾ {first ? priceFmt(nowPrice(first)) : ''}</span>
         </div>
       </div>
       <LeadForm lang={lang} kind="order" />
@@ -164,13 +201,50 @@ const socials = [
 </Base>
 
 <style>
-  .crumbs { padding-top: var(--s-3); }
+  /* Stock: everything marked data-when shows only for the matching state. */
+  .pdp[data-stock='in'] [data-when='out'], .pdp[data-stock='out'] [data-when='in'] { display: none !important; }
+  /* Sale pill in the site's accent colours. */
+  .sale-pill[hidden] { display: none !important; }
+  .sale-pill {
+    justify-self: start; align-self: flex-start; width: fit-content;
+    display: inline-flex; align-items: center; gap: 0.8rem; margin: 0.9rem 0.9rem 0.2rem 0;
+    padding: 0.35rem 1.1rem 0.35rem 0.35rem; border-radius: 14px;
+    background: color-mix(in oklab, var(--accent) 10%, var(--ground)); color: var(--accent);
+    border: 1px solid color-mix(in oklab, var(--accent) 28%, transparent);
+  }
+  .sale-pct {
+    display: inline-flex; align-items: center; min-height: 2.6rem; padding: 0 0.85rem; border-radius: 10px;
+    background: var(--accent); color: var(--accent-ink); font-size: var(--t-xl); font-weight: 800; letter-spacing: -0.01em;
+    box-shadow: 0 8px 18px -10px color-mix(in oklab, var(--accent) 80%, transparent);
+  }
+  .sale-txt { display: grid; gap: 0.05rem; line-height: 1.25; }
+  .sale-name { font-size: var(--t-sm); font-weight: 700; color: var(--ink); }
+  .sale-until { font-size: var(--t-xs); color: var(--ink-2); }
+  .sale-until[hidden] { display: none; }
+  /* :global — the live sale refresh redraws the size prices, and redrawn elements don't get scoped styles. */
+  .pdp :global(.was) { color: var(--ink-3); font-weight: 400; text-decoration-thickness: 1px; }
+  .size .pr { display: inline-flex; align-items: baseline; gap: 0.5rem; }
+  .pdp :global(.sz-pct) { font-size: var(--t-xs); font-weight: 700; padding: 0.05rem 0.45rem; border-radius: 999px; background: var(--accent); color: var(--accent-ink); }
+  .was[hidden] { display: none; }
+  .was-lg { display: block; font-size: var(--t-base); margin: 0.1rem 0 0.2rem; }
+  .stock-badge {
+    display: inline-flex; align-items: center; gap: 0.4rem; margin-top: 0.6rem;
+    font-size: var(--t-xs); font-weight: 600; letter-spacing: 0.04em; color: var(--ink-2);
+  }
+  .stock-badge::before { content: ''; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: oklch(0.6 0.12 150); }
+  .stock-badge.out::before { background: oklch(0.58 0.16 30); }
+  .stock-box { display: grid; gap: 0.6rem; padding: 1.25rem 1.35rem; border: 1px solid var(--line); border-radius: 16px; background: var(--ground-2); }
+  .stock-t { font-weight: 600; font-size: var(--t-lg); color: var(--ink); margin: 0; }
+  .stock-d { color: var(--ink-2); margin: 0; max-width: 46ch; text-wrap: pretty; }
+  .stock-box .quick { margin-top: 0.4rem; display: flex; flex-wrap: wrap; gap: 0.6rem; }
+  .stock-box .quick .btn { flex: 1 1 auto; width: auto; white-space: nowrap; }
+  .crumbs { padding-top: var(--s-2); }
   .back { display: inline-flex; align-items: center; gap: 0.5rem; font-size: var(--t-sm); color: var(--ink-2); text-decoration: none; transition: color 200ms ease; }
   @media (hover: hover) and (pointer: fine) { .back:hover { color: var(--ink); } }
 
-  .pdp { padding-block: var(--s-5) var(--s-6); row-gap: var(--s-5); align-items: start; }
-  .media { grid-column: 1 / span 7; position: sticky; top: 6rem; }
-  .info { grid-column: 9 / -1; display: grid; gap: var(--s-5); }
+  .pdp { padding-block: var(--s-2) var(--s-6); row-gap: var(--s-5); align-items: start; }
+  .media { grid-column: 1 / span 7; position: sticky; top: calc(var(--header-h) + 1rem); }
+  .info { grid-column: 8 / -1; display: grid; gap: clamp(0.9rem, 2.2vh, 1.6rem); align-content: start; }
 
   .stage { display: grid; gap: 0.9rem; animation: stage-in 800ms var(--ease-out) 80ms both; }
   /* The panel arrives once per visit: a short rise and settle; the dimension callouts follow. */
@@ -178,7 +252,7 @@ const socials = [
   .dim-top, .dim-side { animation: dims-in 500ms ease 550ms both; }
   @keyframes dims-in { from { opacity: 0; } }
   /* The panel sits on the page with shop-drawing callouts: width above, height to the right. */
-  .frame-box { container-type: size; height: min(68vh, 44rem); display: grid; place-items: center; padding: 2rem 2.25rem 0 0; }
+  .frame-box { container-type: size; height: clamp(20rem, calc(100svh - var(--header-h) - 8.5rem), 44rem); display: grid; place-items: center; padding: 2rem 2.25rem 0 0; }
   .piece {
     position: relative;
     width: min(100cqw, calc(100cqh * var(--r)));
@@ -204,12 +278,14 @@ const socials = [
   .thumb img { width: 100%; height: 100%; object-fit: cover; }
 
   .title { display: grid; gap: 0.3rem; }
+  .title h1 { line-height: 1.1; }
+  .info .lead { font-size: var(--t-base); line-height: 1.55; }
 
   .sizes { border: 0; padding: 0; display: grid; }
-  .sizes legend { margin-bottom: 0.8rem; }
+  .sizes legend { margin-bottom: 0.5rem; }
   .size {
     position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 1rem;
-    padding: 1rem 0.25rem; border-top: 1px solid var(--line); cursor: pointer; transition: background-color 200ms ease;
+    padding: 0.7rem 0.25rem; border-top: 1px solid var(--line); cursor: pointer; transition: background-color 200ms ease;
   }
   .size:last-of-type { border-bottom: 1px solid var(--line); }
   .size input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; appearance: none; background: none; border: 0; }
@@ -221,14 +297,16 @@ const socials = [
   .size:has(input:focus-visible) { outline: 1.5px solid var(--accent); outline-offset: 2px; }
   @media (hover: hover) and (pointer: fine) { .size:hover { background: color-mix(in oklab, var(--ink) 4%, transparent); } }
 
-  .buy { display: grid; gap: 1rem; }
-  .price-row { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
-  .price { font-size: var(--t-3xl); line-height: 1; letter-spacing: -0.02em; }
-  .order-btn { width: 100%; --h: 3.6rem; font-size: var(--t-base); }
+  .buy { display: grid; gap: 0.75rem; }
+  /* Price and the main action share one row, so the whole decision sits in one glance. */
+  .price-row { display: grid; grid-template-columns: auto 1fr; align-items: end; gap: 1.25rem; }
+  .price-box { display: grid; gap: 0.2rem; }
+  .price { font-size: var(--t-2xl); line-height: 1; letter-spacing: -0.02em; white-space: nowrap; }
+  .order-btn { width: 100%; --h: 3.4rem; font-size: var(--t-base); }
   .note { font-size: var(--t-xs); color: var(--ink-3); }
   /* Secondary contact: two compact buttons side by side, icon tight to its label. */
   .quick { display: grid; grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr)); gap: 0.6rem; }
-  .quick .btn { --h: 3rem; padding-inline: 1rem; gap: 0.5rem; font-size: var(--t-sm); }
+  .quick .btn { --h: 2.75rem; padding-inline: 1rem; gap: 0.5rem; font-size: var(--t-sm); }
   .quick .btn :global(svg) { width: 1.05em; height: 1.05em; }
 
   .specs { display: grid; }
@@ -239,7 +317,7 @@ const socials = [
 
   .follow { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
   .soc { display: flex; gap: 0.25rem; }
-  .soc a { display: inline-flex; width: 2.75rem; height: 2.75rem; align-items: center; justify-content: center; color: var(--ink-2); border-radius: 50%; transition: color 200ms ease, background-color 200ms ease; }
+  .soc a { display: inline-flex; width: 2.5rem; height: 2.5rem; align-items: center; justify-content: center; color: var(--ink-2); border-radius: 50%; transition: color 200ms ease, background-color 200ms ease; }
   @media (hover: hover) and (pointer: fine) { .soc a:hover { color: var(--ink); background: var(--ground-2); } }
 
   .desc { padding-bottom: var(--s-6); }
@@ -276,9 +354,15 @@ const socials = [
 
   @media (max-width: 1000px) {
     .media { grid-column: 1 / -1; position: static; }
-    .info { grid-column: 1 / -1; }
+    .info { grid-column: 1 / -1; gap: var(--s-3); }
     .frame-box { height: min(60vh, 34rem); }
     .display-quote { grid-column: 1 / -1; }
+  }
+  /* Short laptop screens: tighten rows so price, action and specs still fit without scrolling. */
+  @media (min-width: 1001px) and (max-height: 780px) {
+    .size { padding-block: 0.5rem; }
+    .order-btn { --h: 3rem; }
+    .quick .btn { --h: 2.5rem; }
   }
   @media (max-width: 760px) {
     .more-grid { grid-template-columns: 1fr 1fr; }
@@ -298,6 +382,7 @@ const socials = [
 </style>
 
 <script>
+  import { saleEndText } from '../lib/saleDate';
   const root = document.querySelector<HTMLElement>('[data-pdp]');
   if (root) {
     const fmt = (n: number) => new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(n).replace(/,/g, ' ');
@@ -312,9 +397,18 @@ const socials = [
     const sumPrice = drawer.querySelector<HTMLElement>('[data-sum-price]')!;
     const unit = dimW?.textContent?.replace(/[\d\s]/g, '').trim() || 'cm';
 
+    const wasEl = root.querySelector<HTMLElement>('[data-was]');
+    const pill = root.querySelector<HTMLElement>('[data-sale-pill]');
     const apply = (input: HTMLInputElement) => {
-      const { w, h, price, label } = input.dataset;
+      const { w, h, price, label, old } = input.dataset;
       priceEl.textContent = `₾ ${fmt(Number(price))}`;
+      if (wasEl) { wasEl.hidden = !old; wasEl.textContent = old ? `₾ ${fmt(Number(old))}` : ''; }
+      // The sale pill shows the selected size's own discount.
+      if (pill) {
+        pill.hidden = !input.dataset.pct;
+        const pctEl = pill.querySelector('[data-sale-pct]');
+        if (pctEl && input.dataset.pct) pctEl.textContent = `−${input.dataset.pct}%`;
+      }
       if (frame) frame.style.setProperty('--r', String(Number(w) / Number(h)));
       if (dimW) dimW.textContent = `${w} ${unit}`;
       if (dimH) dimH.textContent = `${h} ${unit}`;
@@ -359,8 +453,49 @@ const socials = [
       }),
     );
 
+    // Switch between "buy" and "ask when available". The block that appears skipped the scroll-reveal
+    // while it was hidden, so it is marked as revealed straight away.
+    const setStock = (state: 'in' | 'out') => {
+      if (root.dataset.stock === state) return;
+      root.dataset.stock = state;
+      root.querySelectorAll(`[data-when="${state}"]`).forEach((el) => el.classList.add('is-in'));
+    };
+    // A sale can start, change or end after the site was built: redraw the prices from the live data.
+    const untilEl = root.querySelector<HTMLElement>('[data-sale-until]');
+    const applySale = (live: { sale?: { ends_at?: string; active?: boolean }; sizes: { id: number; price: number; sale_price?: number; sale_percent?: number }[] }) => {
+      if (untilEl) {
+        const txt = live.sale?.active ? saleEndText(live.sale.ends_at, root.dataset.lang || 'ka') : '';
+        untilEl.textContent = txt;
+        untilEl.hidden = !txt;
+      }
+      root.querySelectorAll<HTMLInputElement>('input[name="size"]').forEach((input) => {
+        const s = live.sizes.find((x) => String(x.id) === input.value);
+        if (!s) return;
+        const now = s.sale_price ?? s.price;
+        const on = now < s.price;
+        input.dataset.price = String(now);
+        input.dataset.old = on ? String(s.price) : '';
+        input.dataset.pct = on ? String(s.sale_percent ?? '') : '';
+        const pr = input.closest('label')?.querySelector('.pr');
+        if (pr) pr.innerHTML = (on ? `<s class="was">₾ ${fmt(s.price)}</s><span class="sz-pct">−${s.sale_percent}%</span>` : '') + `<span data-pr>₾ ${fmt(now)}</span>`;
+      });
+      const sel = root.querySelector<HTMLInputElement>('input[name="size"]:checked');
+      if (sel) apply(sel);
+    };
+
+    // Stock can change after the site was built: ask the API and switch the page if needed.
+    fetch(`${root.dataset.api}/products/${root.dataset.slug}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((live) => {
+        if (live && typeof live.in_stock === 'boolean') setStock(live.in_stock ? 'in' : 'out');
+        if (live && Array.isArray(live.sizes)) applySale(live);
+      })
+      .catch(() => {});
+    // The form reports a sale that happened while the visitor was on the page.
+    form.addEventListener('lead:out-of-stock', () => setStock('out'));
+
     // Order drawer
-    document.querySelector('[data-order-open]')?.addEventListener('click', () => drawer.showModal());
+    document.querySelector('[data-order-open]')?.addEventListener('click', () => { if (root.dataset.stock !== 'out') drawer.showModal(); });
     drawer.querySelector('[data-order-close]')?.addEventListener('click', () => drawer.close());
     drawer.addEventListener('click', (e) => {
       if (e.target === drawer) drawer.close();

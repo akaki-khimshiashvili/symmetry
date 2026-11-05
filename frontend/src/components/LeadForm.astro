@@ -1,11 +1,15 @@
 ---
 import Icon from './Icon.astro';
 import { type Lang, useT, CLIENT_TYPES } from '../i18n/ui';
-import { API_URL } from '../lib/data';
+import { API_URL, loadData } from '../lib/data';
 
 interface Props { lang: Lang; kind: 'contact' | 'order'; id?: string }
 const { lang, kind, id = `${kind}-form` } = Astro.props;
 const t = useT(lang);
+const { settings } = await loadData();
+// Orders go straight to Flitt's checkout when online payment is on.
+const pays = kind === 'order' && !!settings.payments;
+const submitLabel = pays ? t('order.pay') : kind === 'order' ? t('order.submit') : t('f.submit');
 const msgs = {
   required: t('f.error.required'),
   phone: t('f.error.phone'),
@@ -13,9 +17,13 @@ const msgs = {
   network: t('f.error.network'),
   generic: t('f.error.generic'),
   sending: t('f.sending'),
+  redirecting: t('order.redirecting'),
+  outOfStock: t('f.error.outOfStock'),
 };
 const endpoint = `${API_URL}/${kind === 'order' ? 'orders' : 'contact'}`;
 const f = (k: string) => `${id}-${k}`;
+// Orders always need an email: the receipt and every status update are sent there.
+const emailAlways = kind === 'order';
 const channels = [
   { key: 'whatsapp', icon: 'whatsapp' },
   { key: 'email', icon: 'mail' },
@@ -27,7 +35,7 @@ const intents = [
   { key: 'other', icon: 'dots' },
 ] as const;
 ---
-<form class="lead" id={id} data-lead-form data-endpoint={endpoint} data-msgs={JSON.stringify(msgs)} novalidate>
+<form class="lead" id={id} data-lead-form data-email-always={emailAlways ? '' : undefined} data-endpoint={endpoint} data-msgs={JSON.stringify(msgs)} novalidate>
   <input type="hidden" name="lang" value={lang} />
   {kind === 'order' && (<><input type="hidden" name="product_id" /><input type="hidden" name="size_id" /></>)}
   <div class="hp" aria-hidden="true">
@@ -91,13 +99,13 @@ const intents = [
 
     <div class="field full">
       <label for={f('email')}>
-        {t('f.email')}<span class="req gap" aria-hidden="true" data-email-req hidden>*</span><span class="opt gap" data-email-opt>({t('f.optional')})</span>
+        {t('f.email')}<span class="req gap" aria-hidden="true" data-email-req hidden={!emailAlways}>*</span><span class="opt gap" data-email-opt hidden={emailAlways}>({t('f.optional')})</span>
       </label>
       <div class="control">
         <Icon name="mail" size={18} class="ci" />
-        <input id={f('email')} name="email" type="email" autocomplete="email" placeholder="name@example.com" aria-describedby={f('email-hint')} />
+        <input id={f('email')} name="email" type="email" autocomplete="email" placeholder="name@example.com" aria-describedby={f('email-hint')} required={emailAlways} />
       </div>
-      <p class="hint" id={f('email-hint')}>{t('f.emailHint')}</p>
+      <p class="hint" id={f('email-hint')}>{emailAlways ? t('order.emailHint') : t('f.emailHint')}</p>
       <p class="err" data-err="email"></p>
     </div>
 
@@ -128,10 +136,11 @@ const intents = [
 
   <p class="form-err" role="alert" data-form-err hidden><Icon name="alert" size={18} /><span></span></p>
 
-  <button class="btn btn-solid submit" type="submit" data-label={kind === 'order' ? t('order.submit') : t('f.submit')}>
-    <span>{kind === 'order' ? t('order.submit') : t('f.submit')}</span>
+  <button class="btn btn-solid submit" type="submit" data-label={submitLabel}>
+    <span>{submitLabel}</span>
     <Icon name="arrow" size={18} />
   </button>
+  {pays && <p class="pay-note">{t('order.payNote')}</p>}
 
   <div class="done" data-done hidden tabindex="-1">
     <span class="done-mark"><Icon name="check" size={22} /></span>
@@ -156,6 +165,7 @@ const intents = [
   .opt { font-weight: 400; color: var(--ink-3); }
 
   .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem 1rem; }
+  .pay-note { margin: -0.4rem 0 0; font-size: var(--t-sm); color: var(--ink-2); text-wrap: pretty; }
   .field { display: grid; gap: 0.45rem; min-width: 0; margin: 0; padding: 0; border: 0; }
   .full { grid-column: 1 / -1; }
   label, legend { display: block; padding: 0; font-size: var(--t-sm); font-weight: 500; color: var(--ink-2); }
@@ -321,7 +331,7 @@ const intents = [
 
     // Email becomes required when the visitor picks "Email" as the reply channel.
     const syncChannel = () => {
-      const isEmail = val('channel') === 'email';
+      const isEmail = val('channel') === 'email' || form.hasAttribute('data-email-always');
       if (emailOpt) emailOpt.hidden = isEmail;
       if (emailReq) emailReq.hidden = !isEmail;
       if (emailInput) emailInput.required = isEmail;
@@ -416,7 +426,7 @@ const intents = [
       if (form.querySelector('[name="intent"]') && !data.intent) errs.intent = msgs.required;
       const phone = (data.phone || '').replace(/[\s\-()]/g, '');
       if (phone && !PHONE.test(phone)) errs.phone = msgs.phone;
-      if (data.channel === 'email' && !data.email?.trim()) errs.email = msgs.required;
+      if ((data.channel === 'email' || form.hasAttribute('data-email-always')) && !data.email?.trim()) errs.email = msgs.required;
       else if (data.email && !EMAIL.test(data.email.trim())) errs.email = msgs.email;
       return errs;
     };
@@ -434,6 +444,7 @@ const intents = [
       }
       btn.disabled = true;
       btnLabel.textContent = msgs.sending;
+      let leaving = false;
       try {
         const res = await fetch(form.dataset.endpoint!, {
           method: 'POST',
@@ -442,22 +453,36 @@ const intents = [
         });
         if (res.status === 422) {
           const body = await res.json().catch(() => ({}));
+          if (body.fields?.product_id === 'out_of_stock') {
+            form.dispatchEvent(new CustomEvent('lead:out-of-stock', { bubbles: true }));
+            throw new Error(msgs.outOfStock);
+          }
           Object.entries(body.fields || {}).forEach(([k, v]) =>
             setErr(k, v === 'invalid' ? (k === 'email' ? msgs.email : k === 'phone' ? msgs.phone : msgs.required) : msgs.required),
           );
           throw new Error(msgs.generic);
         }
         if (!res.ok) throw new Error(msgs.network);
+        const body = await res.json().catch(() => ({}));
+        // Online payment: hand the customer to Flitt's hosted checkout.
+        if (typeof body.checkout_url === 'string' && body.checkout_url.startsWith('https://')) {
+          leaving = true;
+          btnLabel.textContent = msgs.redirecting;
+          location.assign(body.checkout_url);
+          return;
+        }
         done.hidden = false;
         done.focus();
         form.dispatchEvent(new CustomEvent('lead:sent', { bubbles: true }));
       } catch (err) {
-        const m = err instanceof Error && err.message === msgs.generic ? msgs.generic : msgs.network;
+        const m = err instanceof Error && (err.message === msgs.generic || err.message === msgs.outOfStock) ? err.message : msgs.network;
         formErr.querySelector('span')!.textContent = m;
         formErr.hidden = false;
       } finally {
-        btn.disabled = false;
-        btnLabel.textContent = btn.dataset.label || '';
+        if (!leaving) {
+          btn.disabled = false;
+          btnLabel.textContent = btn.dataset.label || '';
+        }
       }
     });
   });

@@ -14,6 +14,8 @@ const FIELDS: { key: string; label: string; hint?: string; type?: string }[] = [
   { key: 'address_en', label: 'მისამართი (ინგლისურად)' },
   { key: 'hours_ka', label: 'სამუშაო საათები (ქართულად)' },
   { key: 'hours_en', label: 'სამუშაო საათები (ინგლისურად)' },
+  { key: 'legal_name', label: 'იურიდიული დასახელება (ქვითრისთვის)', hint: 'მაგ. შპს „სიმეტრია“. ცარიელი = Symmetry' },
+  { key: 'tax_id', label: 'საიდენტიფიკაციო კოდი (ქვითრისთვის)' },
 ];
 
 export function SettingsPage() {

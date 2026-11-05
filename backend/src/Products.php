@@ -25,27 +25,47 @@ final class Products
 
     private static function hydrate(PDO $pdo, array $r, string $baseUrl): array
     {
-        $sizes = $pdo->prepare('SELECT id, width_cm, height_cm, price FROM product_sizes WHERE product_id = ? ORDER BY sort ASC, id ASC');
+        $sizes = $pdo->prepare('SELECT id, width_cm, height_cm, price, sale_percent FROM product_sizes WHERE product_id = ? ORDER BY sort ASC, id ASC');
         $sizes->execute([$r['id']]);
         $images = $pdo->prepare('SELECT id, path FROM product_images WHERE product_id = ? ORDER BY sort ASC, id ASC');
         $images->execute([$r['id']]);
 
+        // Each size has its own sale percentage; the end date applies to the whole product.
+        $saleEnds = (string) ($r['sale_ends_at'] ?? '');
+        $dateOk = self::saleActive(1, $saleEnds);
+        $sizeRows = array_map(function ($s) use ($dateOk) {
+            $pct = (int) ($s['sale_percent'] ?? 0);
+            $live = $dateOk && $pct > 0;
+            return [
+                'id' => (int) $s['id'],
+                'width' => (int) $s['width_cm'],
+                'height' => (int) $s['height_cm'],
+                'price' => (float) $s['price'],
+                'sale_percent' => $pct,
+                'sale_price' => $live ? self::salePrice((float) $s['price'], $pct) : (float) $s['price'],
+            ];
+        }, $sizes->fetchAll());
+        $pcts = array_values(array_filter(array_column($sizeRows, 'sale_percent')));
         $out = [
             'id' => (int) $r['id'],
             'slug' => $r['slug'],
             'pattern' => $r['pattern'],
             'orientation' => $r['orientation'],
             'featured' => (bool) $r['featured'],
+            'in_stock' => (bool) ($r['in_stock'] ?? 1),
             'published' => (bool) $r['published'],
             'sort' => (int) $r['sort'],
             'delivery_days' => ['min' => (int) $r['delivery_days_min'], 'max' => (int) $r['delivery_days_max']],
             'installation_minutes' => (int) $r['installation_minutes'],
-            'sizes' => array_map(fn ($s) => [
-                'id' => (int) $s['id'],
-                'width' => (int) $s['width_cm'],
-                'height' => (int) $s['height_cm'],
-                'price' => (float) $s['price'],
-            ], $sizes->fetchAll()),
+            // Per size: "price" is the regular price, "sale_price" what the customer pays today.
+            // "sale" summarises them: the biggest and smallest discount, the end date, and whether it runs today.
+            'sale' => [
+                'percent' => $pcts ? max($pcts) : 0,
+                'min_percent' => $pcts ? min($pcts) : 0,
+                'ends_at' => $saleEnds,
+                'active' => $dateOk && (bool) $pcts,
+            ],
+            'sizes' => $sizeRows,
             'images' => array_map(fn ($img) => [
                 'id' => (int) $img['id'],
                 'url' => $baseUrl . $img['path'],
@@ -59,6 +79,52 @@ final class Products
     }
 
     /** Validate an incoming product payload. Returns a list of field errors (empty when valid). */
+    public const SALE_MAX = 90;
+
+    /** Is the product's sale running today? */
+    public static function saleActive(int $percent, string $endsAt): bool
+    {
+        if ($percent <= 0) {
+            return false;
+        }
+        if ($endsAt === '') {
+            return true;
+        }
+        $today = (new DateTimeImmutable('now', new DateTimeZone('Asia/Tbilisi')))->format('Y-m-d');
+        return $endsAt >= $today;
+    }
+
+    /** Sale price in whole lari (the price customers pay while a sale runs). */
+    public static function salePrice(float $price, int $percent): float
+    {
+        return (float) round($price * (100 - $percent) / 100);
+    }
+
+    /** The home page shows exactly this many featured products. */
+    public const FEATURED_MAX = 4;
+
+    /** Error when saving $p would put more than FEATURED_MAX products on the home page. */
+    public static function featuredError(PDO $pdo, array $p, ?int $id = null): ?string
+    {
+        if (empty($p['featured'])) {
+            return null;
+        }
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM products WHERE featured = 1 AND id != ?');
+        $stmt->execute([$id ?? 0]);
+        if ((int) $stmt->fetchColumn() < self::FEATURED_MAX) {
+            return null;
+        }
+        // A product that is already featured may still be edited.
+        if ($id) {
+            $was = $pdo->prepare('SELECT featured FROM products WHERE id = ?');
+            $was->execute([$id]);
+            if ((int) $was->fetchColumn() === 1) {
+                return null;
+            }
+        }
+        return 'მთავარ გვერდზე მაქსიმუმ ' . self::FEATURED_MAX . ' პროდუქტი ჩანს. ჯერ მოხსენით მონიშვნა სხვა პროდუქტს.';
+    }
+
     public static function validate(array $p): array
     {
         $errors = [];
@@ -77,8 +143,14 @@ final class Products
                     $errors["sizes.$i"] = 'სიგანე და სიმაღლე უნდა იყოს დადებითი რიცხვი';
                 } elseif ((float) ($s['price'] ?? -1) < 0) {
                     $errors["sizes.$i"] = 'ფასი არ შეიძლება იყოს უარყოფითი';
+                } elseif (!is_numeric($s['sale_percent'] ?? 0) || (int) ($s['sale_percent'] ?? 0) < 0 || (int) ($s['sale_percent'] ?? 0) > self::SALE_MAX) {
+                    $errors["sizes.$i"] = 'ფასდაკლება უნდა იყოს 0-დან ' . self::SALE_MAX . '%-მდე';
                 }
             }
+        }
+        $ends = (string) ($p['sale']['ends_at'] ?? '');
+        if ($ends !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $ends)) {
+            $errors['sale.ends_at'] = 'არასწორი თარიღი';
         }
         if (isset($p['orientation']) && !in_array($p['orientation'], self::ORIENTATIONS, true)) {
             $errors['orientation'] = 'აირჩიეთ ტიპი: ვერტიკალური ან ჰორიზონტალური';
@@ -130,6 +202,10 @@ final class Products
             'pattern' => in_array($p['pattern'] ?? '', self::PATTERNS, true) ? $p['pattern'] : 'wave',
             'orientation' => in_array($p['orientation'] ?? '', self::ORIENTATIONS, true) ? $p['orientation'] : self::guessOrientation($p['sizes'] ?? []),
             'featured' => !empty($p['featured']) ? 1 : 0,
+            'in_stock' => array_key_exists('in_stock', $p) ? (!empty($p['in_stock']) ? 1 : 0) : 1,
+            // Kept as the biggest size discount, for reference; the sizes hold the real values.
+            'sale_percent' => max(0, min(self::SALE_MAX, (int) max([0, ...array_map(fn ($s) => (int) ($s['sale_percent'] ?? 0), $p['sizes'] ?? [])]))),
+            'sale_ends_at' => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($p['sale']['ends_at'] ?? '')) ? (string) $p['sale']['ends_at'] : '',
             'published' => array_key_exists('published', $p) ? (!empty($p['published']) ? 1 : 0) : 1,
             'sort' => (int) ($p['sort'] ?? 0),
         ];
@@ -160,16 +236,17 @@ final class Products
         $keep = [];
         foreach (array_values($sizes) as $i => $s) {
             $sid = isset($s['id']) ? (int) $s['id'] : 0;
-            $vals = [(int) $s['width'], (int) $s['height'], round((float) $s['price'], 2), $i];
+            $pct = max(0, min(self::SALE_MAX, (int) ($s['sale_percent'] ?? 0)));
+            $vals = [(int) $s['width'], (int) $s['height'], round((float) $s['price'], 2), $pct, $i];
             if ($sid > 0) {
-                $stmt = $pdo->prepare('UPDATE product_sizes SET width_cm = ?, height_cm = ?, price = ?, sort = ? WHERE id = ? AND product_id = ?');
+                $stmt = $pdo->prepare('UPDATE product_sizes SET width_cm = ?, height_cm = ?, price = ?, sale_percent = ?, sort = ? WHERE id = ? AND product_id = ?');
                 $stmt->execute([...$vals, $sid, $productId]);
                 if ($stmt->rowCount() > 0) {
                     $keep[] = $sid;
                     continue;
                 }
             }
-            $pdo->prepare('INSERT INTO product_sizes (width_cm, height_cm, price, sort, product_id) VALUES (?, ?, ?, ?, ?)')
+            $pdo->prepare('INSERT INTO product_sizes (width_cm, height_cm, price, sale_percent, sort, product_id) VALUES (?, ?, ?, ?, ?, ?)')
                 ->execute([...$vals, $productId]);
             $keep[] = (int) $pdo->lastInsertId();
         }
