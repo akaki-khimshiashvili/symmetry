@@ -23,6 +23,7 @@ require __DIR__ . '/../src/Db.php';
 require __DIR__ . '/../src/Flitt.php';
 require __DIR__ . '/../src/Receipts.php';
 require __DIR__ . '/../src/Mailer.php';
+require __DIR__ . '/../src/Metrics.php';
 
 Http::cors($config['allowed_origins'], $config['allow_local_origins']);
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -192,6 +193,16 @@ try {
             }
         }],
 
+        // ---------- Analytics (anonymous; the site sends it with navigator.sendBeacon as text/plain) ----------
+        ['POST', '#^/track$#', function () use ($pdo) {
+            try {
+                $b = Http::body();
+            } catch (HttpError) {
+                return ['ok' => false];
+            }
+            return ['ok' => Metrics::track($pdo, $b, (string) ($_SERVER['HTTP_USER_AGENT'] ?? ''))];
+        }],
+
         // ---------- Payments (Flitt) ----------
         ['POST', '#^/payments/callback$#', function () use ($pdo, $flitt, $notify) {
             $data = Flitt::readPayload();
@@ -275,6 +286,15 @@ try {
                 'messages_last' => $count('SELECT COALESCE(MAX(id), 0) FROM messages'),
                 'orders_rev' => (string) $pdo->query("SELECT COALESCE(MAX(payment_updated_at), '') FROM orders")->fetchColumn(),
             ];
+        }],
+
+        ['GET', '#^/admin/metrics$#', function () use ($pdo, $admin, $config, $base) {
+            $admin();
+            $r = Metrics::report($pdo, (int) ($_GET['days'] ?? 30), [$config['site_url']]);
+            foreach ($r['products'] as &$p) {
+                $p['image'] = $p['image'] ? $base . $p['image'] : null;
+            }
+            return $r;
         }],
 
         // ---------- Dropdown options (material, size presets) ----------

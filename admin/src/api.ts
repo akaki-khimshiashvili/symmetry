@@ -57,6 +57,42 @@ export interface Message {
   channel: string; intent: string; message: string; lang: string; status: string; created_at: string;
 }
 export type Settings = Record<string, string>;
+
+/** One period's headline figures (GET /admin/metrics). */
+export interface PeriodTotals {
+  visitors: number; pageviews: number; product_views: number; contacts: number;
+  orders: number; sales: number; revenue: number; messages: number; conversion: number; aov: number;
+}
+export interface SeriesPoint { date: string; visitors: number; views: number; orders: number; messages: number; revenue: number }
+export interface ProductMetric {
+  id: number; name: string; slug: string; published: number; in_stock: number; category: string; orientation: string; image: string | null;
+  views: number; viewers: number; orders: number; sales: number; revenue: number; conversion: number;
+}
+export type KeyCount = { key: string; n: number };
+export type Mix = { key: string; orders: number; messages: number };
+export interface Metrics {
+  days: number; by_month: boolean;
+  current: PeriodTotals; previous: PeriodTotals;
+  series: SeriesPoint[];
+  funnel: { key: 'visitors' | 'product_viewers' | 'orders' | 'sales'; n: number }[];
+  products: ProductMetric[];
+  sizes: { product: string; size: string; orders: number }[];
+  types: { key: string; orders: number; revenue: number }[];
+  sales: {
+    by_status: Record<string, number>; by_payment: Record<string, number>;
+    held_sum: number; held_count: number; refunded_sum: number; abandoned: number;
+    discount_orders: number; discount_given: number; open: number;
+  };
+  customers: { client_types: Mix[]; channels: Mix[]; langs: Mix[]; repeat: number; unique: number };
+  messages: { by_intent: Record<string, number>; by_status: Record<string, number>; waiting: number; oldest_waiting: string | null };
+  traffic: {
+    pages: { key: string; n: number; u: number }[]; referrers: KeyCount[]; direct: number;
+    devices: KeyCount[]; langs: KeyCount[]; contacts: KeyCount[]; tracking_since: string | null;
+  };
+}
+export const PERIODS: { days: number; label: string }[] = [
+  { days: 7, label: '7 დღე' }, { days: 30, label: '30 დღე' }, { days: 90, label: '90 დღე' }, { days: 365, label: '12 თვე' },
+];
 export interface TextOption { id: number; ka: string; en: string }
 export interface SizeOption { id: number; width: number; height: number }
 /** Saved dropdown lists for the product editor. Sizes are in centimetres. */
@@ -138,4 +174,10 @@ export const fmtDate = (s: string) => {
   const p = (n: number) => String(n).padStart(2, '0');
   return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}, ${p(d.getHours())}:${p(d.getMinutes())}`;
 };
+/** "2026-11-05" → "5 ნოე"; "2026-11" → "ნოე 2026". */
+export const fmtDay = (s: string) => {
+  const [y, m, d] = s.split('-').map(Number);
+  return d ? `${d} ${MONTHS[m - 1]}` : `${MONTHS[m - 1]} ${y}`;
+};
+export const fmtNum = (n: number) => new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(n).replace(/,/g, ' ');
 export const fmtPrice = (n: number) => `₾ ${new Intl.NumberFormat('en-US').format(n).replace(/,/g, ' ')}`;

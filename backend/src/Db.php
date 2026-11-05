@@ -123,6 +123,7 @@ CREATE TABLE IF NOT EXISTS tokens (
 );
 SQL);
         Payments::migrate($pdo);
+        Metrics::migrate($pdo);
         // Upgrade databases created before product types existed.
         $cols = array_column($pdo->query('PRAGMA table_info(products)')->fetchAll(), 'name');
         // Stock flag: products out of stock can't be ordered (existing products start in stock).

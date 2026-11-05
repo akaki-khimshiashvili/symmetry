@@ -3,6 +3,7 @@ import '../styles/global.css';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import { type Lang, useT, altPath } from '../i18n/ui';
+import { API_URL } from '../lib/data';
 
 interface Props { lang: Lang; title?: string; description?: string; current?: string; noindex?: boolean }
 const { lang, title, description, current = '', noindex = false } = Astro.props;
@@ -57,6 +58,40 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <slot />
     </main>
     <Footer lang={lang} current={current} />
+    <script is:inline data-track={`${API_URL}/track`} data-lang={lang}>
+      // Anonymous visit counter for the admin's metrics: no cookies, no IP, no personal data.
+      // The visitor is a random id kept in this browser; page views, product views and contact-link clicks are sent.
+      (function () {
+        var me = document.currentScript, url = me && me.dataset.track;
+        if (!url || !navigator.sendBeacon) return;
+        var v;
+        try {
+          v = localStorage.getItem('symmetry:v');
+          if (!v) { v = Array.from(crypto.getRandomValues(new Uint8Array(8)), function (b) { return b.toString(16).padStart(2, '0'); }).join(''); localStorage.setItem('symmetry:v', v); }
+        } catch (e) { return; }
+        var base = { v: v, l: me.dataset.lang, p: location.pathname };
+        // text/plain keeps the beacon a "simple" request (no CORS preflight).
+        var send = function (data) {
+          var b = Object.assign({}, base, data);
+          try { navigator.sendBeacon(url, new Blob([JSON.stringify(b)], { type: 'text/plain' })); } catch (e) {}
+        };
+        send({ k: 'page', r: document.referrer });
+        var pdp = document.querySelector('[data-pdp][data-product-id]');
+        if (pdp) send({ k: 'product', pid: Number(pdp.getAttribute('data-product-id')) });
+        var channel = function (href) {
+          if (/^https?:\/\/(wa\.me|api\.whatsapp\.com)\//i.test(href)) return 'whatsapp';
+          if (/^tel:/i.test(href)) return 'phone';
+          if (/^mailto:/i.test(href)) return 'email';
+          var m = href.match(/^https?:\/\/(?:www\.)?(instagram|facebook|tiktok)\.com/i);
+          return m ? m[1].toLowerCase() : '';
+        };
+        document.addEventListener('click', function (e) {
+          var a = e.target.closest && e.target.closest('a[href]');
+          var c = a && channel(a.getAttribute('href') || '');
+          if (c) send({ k: 'contact', d: c });
+        }, true);
+      })();
+    </script>
     <script is:inline>
       // Set the header's scrolled state without its 400ms background fade: used whenever a page opens
       // already scrolled (language switch, reload, back/forward), so the bar is solid from the first frame.

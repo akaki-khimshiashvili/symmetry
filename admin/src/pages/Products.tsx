@@ -1,12 +1,17 @@
 import { useEffect, useState } from 'preact/hooks';
-import { api, type Product, fmtPrice, typeLabel, SITE_URL, FEATURED_MAX } from '../api';
+import { api, type Product, type ProductMetric, type Metrics, fmtPrice, fmtNum, typeLabel, SITE_URL, FEATURED_MAX } from '../api';
 import { Icon, Loading, Empty, toast, confirmAction } from '../ui';
 import { Preview } from './Preview';
 
 export function ProductsPage() {
   const [items, setItems] = useState<Product[] | null>(null);
+  const [stats, setStats] = useState<Record<number, ProductMetric> | null>(null);
   const load = () => api<Product[]>('/admin/products').then(setItems).catch((e) => toast.err(e.message));
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    // Views and orders over the last 30 days, shown next to each product.
+    api<Metrics>('/admin/metrics?days=30').then((m) => setStats(Object.fromEntries(m.products.map((x) => [x.id, x])))).catch(() => {});
+  }, []);
 
   const remove = async (p: Product) => {
     if (!(await confirmAction(`წავშალოთ „${p.name.ka}“? ეს ქმედება შეუქცევადია: წაიშლება ზომები და ფოტოებიც.`))) return;
@@ -52,7 +57,7 @@ export function ProductsPage() {
           <table class="table">
             <thead>
               <tr>
-                <th></th><th>დასახელება</th><th>ტიპი</th><th>ზომები</th><th>ფასი</th><th>სტატუსი</th><th></th>
+                <th></th><th>დასახელება</th><th>ტიპი</th><th>ზომები</th><th>ფასი</th><th title="ნახვები და შეკვეთები ბოლო 30 დღეში">30 დღე</th><th>სტატუსი</th><th></th>
               </tr>
             </thead>
             <tbody>
@@ -72,6 +77,14 @@ export function ProductsPage() {
                     <td class="num nowrap">
                       {prices.length ? `${fmtPrice(Math.min(...prices))}${prices.length > 1 ? ` – ${fmtPrice(Math.max(...prices))}` : ''}` : 'ფასი არ არის'}
                       {p.sale?.active && <div class="small sale-text">ფასდაკლებით {p.sizes.filter((x) => (x.sale_percent ?? 0) > 0).length}/{p.sizes.length} ზომაზე</div>}
+                    </td>
+                    <td class="num nowrap small">
+                      {!stats ? <span class="muted">…</span> : stats[p.id!] ? (
+                        <div class="pstat" title="ბოლო 30 დღე">
+                          <span><b>{fmtNum(stats[p.id!].views)}</b> ნახვა</span>
+                          <span><b>{fmtNum(stats[p.id!].orders)}</b> შეკვეთა</span>
+                        </div>
+                      ) : <span class="muted">—</span>}
                     </td>
                     <td>
                       <div class="chips">

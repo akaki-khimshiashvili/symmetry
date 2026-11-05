@@ -1,8 +1,6 @@
 import { render } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import '@fontsource-variable/noto-sans-georgian';
-import '@fontsource-variable/noto-serif-georgian';
-import '@fontsource-variable/manrope';
 import '@fontsource/montserrat/latin-800.css';
 import './styles.css';
 import { api, auth, setUnauthorizedHandler, SITE_URL, ApiError } from './api';
@@ -79,7 +77,6 @@ const NAV = [
 type Counts = { orders_new: number; messages_new: number; orders_last: number; messages_last: number; orders_rev: string };
 /** How often the admin checks for new orders and messages while the tab is visible. */
 const POLL_MS = 15000;
-const BASE_TITLE = document.title;
 
 function Shell() {
   const hash = useHash();
@@ -116,11 +113,6 @@ function Shell() {
     return () => { clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('focus', onVisible); };
   }, []);
 
-  // Unhandled items show in the browser tab title, e.g. "(3) Symmetry | ადმინისტრირება".
-  useEffect(() => {
-    const n = (counts?.orders_new ?? 0) + (counts?.messages_new ?? 0);
-    document.title = n ? `(${cap(n)}) ${BASE_TITLE}` : BASE_TITLE;
-  }, [counts?.orders_new, counts?.messages_new]);
 
   const logout = async () => {
     await api('/admin/logout', { method: 'POST' }).catch(() => {});
