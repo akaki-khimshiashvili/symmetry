@@ -82,7 +82,7 @@ export function ProductEdit({ id }: { id: string }) {
   if (!p || !opts) return <Loading />;
 
   const set = <K extends keyof Product>(k: K, v: Product[K]) => { setP({ ...p, [k]: v }); setDirty(true); };
-  /** Panels are split by shape; shelves and whole walls keep their photo format (chosen when cropping). */
+  /** Panels are split by shape; shelves, whole walls and mirrors keep their photo format (chosen when cropping). */
   const setType = (ty: ProductType) => {
     setP(ty === 'portrait' || ty === 'landscape' ? { ...p, category: 'panel', orientation: ty } : { ...p, category: ty });
     setDirty(true);
@@ -248,7 +248,7 @@ export function ProductEdit({ id }: { id: string }) {
                   </label>
                 ))}
               </div>
-              {(typeOf(p) === 'shelf' || typeOf(p) === 'wall') && (
+              {(typeOf(p) !== 'portrait' && typeOf(p) !== 'landscape') && (
                 <span class="muted small">ფოტოს ფორმატს (ვერტიკალური 3:4 თუ ჰორიზონტალური 4:3) ატვირთვისას, კადრირების ფანჯარაში აირჩევთ.</span>
               )}
               {(errors.category || errors.orientation) && <span class="err">{errors.category || errors.orientation}</span>}

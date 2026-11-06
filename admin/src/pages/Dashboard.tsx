@@ -143,12 +143,12 @@ function Overview({ m }: { m: Metrics }) {
   return (
     <>
       <div class="kpis">
-        <Kpi label="ვიზიტორები" value={fmtNum(c.visitors)} cur={c.visitors} prev={p.visitors} hint={`${fmtNum(c.pageviews)} გვერდის ნახვა`} />
-        <Kpi label="შეკვეთები" value={fmtNum(c.orders)} cur={c.orders} prev={p.orders} />
-        <Kpi label="შემოსავალი" value={fmtPrice(c.revenue)} cur={c.revenue} prev={p.revenue} hint={`${fmtNum(c.sales)} გაყიდვა`} />
-        <Kpi label="კონვერსია" value={pct(c.conversion)} cur={c.conversion} prev={p.conversion} hint="ვიზიტორი → შეკვეთა" />
-        <Kpi label="საშუალო შეკვეთა" value={c.aov ? fmtPrice(c.aov) : '—'} cur={c.aov} prev={p.aov} />
-        <Kpi label="შეტყობინებები" value={fmtNum(c.messages)} cur={c.messages} prev={p.messages} />
+        <Kpi icon="users" label="ვიზიტორები" value={fmtNum(c.visitors)} cur={c.visitors} prev={p.visitors} hint={`${fmtNum(c.pageviews)} გვერდის ნახვა`} />
+        <Kpi icon="bag" label="შეკვეთები" value={fmtNum(c.orders)} cur={c.orders} prev={p.orders} />
+        <Kpi icon="coin" label="შემოსავალი" value={fmtPrice(c.revenue)} cur={c.revenue} prev={p.revenue} hint={`${fmtNum(c.sales)} გაყიდვა`} />
+        <Kpi icon="percent" label="კონვერსია" value={pct(c.conversion)} cur={c.conversion} prev={p.conversion} hint="ვიზიტორი → შეკვეთა" />
+        <Kpi icon="receipt" label="საშუალო შეკვეთა" value={c.aov ? fmtPrice(c.aov) : '—'} cur={c.aov} prev={p.aov} />
+        <Kpi icon="chat" label="შეტყობინებები" value={fmtNum(c.messages)} cur={c.messages} prev={p.messages} />
       </div>
       <div class="two">
         <Columns title="ვიზიტორები" points={m.series} pick={(x) => x.visitors} total={<b>{fmtNum(sum('visitors'))}</b>} />
@@ -194,9 +194,9 @@ function ProductsTab({ m }: { m: Metrics }) {
   return (
     <>
       <div class="kpis">
-        <Kpi label="პროდუქტის ნახვები" value={fmtNum(m.current.product_views)} cur={m.current.product_views} prev={m.previous.product_views} />
-        <Kpi label="ნანახი პროდუქტი" value={<>{viewed.length}<small> / {m.products.length}</small></>} hint={unseen ? `${unseen} გამოქვეყნებული არავის უნახავს` : 'ყველა ნანახია'} />
-        <Kpi label="საუკეთესო კონვერსია" value={best ? pct(best.conversion) : '—'} hint={best ? best.name : 'შეკვეთები ჯერ არ არის'} />
+        <Kpi icon="eye" label="პროდუქტის ნახვები" value={fmtNum(m.current.product_views)} cur={m.current.product_views} prev={m.previous.product_views} />
+        <Kpi icon="grid" label="ნანახი პროდუქტი" value={<>{viewed.length}<small> / {m.products.length}</small></>} hint={unseen ? `${unseen} გამოქვეყნებული არავის უნახავს` : 'ყველა ნანახია'} />
+        <Kpi icon="target" label="საუკეთესო კონვერსია" value={best ? pct(best.conversion) : '—'} hint={best ? best.name : 'შეკვეთები ჯერ არ არის'} />
       </div>
       <div class="card table-wrap">
         <table class="table metrics-table">
@@ -259,12 +259,12 @@ function SalesTab({ m }: { m: Metrics }) {
   return (
     <>
       <div class="kpis">
-        <Kpi label="შემოსავალი" value={fmtPrice(c.revenue)} cur={c.revenue} prev={p.revenue} hint={`${fmtNum(c.sales)} გაყიდვა`} />
-        <Kpi label="დასადასტურებელი თანხა" value={fmtPrice(s.held_sum)} hint={`${fmtNum(s.held_count)} შეკვეთა ელოდება`} />
-        <Kpi label="ღია შეკვეთები" value={fmtNum(s.open)} hint="ახალი + მუშავდება" />
-        <Kpi label="დაუსრულებელი გადახდა" value={fmtNum(s.abandoned)} hint="დატოვა ან ბანკმა უარყო" />
-        <Kpi label="ფასდაკლებით" value={fmtNum(s.discount_orders)} hint={s.discount_given ? `დათმობილი ${fmtPrice(s.discount_given)}` : 'შეკვეთა'} />
-        <Kpi label="დაბრუნებული" value={fmtPrice(s.refunded_sum)} />
+        <Kpi icon="coin" label="შემოსავალი" value={fmtPrice(c.revenue)} cur={c.revenue} prev={p.revenue} hint={`${fmtNum(c.sales)} გაყიდვა`} />
+        <Kpi icon="lock" label="დასადასტურებელი თანხა" value={fmtPrice(s.held_sum)} hint={`${fmtNum(s.held_count)} შეკვეთა ელოდება`} />
+        <Kpi icon="clock" label="ღია შეკვეთები" value={fmtNum(s.open)} hint="ახალი + მუშავდება" />
+        <Kpi icon="alert" label="დაუსრულებელი გადახდა" value={fmtNum(s.abandoned)} hint="დატოვა ან ბანკმა უარყო" />
+        <Kpi icon="tag" label="ფასდაკლებით" value={fmtNum(s.discount_orders)} hint={s.discount_given ? `დათმობილი ${fmtPrice(s.discount_given)}` : 'შეკვეთა'} />
+        <Kpi icon="undo" label="დაბრუნებული" value={fmtPrice(s.refunded_sum)} />
       </div>
       <Columns title="შემოსავალი" points={m.series} pick={(x) => x.revenue} fmt={fmtPrice} total={<b>{fmtPrice(c.revenue)}</b>} />
       <div class="two">
@@ -283,9 +283,9 @@ function CustomersTab({ m }: { m: Metrics }) {
   return (
     <>
       <div class="kpis">
-        <Kpi label="მყიდველები" value={fmtNum(cu.unique)} hint="სხვადასხვა ტელეფონის ნომერი" />
-        <Kpi label="განმეორებითი" value={fmtNum(cu.repeat)} hint="შეუკვეთა ერთზე მეტჯერ" />
-        <Kpi label="უპასუხო შეტყობინება" value={fmtNum(ms.waiting)} hint={ms.oldest_waiting ? `უძველესი: ${fmtDate(ms.oldest_waiting)}` : 'ყველას უპასუხეთ'} invert />
+        <Kpi icon="users" label="მყიდველები" value={fmtNum(cu.unique)} hint="სხვადასხვა ტელეფონის ნომერი" />
+        <Kpi icon="refresh" label="განმეორებითი" value={fmtNum(cu.repeat)} hint="შეუკვეთა ერთზე მეტჯერ" />
+        <Kpi icon="mail" label="უპასუხო შეტყობინება" value={fmtNum(ms.waiting)} hint={ms.oldest_waiting ? `უძველესი: ${fmtDate(ms.oldest_waiting)}` : 'ყველას უპასუხეთ'} invert />
       </div>
       <div class="two">
         <BarList title="ვინ არიან" rows={mixRows(cu.client_types, CLIENT_TYPES)} />
@@ -304,9 +304,9 @@ function TrafficTab({ m }: { m: Metrics }) {
   return (
     <>
       <div class="kpis">
-        <Kpi label="ვიზიტორები" value={fmtNum(c.visitors)} cur={c.visitors} prev={p.visitors} />
-        <Kpi label="გვერდის ნახვები" value={fmtNum(c.pageviews)} cur={c.pageviews} prev={p.pageviews} hint={c.visitors ? `${fmtNum(Math.round((c.pageviews / c.visitors) * 10) / 10)} ვიზიტორზე` : undefined} />
-        <Kpi label="დაკავშირების კლიკი" value={fmtNum(c.contacts)} cur={c.contacts} prev={p.contacts} hint="WhatsApp, ზარი, ელ-ფოსტა" />
+        <Kpi icon="user" label="ვიზიტორები" value={fmtNum(c.visitors)} cur={c.visitors} prev={p.visitors} />
+        <Kpi icon="pages" label="გვერდის ნახვები" value={fmtNum(c.pageviews)} cur={c.pageviews} prev={p.pageviews} hint={c.visitors ? `${fmtNum(Math.round((c.pageviews / c.visitors) * 10) / 10)} ვიზიტორზე` : undefined} />
+        <Kpi icon="pointer" label="დაკავშირების კლიკი" value={fmtNum(c.contacts)} cur={c.contacts} prev={p.contacts} hint="WhatsApp, ზარი, ელ-ფოსტა" />
       </div>
       <Columns title="გვერდის ნახვები" points={m.series} pick={(x) => x.views} total={<b>{fmtNum(c.pageviews)}</b>} />
       <div class="two">

@@ -11,8 +11,8 @@ export interface Product {
   slug: string;
   pattern: string;
   orientation: 'portrait' | 'landscape';
-  /** Wall panel, shelf or whole wall (shown as separate sections on the site). */
-  category: 'panel' | 'shelf' | 'wall';
+  /** Wall panel, shelf, whole wall or mirror (shown as separate sections on the site). */
+  category: 'panel' | 'shelf' | 'wall' | 'mirror';
   /** პროდუქტის განზომილება: chosen separately from the type, one per product. */
   dimension: Dimension;
   featured: boolean;
@@ -172,14 +172,15 @@ export const CLIENT_TYPES: Record<string, string> = {
   other: 'სხვა',
 };
 export const CHANNELS: Record<string, string> = { whatsapp: 'WhatsApp', email: 'ელ-ფოსტა', phone: 'ზარი' };
-export const CATEGORIES: Record<string, string> = { panel: 'კედლის პანელი', shelf: 'თარო', wall: 'მთლიანი კედელი' };
+export const CATEGORIES: Record<string, string> = { panel: 'კედლის პანელი', shelf: 'თარო', wall: 'მთლიანი კედელი', mirror: 'სარკე' };
 /** The one "type" choice in the admin: panels split by shape, then shelves and whole walls. */
-export type ProductType = 'portrait' | 'landscape' | 'shelf' | 'wall';
+export type ProductType = 'portrait' | 'landscape' | 'shelf' | 'wall' | 'mirror';
 export const PRODUCT_TYPES: { key: ProductType; label: string; hint: string }[] = [
   { key: 'portrait', label: 'ვერტიკალური დიზაინი', hint: 'მაღალი, ვიწრო პანელი' },
   { key: 'landscape', label: 'ჰორიზონტალური დიზაინი', hint: 'ფართო პანელი' },
   { key: 'shelf', label: 'თარო', hint: 'პარამეტრული თარო' },
   { key: 'wall', label: 'მთლიანი კედელი', hint: 'მთელი კედლის ინსტალაცია' },
+  { key: 'mirror', label: 'სარკე', hint: 'პარამეტრული ჩარჩოთი' },
 ];
 export type Dimension = 'portrait' | 'landscape' | 'wall';
 export const DIMENSIONS: { key: Dimension; label: string; hint: string }[] = [
@@ -188,8 +189,18 @@ export const DIMENSIONS: { key: Dimension; label: string; hint: string }[] = [
   { key: 'wall', label: 'მთლიანი კედელი', hint: 'მთელ კედელზე' },
 ];
 export const typeOf = (p: Pick<Product, 'category' | 'orientation'>): ProductType =>
-  p.category === 'shelf' || p.category === 'wall' ? p.category : p.orientation;
+  p.category === 'panel' || !p.category ? p.orientation : p.category;
 export const typeLabel = (p: Pick<Product, 'category' | 'orientation'>) => PRODUCT_TYPES.find((t) => t.key === typeOf(p))!.label;
+/** Home-page collection tiles; each can get its own cover photo, cropped to the tile's 4:5 frame. */
+export type CollectionKey = 'mirror' | 'shelf' | 'wall';
+export const COLLECTION: { key: CollectionKey; label: string }[] = [
+  { key: 'mirror', label: 'სარკე' },
+  { key: 'shelf', label: 'თაროები' },
+  { key: 'wall', label: 'მთლიანი კედელი' },
+];
+export type CollectionCovers = Record<CollectionKey, string>;
+/** Width / height of a collection tile on the home page. */
+export const COLLECTION_RATIO = 4 / 5;
 export const ORIENTATIONS: Record<string, string> = { portrait: 'ვერტიკალური დიზაინი', landscape: 'ჰორიზონტალური დიზაინი' };
 export const PATTERNS: Record<string, string> = {
   wave: 'ტალღა', dune: 'დიუნა', ripple: 'ექო (წრიული)', twist: 'სპირალი', prism: 'პრიზმა', mosaic: 'მოზაიკა',

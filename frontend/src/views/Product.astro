@@ -147,7 +147,7 @@ const socials = [
       </div>
 
       <dl class="specs" data-reveal style="--d:4">
-        <div><dt><Icon name="shape" size={18} />{t('p.type')}</dt><dd>{t((p.category === 'shelf' || p.category === 'wall' ? `type.${p.category}.s` : `type.${p.orientation}`) as any)}</dd></div>
+        <div><dt><Icon name="shape" size={18} />{t('p.type')}</dt><dd>{t((p.category === 'shelf' || p.category === 'wall' || p.category === 'mirror' ? `type.${p.category}.s` : `type.${p.orientation}`) as any)}</dd></div>
         <div><dt><Icon name="shape" size={18} />{t('p.dimension')}</dt><dd>{t(`dim.${dimensionOf(p)}` as any)}</dd></div>
         <div><dt><Icon name="grain" size={18} />{t('p.material')}</dt><dd>{loc(p.material, lang)}</dd></div>
         <div><dt><Icon name="truck" size={18} />{t('p.delivery')}</dt><dd class="num">{days} {t('p.workingDays')}</dd></div>

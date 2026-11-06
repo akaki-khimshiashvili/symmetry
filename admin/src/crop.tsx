@@ -17,14 +17,19 @@ type Box = { w: number; h: number };
 type Pos = { x: number; y: number };
 
 /**
- * Crop step for product photos. Every chosen photo is framed at the product's shape (3:4 or 4:3)
- * before upload, so it sits on the site exactly as framed here. Drag to move, wheel / slider to zoom.
- * Switching the format also switches the product's type (the parent decides what that means).
+ * Crop step for photos. Every chosen photo is framed at its place's shape before upload, so it sits on
+ * the site exactly as framed here. Drag to move, wheel / slider to zoom.
+ * Product photos: 3:4 or 4:3; switching the format also switches the product's type (the parent decides).
+ * Fixed frames (e.g. a 4:5 collection tile): pass `ratio` and no format switch is shown.
  */
-export function CropDialog({ files, orientation, onOrientation, onDone, onClose }: {
+export function CropDialog({ files, orientation = 'portrait', onOrientation, ratio: fixedRatio, title, hint, onDone, onClose }: {
   files: File[];
-  orientation: Orientation;
-  onOrientation: (o: Orientation) => void;
+  orientation?: Orientation;
+  onOrientation?: (o: Orientation) => void;
+  /** Width / height of a fixed frame; overrides `orientation`. */
+  ratio?: number;
+  title?: string;
+  hint?: string;
   onDone: (cropped: File[]) => void;
   onClose: () => void;
 }) {
@@ -42,7 +47,7 @@ export function CropDialog({ files, orientation, onOrientation, onDone, onClose 
   const drag = useRef<{ id: number; sx: number; sy: number; start: Pos } | null>(null);
 
   const file = files[idx];
-  const ratio = RATIO[orientation];
+  const ratio = fixedRatio ?? RATIO[orientation];
 
   useEffect(() => { dlg.current?.showModal(); }, []);
 
@@ -83,7 +88,7 @@ export function CropDialog({ files, orientation, onOrientation, onDone, onClose 
     if (!nat) return;
     setZoom(1);
     setPos({ x: (fw - nat.w * base) / 2, y: (fh - nat.h * base) / 2 });
-  }, [nat, orientation, box.w, box.h]);
+  }, [nat, ratio, box.w, box.h]);
 
   /** Zoom to z, keeping the point (px, py) of the frame still. */
   const zoomTo = (z: number, px = fw / 2, py = fh / 2) => {
@@ -152,13 +157,13 @@ export function CropDialog({ files, orientation, onOrientation, onDone, onClose 
     <dialog ref={dlg} class="crop" onCancel={(e) => { e.preventDefault(); close(); }} aria-labelledby="crop-title">
       <header class="crop-head">
         <div>
-          <h2 id="crop-title">ფოტოს კადრირება{files.length > 1 && <span class="muted"> · {idx + 1}/{files.length}</span>}</h2>
-          <p class="muted small">გადაათრიეთ და გაადიდეთ ფოტო. საიტზე ზუსტად ჩარჩოში მოქცეული ნაწილი გამოჩნდება.</p>
+          <h2 id="crop-title">{title ?? 'ფოტოს კადრირება'}{files.length > 1 && <span class="muted"> · {idx + 1}/{files.length}</span>}</h2>
+          <p class="muted small">{hint ?? 'გადაათრიეთ და გაადიდეთ ფოტო. საიტზე ზუსტად ჩარჩოში მოქცეული ნაწილი გამოჩნდება.'}</p>
         </div>
         <button type="button" class="icon-btn" onClick={close} aria-label="დახურვა"><Icon name="close" /></button>
       </header>
 
-      <fieldset class="seg-field crop-format">
+      {fixedRatio === undefined && onOrientation && <fieldset class="seg-field crop-format">
         <legend>ფორმატი (პროდუქტის ტიპი)</legend>
         <div class="seg">
           {FORMATS.map((f) => (
@@ -168,7 +173,7 @@ export function CropDialog({ files, orientation, onOrientation, onDone, onClose 
             </label>
           ))}
         </div>
-      </fieldset>
+      </fieldset>}
 
       <div
         ref={stage}

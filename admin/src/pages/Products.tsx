@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { api, type Product, type ProductMetric, type Metrics, fmtPrice, fmtNum, typeLabel, SITE_URL, FEATURED_MAX } from '../api';
 import { Icon, Loading, Empty, toast, confirmAction } from '../ui';
 import { Preview } from './Preview';
+import { CollectionCovers } from '../collection';
 
 export function ProductsPage() {
   const [items, setItems] = useState<Product[] | null>(null);
@@ -118,6 +119,8 @@ export function ProductsPage() {
           </table>
         </div>
       )}
+
+      <CollectionCovers />
     </section>
   );
 }

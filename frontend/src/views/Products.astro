@@ -30,7 +30,8 @@ const facts = products.map((p, i) => {
   };
 });
 
-const TYPES = (['portrait', 'landscape', 'shelf', 'wall'] as const).filter((k) => facts.some((f) => f.type === k));
+// Mirrors are always offered (greyed out until the first one is in the catalogue); other types appear once they have products.
+const TYPES = (['portrait', 'landscape', 'shelf', 'mirror', 'wall'] as const).filter((k) => k === 'mirror' || facts.some((f) => f.type === k));
 const STEP = 50;
 const priceLo = facts.length ? Math.floor(Math.min(...facts.map((f) => f.pmin)) / STEP) * STEP : 0;
 const priceHi = facts.length ? Math.ceil(Math.max(...facts.map((f) => f.pmax)) / STEP) * STEP : STEP;

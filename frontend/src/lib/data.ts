@@ -12,8 +12,8 @@ export interface Product {
   slug: string;
   pattern: string;
   orientation: 'portrait' | 'landscape';
-  /** Wall panel, shelf or whole wall. Missing (older API / seed data) counts as a panel. */
-  category?: 'panel' | 'shelf' | 'wall';
+  /** Wall panel, shelf, whole wall or mirror. Missing (older API / seed data) counts as a panel. */
+  category?: 'panel' | 'shelf' | 'wall' | 'mirror';
   /** პროდუქტის განზომილება, set in the admin separately from the type. Missing (older data) follows the type. */
   dimension?: 'portrait' | 'landscape' | 'wall';
   featured: boolean;
@@ -43,6 +43,8 @@ export interface Settings {
   default_palette: string;
   /** Online payment (Flitt) is switched on in the API. */
   payments?: boolean;
+  /** Home collection cover photos chosen in the admin (already cropped to 4:5); '' = none. */
+  collection?: Partial<Record<'mirror' | 'shelf' | 'wall', string>>;
 }
 
 export const API_URL = (import.meta.env.PUBLIC_API_URL || 'http://localhost:8000/api').replace(/\/$/, '');
@@ -96,12 +98,12 @@ export function orientationOf(p: Pick<Product, 'sizes'>): 'portrait' | 'landscap
   return s && s.height > s.width ? 'portrait' : 'landscape';
 }
 
-/** The catalogue section a product belongs to: shelves are one group, panels split by shape. */
-export type Kind = 'portrait' | 'landscape' | 'shelf' | 'wall';
+/** The catalogue section a product belongs to: shelves, walls and mirrors are one group each, panels split by shape. */
+export type Kind = 'portrait' | 'landscape' | 'shelf' | 'wall' | 'mirror';
 export const dimensionOf = (p: Pick<Product, 'dimension' | 'category' | 'orientation'>): 'portrait' | 'landscape' | 'wall' =>
   p.dimension ?? (p.category === 'wall' ? 'wall' : p.orientation === 'portrait' ? 'portrait' : 'landscape');
 export const kindOf = (p: Pick<Product, 'category' | 'orientation'>): Kind =>
-  p.category === 'shelf' || p.category === 'wall' ? p.category : p.orientation;
+  p.category === 'shelf' || p.category === 'wall' || p.category === 'mirror' ? p.category : p.orientation;
 
 export const priceFmt = (n: number) =>
   new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(n).replace(/,/g, ' ');

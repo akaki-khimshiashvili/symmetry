@@ -2,6 +2,21 @@ import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 
 const paths: Record<string, string> = {
+  // Dashboard metrics
+  users: '<circle cx="9" cy="8.5" r="3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M15.5 5.8a3 3 0 0 1 0 5.4"/><path d="M17.5 14a5.5 5.5 0 0 1 3 5"/>',
+  user: '<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>',
+  coin: '<circle cx="12" cy="12" r="8.5"/><path d="M14.8 9.3c-.5-.8-1.5-1.3-2.8-1.3-1.7 0-2.8.8-2.8 2s1.1 1.7 2.8 2 2.8.8 2.8 2-1.1 2-2.8 2c-1.3 0-2.3-.5-2.8-1.3"/><path d="M12 6.5V8M12 16v1.5"/>',
+  percent: '<path d="M18.5 5.5 5.5 18.5"/><circle cx="7.5" cy="7.5" r="2.2"/><circle cx="16.5" cy="16.5" r="2.2"/>',
+  receipt: '<path d="M6 3.5h12v17l-2.4-1.5-2.4 1.5-2.4-1.5-2.4 1.5L6 20.5z"/><path d="M9 8.5h6M9 12h6M9 15.5h3.5"/>',
+  chat: '<path d="M4.5 5.5h15v10h-8l-4.5 3.5v-3.5h-2.5z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/>',
+  lock: '<rect x="5" y="10.5" width="14" height="10" rx="1.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/><path d="M12 14.5v2.5"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  alert: '<path d="M12 4 3 19.5h18z"/><path d="M12 10v4.5"/><path d="M12 17.2v.1"/>',
+  tag: '<path d="M3.5 12.5V4h8.5l8.5 8.5-8.5 8.5z"/><circle cx="8" cy="8.5" r="1.3"/>',
+  undo: '<path d="M9 7 4.5 11.5 9 16"/><path d="M4.5 11.5h10a5 5 0 0 1 0 10H11"/>',
+  target: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="0.8"/>',
+  pages: '<path d="M8 3.5h8.5L20 7v11.5H8z"/><path d="M16.5 3.5V7H20"/><path d="M4 7.5v13h11"/>',
+  pointer: '<path d="M6 3.5 18 12l-5.2 1.1 3 6.2-2.4 1.2-3-6.3L6 18z"/>',
   grid: '<rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/>',
   panel: '<rect x="4" y="3.5" width="2.4" height="17"/><rect x="9" y="6.5" width="2.4" height="11"/><rect x="13.6" y="6.5" width="2.4" height="11"/><rect x="18" y="3.5" width="2.4" height="17"/>',
   bag: '<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/>',

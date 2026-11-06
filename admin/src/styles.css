@@ -168,7 +168,12 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); gap: 0.75rem; }
 .kpi { display: grid; align-content: start; gap: 0.1rem; padding: 0.8rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); text-decoration: none; color: var(--text-2); min-width: 0; }
-.kpi-label { font-size: 13px; letter-spacing: 0.01em; }
+.kpi-label { display: flex; align-items: center; gap: 0.5rem; min-width: 0; font-size: 13px; letter-spacing: 0.01em; }
+.kpi-ico {
+  flex: none; display: grid; place-items: center; width: 1.9rem; height: 1.9rem; border-radius: 8px;
+  color: var(--brand); background: color-mix(in oklab, var(--brand) 11%, transparent);
+}
+.kpi:has(.kpi-ico) .kpi-n { margin-top: 0.35rem; }
 .kpi-n { font-family: var(--f-head); font-size: 1.6rem; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kpi-n small { font-size: 0.95rem; color: var(--text-3); }
 .kpi-foot { display: flex; flex-wrap: wrap; gap: 0.15rem 0.5rem; font-size: 12px; min-height: 1.1rem; }
@@ -292,6 +297,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .type-ico.landscape::before { left: 0.05rem; right: 0.05rem; top: 0.4rem; bottom: 0.4rem; }
 .type-ico.shelf::before { left: 0.1rem; right: 0.1rem; top: 0.45rem; height: 0; border-width: 0 0 2px; border-radius: 0; }
 .type-ico.shelf::after { content: ''; position: absolute; left: 0.1rem; right: 0.1rem; top: 1.05rem; border-bottom: 2px solid currentColor; }
+.type-ico.mirror::before { left: 0.3rem; right: 0.3rem; top: 0.1rem; bottom: 0.1rem; border-radius: 0.7rem 0.7rem 2px 2px; }
+.type-ico.mirror::after { content: ''; position: absolute; left: 0.62rem; top: 0.45rem; width: 1.5px; height: 0.5rem; background: currentColor; transform: rotate(25deg); opacity: 0.6; }
 .type-ico.wall::before {
   inset: 0.05rem; border-radius: 1px;
   background: repeating-linear-gradient(90deg, currentColor 0 1.5px, transparent 1.5px 4px);
@@ -583,6 +590,21 @@ select.s-cancelled { color: var(--text-3); }
 .imgs.landscape img { aspect-ratio: 4 / 3; }
 
 /* Crop step */
+/* ---------- Home collection covers ---------- */
+.coll-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.coll-item { display: grid; gap: 0.6rem; min-width: 0; }
+.coll-frame {
+  position: relative; display: grid; place-items: center; aspect-ratio: 4 / 5; width: 100%; padding: 0; overflow: hidden;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); cursor: pointer; font: inherit;
+}
+.coll-frame.empty { border-style: dashed; }
+.coll-frame.empty span { display: inline-flex; align-items: center; gap: 0.4rem; }
+.coll-frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.coll-frame:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.coll-busy { position: absolute; inset: auto 0 0; padding: 0.4rem; font-size: 12px; text-align: center; background: rgb(255 255 255 / 0.85); }
+.coll-foot { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+@media (max-width: 620px) { .coll-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
 .crop {
   margin: auto; border: 0; border-radius: 14px; padding: 1.25rem; width: min(52rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem);
   display: grid; gap: 1rem; background: var(--surface); color: var(--text); box-shadow: 0 30px 60px -20px rgb(0 0 0 / 0.45);

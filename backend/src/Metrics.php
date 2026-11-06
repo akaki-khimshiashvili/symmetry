@@ -195,7 +195,7 @@ SQL);
         unset($p);
         $sizes = $all("SELECT product_name AS product, size_label AS size, COUNT(*) AS orders FROM orders WHERE created_at >= $from GROUP BY product_id, size_label ORDER BY orders DESC, product LIMIT 8");
         $byType = $all(<<<SQL
-SELECT CASE WHEN p.category IN ('shelf', 'wall') THEN p.category ELSE COALESCE(p.orientation, 'landscape') END AS k,
+SELECT CASE WHEN p.category IN ('shelf', 'wall', 'mirror') THEN p.category ELSE COALESCE(p.orientation, 'landscape') END AS k,
   COUNT(o.id) AS orders, COALESCE(SUM(CASE WHEN $sold THEN o.price END), 0) AS revenue
 FROM orders o LEFT JOIN products p ON p.id = o.product_id
 WHERE o.created_at >= $from GROUP BY k ORDER BY orders DESC

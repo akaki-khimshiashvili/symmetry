@@ -4,7 +4,7 @@ final class Products
 {
     public const PATTERNS = ['wave', 'dune', 'ripple', 'twist', 'prism', 'mosaic'];
     public const ORIENTATIONS = ['portrait', 'landscape'];
-    public const CATEGORIES = ['panel', 'shelf', 'wall']; // wall = მთლიანი კედელი (a whole-wall installation)
+    public const CATEGORIES = ['panel', 'shelf', 'wall', 'mirror']; // wall = მთლიანი კედელი (a whole-wall installation), mirror = სარკე
     /** პროდუქტის განზომილება: chosen separately from the type, one per product. */
     public const DIMENSIONS = ['portrait', 'landscape', 'wall'];
     private const I18N = ['name', 'short', 'description', 'material'];
@@ -161,7 +161,7 @@ final class Products
             $errors['orientation'] = 'აირჩიეთ ტიპი: ვერტიკალური ან ჰორიზონტალური';
         }
         if (isset($p['category']) && !in_array($p['category'], self::CATEGORIES, true)) {
-            $errors['category'] = 'აირჩიეთ ტიპი: პანელი, თარო ან მთლიანი კედელი';
+            $errors['category'] = 'აირჩიეთ ტიპი: პანელი, თარო, მთლიანი კედელი ან სარკე';
         }
         if (isset($p['dimension']) && !in_array($p['dimension'], self::DIMENSIONS, true)) {
             $errors['dimension'] = 'აირჩიეთ განზომილება: პორტრეტი, ჰორიზონტალური დიზაინი ან მთლიანი კედელი';

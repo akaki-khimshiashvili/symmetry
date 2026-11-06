@@ -5,6 +5,7 @@
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
 import { fmtDay, fmtNum } from './api';
+import { Icon } from './ui';
 
 /** Percentage change, or null when there is nothing to compare with. */
 export const change = (cur: number, prev: number) => (prev > 0 ? Math.round(((cur - prev) / prev) * 100) : null);
@@ -25,12 +26,14 @@ export function Delta({ cur, prev, invert = false }: { cur: number; prev: number
 
 /** One headline number with its comparison to the previous period. */
 /** Stats are read-only: a card never links anywhere. */
-export function Kpi({ label, value, cur, prev, hint, invert }: {
+export function Kpi({ label, value, cur, prev, hint, invert, icon }: {
   label: string; value: ComponentChildren; cur?: number; prev?: number; hint?: string; invert?: boolean;
+  /** Icon name from ui.tsx, shown next to the label. */
+  icon?: string;
 }) {
   const body = (
     <>
-      <span class="kpi-label">{label}</span>
+      <span class="kpi-label">{icon && <span class="kpi-ico"><Icon name={icon} size={16} /></span>}{label}</span>
       <span class="kpi-n num">{value}</span>
       <span class="kpi-foot">
         {cur !== undefined && prev !== undefined && <Delta cur={cur} prev={prev} invert={invert} />}

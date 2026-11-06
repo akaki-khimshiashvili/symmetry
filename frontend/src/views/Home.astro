@@ -15,13 +15,18 @@ const { products, settings } = await loadData();
 
 // Up to 4 products marked "მთავარზე" in the admin; if fewer are marked, the rest of the catalogue fills the row.
 const featured = [...products.filter((p) => p.featured), ...products.filter((p) => !p.featured)].slice(0, 4);
-const types = (['portrait', 'landscape', 'shelf', 'wall'] as const).map((key) => {
+// Collection tiles: mirrors, shelves, whole walls. The cover is the photo chosen (and cropped to 4:5) in the
+// admin; without one, the type's featured / first product photo. A tile with no products yet still shows
+// (a drawn pattern, or the chosen photo) and leads to the contact page as a custom project.
+const covers = settings.collection ?? {};
+const types = (['mirror', 'shelf', 'wall'] as const).map((key) => {
   const items = products.filter((p) => kindOf(p) === key);
-  return { key, items, cover: items.find((p) => p.featured) ?? items[0], from: items.length ? Math.min(...items.map(minPrice)) : 0 };
-}).filter((x) => x.cover || x.key === 'wall');
-// Whole walls are always on show: until the first one is in the catalogue, the tile draws a wall
-// pattern and leads to the contact page (every whole wall starts as a custom project).
-const wallSketch = { slug: 'whole-wall', pattern: 'dune', images: [] } as unknown as (typeof products)[number];
+  const product = items.find((p) => p.featured) ?? items[0];
+  const chosen = covers[key];
+  const sketch = { slug: `${key}-sketch`, pattern: key === 'mirror' ? 'ripple' : key === 'shelf' ? 'wave' : 'dune', images: [] } as unknown as (typeof products)[number];
+  const cover = chosen ? { ...(product ?? sketch), images: [{ id: 0, url: chosen }] } : product ?? sketch;
+  return { key, items, cover, photo: !!(chosen || product), from: items.length ? Math.min(...items.map(minPrice)) : 0 };
+});
 
 ---
 <Base lang={lang} current="home">
@@ -34,16 +39,16 @@ const wallSketch = { slug: 'whole-wall', pattern: 'dune', images: [] } as unknow
 
       <div class="types">
         {types.map((ty, i) => (
-          <a class={`tile tile-${ty.key}`} href={ty.cover ? `${path(lang, '/products/')}?type=${ty.key}` : path(lang, '/contact/')} data-reveal style={`--d:${i}`}>
+          <a class={`tile tile-${ty.key}`} href={ty.items.length ? `${path(lang, '/products/')}?type=${ty.key}` : path(lang, '/contact/')} data-reveal style={`--d:${i}`}>
             <div class="tile-img">
-              <Leaf product={ty.cover ?? wallSketch} alt="" ratio={4 / 5} photo={!!ty.cover} density={ty.cover ? 1 : 1.6} />
-              {ty.cover && <span class="tile-count num">{ty.items.length} {t('products.count')}</span>}
+              <Leaf product={ty.cover} alt="" ratio={4 / 5} photo={ty.photo} density={ty.photo ? 1 : 1.6} />
+              {ty.items.length > 0 && <span class="tile-count num">{ty.items.length} {t('products.count')}</span>}
             </div>
             <div class="tile-text">
               <h3>{t(`type.${ty.key}` as any)}<Icon name="arrow" size={18} class="tile-go" /></h3>
               <p class="tile-d">{t(`type.${ty.key}.d` as any)}</p>
               <span class="tile-meta num">
-                {ty.cover ? <>₾ {priceFmt(ty.from)} {t('collection.from')}</> : t('collection.custom')}
+                {ty.items.length ? <>₾ {priceFmt(ty.from)} {t('collection.from')}</> : t('collection.custom')}
               </span>
             </div>
           </a>
@@ -102,7 +107,7 @@ const wallSketch = { slug: 'whole-wall', pattern: 'dune', images: [] } as unknow
     box-shadow: 0 1px 2px rgb(40 22 10 / 0.06), 0 22px 40px -28px rgb(40 22 10 / 0.45);
     transition: box-shadow 400ms var(--ease-out), transform 400ms var(--ease-out);
   }
-  .tile-img :global(.leaf) { aspect-ratio: 4 / 5 !important; transition: transform 900ms var(--ease-out); }
+  .tile-img :global(.leaf) { aspect-ratio: 4 / 5 !important; }
   .tile-count {
     position: absolute; left: 0.75rem; top: 0.75rem; padding: 0.3rem 0.7rem; border-radius: 999px;
     font-size: var(--t-xs); font-weight: 600; letter-spacing: 0.02em; color: var(--ink);
@@ -125,12 +130,12 @@ const wallSketch = { slug: 'whole-wall', pattern: 'dune', images: [] } as unknow
   }
   @media (hover: hover) and (pointer: fine) {
     .tile:hover .tile-img { transform: translateY(-4px); box-shadow: 0 1px 2px rgb(40 22 10 / 0.06), 0 30px 50px -26px rgb(40 22 10 / 0.5); }
-    .tile:hover .tile-img :global(.leaf) { transform: scale(1.04); }
     .tile:hover h3 :global(.tile-go) { transform: translateX(4px); color: var(--ink); }
   }
   .tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; border-radius: 6px; }
   @media (prefers-reduced-motion: reduce) {
-    .tile-img, .tile-img :global(.leaf), .tile-text h3 :global(.tile-go) { transition: none; }
+    .tile-img, .tile-text h3 :global(.tile-go) { transition: none; }
+    .tile:hover .tile-img { transform: none; }
   }
   .featured-grid { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
   .featured-grid { gap: var(--s-4) calc(var(--gutter) * 1.25); }

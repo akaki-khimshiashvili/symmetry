@@ -44,6 +44,8 @@ const SETTING_KEYS = [
     // Seller details printed on receipts and invoices; bank details for invoices.
     'legal_name', 'tax_id', 'bank_name', 'bank_swift', 'iban',
 ];
+/** Home-page collection tiles whose cover photo is chosen (and cropped to 4:5) in the admin. */
+const COLLECTION_KEYS = ['mirror', 'shelf', 'wall'];
 
 try {
     $pdo = Db::get($config);
@@ -115,6 +117,16 @@ try {
         }
         return $out;
     };
+    /** Cover photo URLs of the home collection tiles ('' = none chosen, the site falls back to a product photo). */
+    $collection = function () use ($pdo, $base): array {
+        $rows = $pdo->query("SELECT key, value FROM settings WHERE key LIKE 'collection_%'")->fetchAll(PDO::FETCH_KEY_PAIR);
+        $out = [];
+        foreach (COLLECTION_KEYS as $k) {
+            $path = $rows['collection_' . $k] ?? '';
+            $out[$k] = $path !== '' ? $base . $path : '';
+        }
+        return $out;
+    };
 
     $productOr404 = function (string $id, bool $hidden) use ($pdo, $base): array {
         $p = Products::find($pdo, $id, $hidden, $base);
@@ -129,7 +141,8 @@ try {
         ['GET', '#^/health$#', fn () => ['ok' => true]],
         ['GET', '#^/products$#', fn () => Products::all($pdo, false, $base)],
         ['GET', '#^/products/([\w-]+)$#', fn ($id) => $productOr404($id, false)],
-        ['GET', '#^/settings$#', fn () => $settings() + ['payments' => (bool) $config['flitt_enabled']]],
+        ['GET', '#^/settings$#', fn () => $settings() + ['payments' => (bool) $config['flitt_enabled'], 'collection' => $collection()]],
+        ['GET', '#^/collection$#', fn () => $collection()],
 
         ['POST', '#^/contact$#', function () use ($pdo) {
             $b = Http::body();
@@ -440,6 +453,65 @@ try {
             Products::unlinkUpload($config['upload_dir'], (string) $path);
             $pdo->prepare('DELETE FROM product_images WHERE id = ?')->execute([(int) $imgId]);
             return ['ok' => true];
+        }],
+
+        // Home collection cover: one photo per tile, already cropped to 4:5 in the admin. Replaces the previous one.
+        ['POST', '#^/admin/collection/(\w+)/image$#', function ($key) use ($pdo, $admin, $config, $collection) {
+            $admin();
+            if (!in_array($key, COLLECTION_KEYS, true)) {
+                throw new HttpError(404, 'კოლექცია ვერ მოიძებნა');
+            }
+            $f = $_FILES['image'] ?? null;
+            if (!$f || is_array($f['name'])) {
+                throw new HttpError(400, 'ფაილი არ არის არჩეული');
+            }
+            if ($f['error'] !== UPLOAD_ERR_OK) {
+                throw new HttpError(400, 'ატვირთვა ვერ მოხერხდა');
+            }
+            if ($f['size'] > $config['max_upload_bytes']) {
+                throw new HttpError(413, 'ფაილი ძალიან დიდია (მაქს. 8 MB)');
+            }
+            $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/avif' => 'avif'];
+            $mime = (new finfo(FILEINFO_MIME_TYPE))->file($f['tmp_name']);
+            if (!isset($allowed[$mime])) {
+                throw new HttpError(415, 'დაშვებულია მხოლოდ JPG, PNG, WEBP, AVIF');
+            }
+            if (!is_dir($config['upload_dir'])) {
+                mkdir($config['upload_dir'], 0775, true);
+            }
+            $stem = 'c-' . $key . '-' . bin2hex(random_bytes(8));
+            if (Images::supported()) {
+                $file = $stem . '.webp';
+                try {
+                    Images::toWebp($f['tmp_name'], $mime, $config['upload_dir'] . '/' . $file);
+                } catch (RuntimeException $e) {
+                    throw new HttpError(422, $e->getMessage());
+                }
+            } else {
+                $file = $stem . '.' . $allowed[$mime];
+                if (!move_uploaded_file($f['tmp_name'], $config['upload_dir'] . '/' . $file)) {
+                    throw new HttpError(500, 'ფაილის შენახვა ვერ მოხერხდა');
+                }
+            }
+            $old = $pdo->query("SELECT value FROM settings WHERE key = " . $pdo->quote('collection_' . $key))->fetchColumn();
+            $pdo->prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
+                ->execute(['collection_' . $key, $config['upload_url'] . '/' . $file]);
+            if ($old) {
+                Products::unlinkUpload($config['upload_dir'], (string) $old);
+            }
+            return $collection();
+        }],
+        ['DELETE', '#^/admin/collection/(\w+)/image$#', function ($key) use ($pdo, $admin, $config, $collection) {
+            $admin();
+            if (!in_array($key, COLLECTION_KEYS, true)) {
+                throw new HttpError(404, 'კოლექცია ვერ მოიძებნა');
+            }
+            $old = $pdo->query("SELECT value FROM settings WHERE key = " . $pdo->quote('collection_' . $key))->fetchColumn();
+            if ($old) {
+                Products::unlinkUpload($config['upload_dir'], (string) $old);
+            }
+            $pdo->prepare('DELETE FROM settings WHERE key = ?')->execute(['collection_' . $key]);
+            return $collection();
         }],
 
         ['GET', '#^/admin/orders$#', function () use ($pdo, $admin) {

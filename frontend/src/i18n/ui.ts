@@ -35,7 +35,7 @@ export const ui = {
 
     'products.title': 'პროდუქცია',
     'products.lead': 'ინდივიდუალური ზომისა თუ დიზაინისთვის დაგვიკავშირდით.',
-    'products.count': 'ნიმუში',
+    'products.count': 'პროდუქცია',
     'products.sizes': 'ზომა',
     'products.empty': 'პროდუქცია მალე დაემატება.',
 
@@ -249,6 +249,9 @@ export const ui = {
     'type.shelf': 'თაროები',
     'type.shelf.s': 'თარო',
     'type.shelf.d': 'პარამეტრული კედლის თაროები: სკულპტურა, რომელზეც ნივთებიც დაიდება.',
+    'type.mirror': 'სარკე',
+    'type.mirror.s': 'სარკე',
+    'type.mirror.d': 'სარკეები პარამეტრული ხის ჩარჩოთი: ტალღა, რომელიც სივრცეს ირეკლავს.',
     'type.wall': 'მთლიანი კედელი',
     'type.wall.s': 'მთლიანი კედელი',
     'type.wall.d': 'მთელი კედლის პარამეტრული ინსტალაცია: ერთიანი ტალღა იატაკიდან ჭერამდე.',
@@ -546,6 +549,9 @@ export const ui = {
     'type.shelf': 'Shelves',
     'type.shelf.s': 'Shelf',
     'type.shelf.d': 'Parametric wall shelves: a sculpture you can put things on.',
+    'type.mirror': 'Mirrors',
+    'type.mirror.s': 'Mirror',
+    'type.mirror.d': 'Mirrors in a parametric wooden frame: a wave that reflects the room.',
     'type.wall': 'Whole walls',
     'type.wall.s': 'Whole wall',
     'type.wall.d': 'A parametric installation across an entire wall: one continuous wave, floor to ceiling.',
