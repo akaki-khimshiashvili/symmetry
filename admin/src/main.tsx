@@ -1,8 +1,10 @@
 import { render } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import '@fontsource-variable/noto-sans-georgian';
+import '@fontsource/montserrat/latin-600.css';
 import '@fontsource/montserrat/latin-800.css';
 import './styles.css';
+import './invoices.css';
 import { api, auth, setUnauthorizedHandler, SITE_URL, ApiError } from './api';
 import { Icon, Toaster, ConfirmHost, toast, cap } from './ui';
 import { announce } from './live';
@@ -12,6 +14,7 @@ import { ProductEdit } from './pages/ProductEdit';
 import { OrdersPage } from './pages/Orders';
 import { MessagesPage } from './pages/Messages';
 import { SettingsPage } from './pages/Settings';
+import { InvoicesPage, InvoiceEdit } from './pages/Invoices';
 
 const useHash = () => {
   const [hash, setHash] = useState(location.hash.slice(1) || '/');
@@ -71,6 +74,7 @@ const NAV = [
   { to: '/products', label: 'პროდუქცია', icon: 'panel' },
   { to: '/orders', label: 'შეკვეთები', icon: 'bag' },
   { to: '/messages', label: 'შეტყობინებები', icon: 'mail' },
+  { to: '/invoices', label: 'ინვოისები', icon: 'doc' },
   { to: '/settings', label: 'პარამეტრები', icon: 'gear' },
 ];
 
@@ -122,7 +126,10 @@ function Shell() {
 
   let page;
   const editMatch = hash.match(/^\/products\/(new|\d+)$/);
+  const invMatch = hash.match(/^\/invoices\/(new|\d+)(?:\?order=(\d+))?$/);
   if (editMatch) page = <ProductEdit id={editMatch[1]} />;
+  else if (invMatch) page = <InvoiceEdit key={invMatch[1]} id={invMatch[1]} orderId={invMatch[2]} />;
+  else if (hash.startsWith('/invoices')) page = <InvoicesPage />;
   else if (hash.startsWith('/products')) page = <ProductsPage />;
   else if (hash.startsWith('/orders')) page = <OrdersPage onChange={refreshCounts} />;
   else if (hash.startsWith('/messages')) page = <MessagesPage onChange={refreshCounts} />;

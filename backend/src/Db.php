@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS tokens (
 SQL);
         Payments::migrate($pdo);
         Metrics::migrate($pdo);
+        Invoices::migrate($pdo);
         // Upgrade databases created before product types existed.
         $cols = array_column($pdo->query('PRAGMA table_info(products)')->fetchAll(), 'name');
         // Stock flag: products out of stock can't be ordered (existing products start in stock).
@@ -147,6 +148,11 @@ SQL);
         // Category: wall panels vs shelves (existing products are panels).
         if (!in_array('category', $cols, true)) {
             $pdo->exec("ALTER TABLE products ADD COLUMN category TEXT NOT NULL DEFAULT 'panel'");
+        }
+        // Dimension (პორტრეტი / ჰორიზონტალური / მთლიანი კედელი): a separate choice from the type. Existing products start from their type.
+        if (!in_array('dimension', $cols, true)) {
+            $pdo->exec("ALTER TABLE products ADD COLUMN dimension TEXT NOT NULL DEFAULT ''");
+            $pdo->exec("UPDATE products SET dimension = CASE WHEN category = 'wall' THEN 'wall' WHEN orientation = 'portrait' THEN 'portrait' ELSE 'landscape' END");
         }
         if (!in_array('orientation', $cols, true)) {
             $pdo->exec("ALTER TABLE products ADD COLUMN orientation TEXT NOT NULL DEFAULT 'landscape'");

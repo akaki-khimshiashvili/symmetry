@@ -120,6 +120,15 @@ Email is required on the order form. The receipt is emailed to the customer auto
 - **In production**, set `SYMMETRY_SMTP_HOST`, `SYMMETRY_SMTP_PORT` (587 or 465), `SYMMETRY_SMTP_SECURE` (`tls` for 587, `ssl` for 465), `SYMMETRY_SMTP_USER`, `SYMMETRY_SMTP_PASS` and `SYMMETRY_MAIL_FROM` (an address the SMTP account may send from, ideally on the shop's own domain with SPF/DKIM set up so receipts don't land in spam). Optional: `SYMMETRY_MAIL_REPLY_TO` (where customer replies go) and `SYMMETRY_MAIL_COPY_TO` (a hidden copy of every receipt for the store).
 - A mail failure never blocks a payment step. It is logged, and the admin shows the receipt as not sent.
 
+### Invoices
+
+Admin → **ინვოისები** creates invoices: a request to pay by bank transfer, usually for company clients. An invoice is **not** a tax invoice (საგადასახადო ანგარიშ-ფაქტურა). VAT payers issue those on rs.ge.
+
+- Start an invoice from scratch, or from an order (**ინვოისის შექმნა** on the order card), which fills in the client and the item. The A4 preview updates as you type. **PDF / ბეჭდვა** prints only the sheet ("Save as PDF"), and the file is named after the invoice number.
+- Each invoice is in Georgian or English. Lines have a description, quantity, unit and price. **ფასები მოიცავს დღგ-ს** shows the 18% VAT inside the total (turn it on only if the company is VAT-registered).
+- **Status:** პროექტი (draft) → გაცემული (issued) → გადახდილი (paid), or გაუქმებული (cancelled). Drafts have no number and can be deleted. Issuing gives the next number for that year (`INV-2026-0001`) and freezes the seller's details on the invoice. Numbered invoices are never deleted or renumbered, only cancelled. Paid and cancelled invoices are read-only. Issued invoices past their due date show as ვადაგადაცილებული (overdue).
+- The seller's legal name, ID code, address and contacts, plus the bank details (IBAN, bank, SWIFT), come from admin → პარამეტრები.
+
 ## Wood palettes
 
 The floating **ხის ჯიში / Wood** control (bottom-left) switches between six palettes live: walnut, ebony, white oak, teak, sapele and smoked oak. Once you've picked one, set it as the default in admin → პარამეტრები. To remove the switcher for launch, delete `<PaletteSwitcher />` in `frontend/src/layouts/Base.astro`. See `DESIGN.md` for the full system.

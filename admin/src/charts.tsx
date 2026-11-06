@@ -16,7 +16,7 @@ export function Delta({ cur, prev, invert = false }: { cur: number; prev: number
   if (pct === 0) return <span class="delta muted">უცვლელი</span>;
   const good = invert ? pct < 0 : pct > 0;
   return (
-    <span class={`delta ${good ? 'up' : 'down'}`} title="წინა იმავე ხანგრძლივობის პერიოდთან შედარებით">
+    <span class={`delta ${good ? 'up' : 'down'}`}>
       <span aria-hidden="true">{pct > 0 ? '▲' : '▼'}</span> {Math.abs(pct)}%
       <span class="sr"> {pct > 0 ? 'ზრდა' : 'კლება'}</span>
     </span>
@@ -56,10 +56,42 @@ export function Columns<T extends { date: string }>({ title, points, pick, fmt =
   title: string; points: T[]; pick: (p: T) => number; fmt?: (n: number) => string; total?: ComponentChildren;
 }) {
   const [hover, setHover] = useState<number | null>(null);
+  const [scrubbing, setScrubbing] = useState(false);
   const values = points.map(pick);
   const top = niceMax(Math.max(...values, 0));
   const h = hover !== null ? points[hover] : null;
   const labelAt = new Set([0, Math.floor((points.length - 1) / 2), points.length - 1]);
+
+  /** Which day is under the pointer: the whole plot is one target, so thin columns are easy to hit. */
+  const indexAt = (el: HTMLElement, clientX: number) => {
+    const r = el.getBoundingClientRect();
+    return Math.max(0, Math.min(points.length - 1, Math.floor(((clientX - r.left) / r.width) * points.length)));
+  };
+  // Direct manipulation: the readout follows the pointer 1:1, from the first touch, for as long as it is down.
+  const onDown = (e: PointerEvent) => {
+    const el = e.currentTarget as HTMLElement;
+    if (e.pointerType !== 'mouse') try { el.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
+    setScrubbing(true);
+    setHover(indexAt(el, e.clientX));
+  };
+  const onMove = (e: PointerEvent) => {
+    if (e.pointerType === 'mouse' || scrubbing) setHover(indexAt(e.currentTarget as HTMLElement, e.clientX));
+  };
+  const onEnd = (e: PointerEvent) => {
+    setScrubbing(false);
+    if (e.pointerType !== 'mouse') setHover(null); // a finger lifting means "done looking"; the mouse keeps hovering
+  };
+  // Keyboard: one tab stop per chart, arrows walk through the days.
+  const onKey = (e: KeyboardEvent) => {
+    const last = points.length - 1;
+    const next = e.key === 'ArrowRight' ? Math.min(last, (hover ?? -1) + 1)
+      : e.key === 'ArrowLeft' ? Math.max(0, (hover ?? points.length) - 1)
+      : e.key === 'Home' ? 0 : e.key === 'End' ? last : e.key === 'Escape' ? null : undefined;
+    if (next === undefined) return;
+    e.preventDefault();
+    setHover(next);
+  };
+
   return (
     <figure class="card chart">
       <figcaption class="chart-head">
@@ -70,16 +102,18 @@ export function Columns<T extends { date: string }>({ title, points, pick, fmt =
       </figcaption>
       <div class="cols-wrap">
         <div class="cols-axis num" aria-hidden="true"><span>{fmt(top)}</span><span>{fmt(top / 2)}</span><span>0</span></div>
-        <div class="cols" style={{ '--n': points.length } as any} onMouseLeave={() => setHover(null)} role="list" aria-label={title}>
+        <div
+          class={`cols ${hover !== null ? 'has-hover' : ''}`} style={{ '--n': points.length } as any}
+          tabIndex={0} role="group" aria-label={`${title}. ისრებით დღეების დათვალიერება`}
+          onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onEnd} onPointerCancel={onEnd}
+          onPointerLeave={(e) => e.pointerType === 'mouse' && setHover(null)}
+          onKeyDown={onKey} onBlur={() => setHover(null)}
+        >
           {points.map((p, i) => {
             const v = values[i];
             return (
-              <div
-                key={p.date} role="listitem" tabIndex={0} class={`col ${hover === i ? 'on' : ''}`}
-                aria-label={`${fmtDay(p.date)}: ${fmt(v)}`}
-                onMouseEnter={() => setHover(i)} onFocus={() => setHover(i)} onBlur={() => setHover(null)}
-              >
-                <span class="col-bar" style={{ height: v > 0 ? `max(3px, ${(v / top) * 100}%)` : '0' }} />
+              <div key={p.date} class={`col ${hover === i ? 'on' : ''}`} aria-hidden="true">
+                <span class="col-bar" style={{ '--cut': v > 0 ? `min(${100 - (v / top) * 100}%, calc(100% - 3px))` : '100%' } as any} />
               </div>
             );
           })}
@@ -91,6 +125,9 @@ export function Columns<T extends { date: string }>({ title, points, pick, fmt =
     </figure>
   );
 }
+
+/** Bars are full width and clipped to their share (0–1), so changes animate without layout work. */
+const cut = (share: number) => ({ '--cut': `${100 - Math.max(0, Math.min(1, share)) * 100}%` } as any);
 
 export type BarRow = { key: string; label: ComponentChildren; n: number; note?: ComponentChildren };
 
@@ -111,7 +148,7 @@ export function BarList({ title, rows, fmt = fmtNum, empty = 'მონაცე
                 <span class="blist-label">{r.label}</span>
                 <span class="blist-n num">{fmt(r.n)}{sum > 0 && <span class="muted"> · {Math.round((r.n / sum) * 100)}%</span>}</span>
               </div>
-              <span class="blist-track" aria-hidden="true"><span class="blist-bar" style={{ width: `${(r.n / max) * 100}%` }} /></span>
+              <span class="blist-track" aria-hidden="true"><span class="blist-bar" style={cut(r.n / max)} /></span>
               {r.note && <div class="muted small">{r.note}</div>}
             </li>
           ))}
@@ -139,7 +176,7 @@ export function Funnel({ steps }: { steps: { label: string; n: number; hint: str
                   {i > 0 && <span class="muted"> · {prev > 0 ? `${Math.round((s.n / prev) * 100)}%` : '—'}</span>}
                 </span>
               </div>
-              <span class="blist-track" aria-hidden="true"><span class="blist-bar" style={{ width: first > 0 ? `${Math.min(100, (s.n / first) * 100)}%` : '0' }} /></span>
+              <span class="blist-track" aria-hidden="true"><span class="blist-bar" style={cut(first > 0 ? s.n / first : 0)} /></span>
             </li>
           );
         })}

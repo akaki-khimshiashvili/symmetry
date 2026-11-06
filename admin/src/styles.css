@@ -2,6 +2,9 @@
 
 /* Admin work surface: daylight office use, so a light oak ground with a walnut sidebar. */
 :root {
+  /* Critically damped spring (damping 1.0, response 0.35s): settles without overshoot. Sampled into linear(). */
+  --spring: linear(0, 0.055, 0.173, 0.309, 0.441, 0.558, 0.656, 0.736, 0.8, 0.849, 0.887, 0.916, 0.938, 0.955, 0.967, 0.976, 0.982, 0.987, 0.991, 0.993, 0.995, 0.997, 0.998, 0.998, 1);
+  --spring-dur: 500ms;
   --bg: oklch(0.965 0.008 80);
   --surface: oklch(0.995 0.003 80);
   --surface-2: oklch(0.94 0.012 78);
@@ -79,7 +82,7 @@ h2 { font-family: var(--f-head); font-weight: 600; font-size: 1.05rem; line-heig
 
 /* Fields */
 .fld { display: grid; gap: 0.35rem; min-width: 0; }
-.fld > span:first-child { font-size: 13px; font-weight: 500; color: var(--text-2); }
+.fld > span:first-child { font-size: 14.5px; font-weight: 500; color: var(--text-2); }
 input:not([type='checkbox']):not([type='radio']), select, textarea {
   width: 100%; min-height: 2.6rem; padding: 0.55rem 0.75rem; background: var(--surface);
   border: 1px solid var(--border); border-radius: 8px; transition: border-color 140ms ease, box-shadow 140ms ease;
@@ -142,23 +145,38 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .stack { display: grid; gap: 1rem; }
 .head-actions { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
 /* Four equal slots: the switch keeps its exact size and place whichever period is on. */
-.period { display: inline-grid; grid-template-columns: repeat(4, 4.75rem); padding: 3px; gap: 2px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
-.period button { border: 0; background: none; padding: 0.4rem 0.25rem; text-align: center; border-radius: 6px; font-size: 13px; color: var(--text-2); cursor: pointer; white-space: nowrap; transition: background-color 140ms ease, color 140ms ease; }
-.period button.on { background: var(--brand); color: var(--brand-ink); font-weight: 600; }
-@media (hover: hover) { .period button:not(.on):hover { background: var(--surface-2); color: var(--text); } }
-.metrics { display: grid; gap: 1rem; transition: opacity 160ms ease; }
-.metrics.is-loading { opacity: 0.55; }
+.period { --slot: 4.75rem; position: relative; isolation: isolate; display: inline-grid; grid-template-columns: repeat(4, var(--slot)); padding: 3px; gap: 2px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
+/* One pill slides under the options (transform only), so the eye follows the selection. --i = selected index. */
+.period::before {
+  content: ''; position: absolute; z-index: -1; top: 3px; bottom: 3px; left: 3px; width: var(--slot); border-radius: 6px; background: var(--brand);
+  transform: translateX(calc(var(--i, 0) * (var(--slot) + 2px)));
+  transition: transform 220ms var(--ease-out); transition: transform var(--spring-dur) var(--spring);
+}
+.period button {
+  border: 0; background: none; padding: 0.4rem 0.25rem; text-align: center; border-radius: 6px; font-size: 13px; color: var(--text-2); cursor: pointer; white-space: nowrap;
+  transition: color 160ms ease, background-color 140ms ease, transform 140ms var(--ease-out);
+}
+.period button:active { transform: scale(0.97); }
+.period button.on { color: var(--brand-ink); font-weight: 600; }
+@media (hover: hover) and (pointer: fine) { .period button:not(.on):hover { background: var(--surface-2); color: var(--text); } }
+/* Dimming waits 120ms, so quick reloads never flicker; coming back is immediate. */
+.metrics { display: grid; gap: 1rem; transition: opacity 160ms ease; animation: mt-in 150ms ease-out; }
+.metrics.is-loading { opacity: 0.55; transition-delay: 120ms; }
+@keyframes mt-in { from { opacity: 0; } }
 .note { display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.8rem 1rem; border-radius: var(--radius); background: color-mix(in oklab, var(--honey) 16%, var(--surface)); border: 1px solid color-mix(in oklab, var(--honey) 55%, var(--border)); font-size: 14px; }
 .note .icon { margin-top: 0.15rem; }
 
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); gap: 0.75rem; }
-.kpi { display: grid; align-content: start; gap: 0.1rem; padding: 0.8rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); text-decoration: none; color: var(--text-2); transition: border-color 160ms ease; min-width: 0; }
-.kpi-label { font-size: 13px; }
-.kpi-n { font-family: var(--f-head); font-size: 1.6rem; font-weight: 700; line-height: 1.15; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi { display: grid; align-content: start; gap: 0.1rem; padding: 0.8rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); text-decoration: none; color: var(--text-2); min-width: 0; }
+.kpi-label { font-size: 13px; letter-spacing: 0.01em; }
+.kpi-n { font-family: var(--f-head); font-size: 1.6rem; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kpi-n small { font-size: 0.95rem; color: var(--text-3); }
 .kpi-foot { display: flex; flex-wrap: wrap; gap: 0.15rem 0.5rem; font-size: 12px; min-height: 1.1rem; }
 .kpi-foot .muted { min-width: 0; overflow-wrap: anywhere; }
-.delta { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.delta { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; padding: 0 0.4rem; border-radius: 999px; line-height: 1.15rem; }
+.delta.up { background: color-mix(in oklab, var(--ok) 12%, transparent); }
+.delta.down { background: color-mix(in oklab, var(--danger) 10%, transparent); }
+.delta.muted { padding: 0; }
 .delta.up { color: var(--ok); }
 .delta.down { color: var(--danger); }
 .delta.muted { font-weight: 400; }
@@ -175,11 +193,19 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   border-bottom: 1px solid var(--border);
   background: linear-gradient(to bottom, var(--surface-2) 1px, transparent 1px) 0 0 / 100% 50%;
 }
-.col { height: 100%; display: flex; align-items: flex-end; cursor: default; outline: none; border-radius: 4px 4px 0 0; }
-.col-bar { display: block; width: 100%; max-width: 2.25rem; margin-inline: auto; background: color-mix(in oklab, var(--brand) 78%, var(--surface)); border-radius: 4px 4px 0 0; transition: background-color 120ms ease; }
+.col { height: 100%; display: flex; align-items: flex-end; border-radius: 4px 4px 0 0; pointer-events: none; }
+.col-bar {
+  display: block; width: 100%; max-width: 2.25rem; height: 100%; margin-inline: auto; background: color-mix(in oklab, var(--brand) 78%, var(--surface));
+  /* The bar is full height and clipped to its value: no layout work, rounded tops at any height, smooth when a live update changes it. */
+  clip-path: inset(var(--cut, 100%) 0 0 0 round 4px 4px 0 0);
+  transition: clip-path 320ms var(--ease-out), background-color 120ms ease; transition: clip-path var(--spring-dur) var(--spring), background-color 120ms ease;
+}
 .col.on { background: color-mix(in oklab, var(--brand) 7%, transparent); }
 .col.on .col-bar { background: var(--brand); }
-.col:focus-visible { box-shadow: inset 0 0 0 2px var(--brand); }
+.cols { cursor: crosshair; touch-action: pan-y; user-select: none; -webkit-user-select: none; outline: none; border-radius: 4px 4px 0 0; }
+.cols:focus-visible { box-shadow: 0 0 0 2px var(--brand); }
+/* While a day is picked, the others step back so the picked one reads at a glance. */
+.cols.has-hover .col:not(.on) .col-bar { background: color-mix(in oklab, var(--brand) 45%, var(--surface)); }
 .cols-x { grid-column: 2; display: flex; justify-content: space-between; font-size: 11px; color: var(--text-3); white-space: nowrap; }
 
 /* Labelled bar lists ("how is it split"). */
@@ -192,11 +218,36 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .blist-n { white-space: nowrap; font-weight: 600; }
 .blist-n .muted { font-weight: 400; }
 .blist-track { display: block; height: 6px; margin-top: 0.3rem; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
-.blist-bar { display: block; height: 100%; border-radius: 4px; background: color-mix(in oklab, var(--brand) 78%, var(--surface)); }
+.blist-bar { display: block; height: 100%; background: color-mix(in oklab, var(--brand) 78%, var(--surface)); clip-path: inset(0 var(--cut, 100%) 0 0 round 4px); transition: clip-path 320ms var(--ease-out); transition: clip-path var(--spring-dur) var(--spring); }
+@media (prefers-reduced-motion: reduce) {
+  .period::before, .col-bar, .blist-bar { transition: none; }
+  .period button:active { transform: none; }
+}
 .blist-empty { padding-block: 0.5rem; }
 .funnel-note { margin-top: -0.15rem; }
 
 .metrics-table .num-col { text-align: right; }
+
+/* Dashboard controls float on a translucent layer; the soft edge shows only when content is underneath. */
+.mt-page { position: relative; }
+.mt-sentinel { position: absolute; top: 0; left: 0; width: 1px; height: 1px; }
+.mt-bar { display: grid; gap: 0.75rem; }
+@media (min-width: 1101px) {
+  .mt-bar {
+    position: sticky; top: 0; z-index: 6; margin: -1rem calc(-1 * clamp(1rem, 3vw, 2.75rem)) 0; padding: 1rem clamp(1rem, 3vw, 2.75rem) 0;
+    background: color-mix(in oklab, var(--bg) 78%, transparent); -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%);
+  }
+  .mt-bar::after {
+    content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 14px; pointer-events: none;
+    background: linear-gradient(to bottom, color-mix(in oklab, var(--text) 9%, transparent), transparent); opacity: 0; transition: opacity 200ms ease;
+  }
+  .mt-bar.is-stuck::after { opacity: 1; }
+  .mt-bar .tabs { border-bottom-color: transparent; }
+}
+@media (prefers-reduced-transparency: reduce) { .mt-bar { background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; } }
+@media (prefers-contrast: more) { .mt-bar { background: var(--bg); border-bottom: 1px solid var(--text-3); } .mt-bar::after { display: none; } }
+.mt-compare { font-size: 12.5px; margin: -0.35rem 0 -0.25rem; }
+.mt-compare span { font-size: 9px; letter-spacing: 0.05em; vertical-align: 1px; }
 .metrics-table th.num-col { padding-inline: 0.5rem 1rem; }
 .th-sort { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; white-space: nowrap; }
 .th-sort.on { color: var(--text); }
@@ -227,13 +278,13 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 
 /* Segmented choice */
 .seg-field { border: 0; padding: 0; display: grid; gap: 0.45rem; }
-.seg-field legend { font-size: 14px; font-weight: 600; margin-bottom: 0.45rem; }
+.seg-field legend { font-size: 15.5px; font-weight: 600; margin-bottom: 0.45rem; }
 /* Product type: four cards, each with a small drawing of its shape. */
 .seg.type-seg { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
 .type-seg label { display: flex; align-items: center; gap: 0.65rem; min-width: 0; padding: 0.65rem 0.75rem; text-align: left; }
 .type-txt { display: grid; gap: 0.1rem; min-width: 0; }
-.type-txt b { font-weight: 600; font-size: 13.5px; line-height: 1.25; }
-.type-txt small { font-size: 11.5px; color: var(--text-3); line-height: 1.3; }
+.type-txt b { font-weight: 600; font-size: 15px; line-height: 1.25; }
+.type-txt small { font-size: 13px; color: var(--text-3); line-height: 1.3; }
 .type-seg label.on .type-txt small { color: inherit; opacity: 0.75; }
 .type-ico { flex: none; position: relative; width: 1.6rem; height: 1.6rem; color: currentColor; }
 .type-ico::before { content: ''; position: absolute; border: 1.5px solid currentColor; border-radius: 2px; }
@@ -245,7 +296,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   inset: 0.05rem; border-radius: 1px;
   background: repeating-linear-gradient(90deg, currentColor 0 1.5px, transparent 1.5px 4px);
 }
-@media (max-width: 520px) { .seg.type-seg { grid-template-columns: minmax(0, 1fr); } }
+.seg.type-seg.dim-seg { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 760px) { .seg.type-seg.dim-seg { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .seg.type-seg, .seg.type-seg.dim-seg { grid-template-columns: minmax(0, 1fr); } }
 .seg { display: inline-flex; flex-wrap: wrap; gap: 0.4rem; }
 .seg label { position: relative; padding: 0.55rem 1rem; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; background: var(--surface); }
 .seg label.on { border-color: var(--brand); background: color-mix(in oklab, var(--brand) 8%, var(--surface)); color: var(--brand); font-weight: 600; }
@@ -261,9 +314,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .col-main, .col-side { display: grid; gap: 1.25rem; }
 .col-side { position: sticky; top: 6rem; }
 .bi { display: grid; gap: 0.45rem; }
-.bi-label { font-size: 14px; font-weight: 600; }
+.bi-label { font-size: 15.5px; font-weight: 600; }
 .bi-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-.lang-tag { font-size: 11px !important; letter-spacing: 0.06em; color: var(--text-3) !important; }
+.lang-tag { font-size: 12px !important; letter-spacing: 0.06em; color: var(--text-3) !important; }
 .row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
 .row4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; }
 @media (max-width: 900px) { .row4 { grid-template-columns: 1fr 1fr; } }

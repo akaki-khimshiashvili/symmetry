@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { useLive } from '../live';
 import {
   api, type Metrics, type Mix, type ProductMetric, PERIODS, PAYMENT, CLIENT_TYPES, CHANNELS, PRODUCT_TYPES,
@@ -56,6 +56,19 @@ export function Dashboard() {
       .finally(() => setLoading(false));
   };
   useEffect(() => { load(); }, [days]);
+
+  // The controls bar floats over the content; its soft edge appears only once something scrolls under it.
+  const sentinel = useRef<HTMLDivElement>(null);
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el) return;
+    const check = () => setStuck(el.getBoundingClientRect().top < 0);
+    check();
+    addEventListener('scroll', check, { passive: true });
+    return () => removeEventListener('scroll', check);
+  }, []);
+  const period = PERIODS.find((p) => p.days === days);
   useLive(['orders', 'messages'], () => load(true));
 
   const rebuild = async () => {
@@ -71,14 +84,16 @@ export function Dashboard() {
   };
 
   return (
-    <section class="page">
+    <section class="page mt-page">
+      <div ref={sentinel} class="mt-sentinel" aria-hidden="true" />
+      <div class={`mt-bar ${stuck ? 'is-stuck' : ''}`}>
       <header class="page-head">
         <div>
           <h1>მიმოხილვა</h1>
           <p class="muted">ვიზიტები, პროდუქცია და გაყიდვები არჩეული პერიოდისთვის.</p>
         </div>
         <div class="head-actions">
-          <div class="period" role="radiogroup" aria-label="პერიოდი">
+          <div class="period" role="radiogroup" aria-label="პერიოდი" style={{ '--i': Math.max(0, PERIODS.findIndex((p) => p.days === days)) } as any}>
             {PERIODS.map((p) => (
               <button key={p.days} type="button" role="radio" aria-checked={days === p.days} class={days === p.days ? 'on' : ''} onClick={() => setDays(p.days)}>{p.label}</button>
             ))}
@@ -94,10 +109,14 @@ export function Dashboard() {
           <button key={t.key} type="button" role="tab" id={`mt-${t.key}`} aria-selected={tab === t.key} aria-controls="mt-panel" class={tab === t.key ? 'on' : ''} onClick={() => setTab(t.key)}>{t.label}</button>
         ))}
       </div>
+      </div>
 
       {!m ? <Loading /> : (
-        <div id="mt-panel" role="tabpanel" aria-labelledby={`mt-${tab}`} class={`metrics ${loading ? 'is-loading' : ''}`} aria-busy={loading}>
+        <div key={tab} id="mt-panel" role="tabpanel" aria-labelledby={`mt-${tab}`} class={`metrics ${loading ? 'is-loading' : ''}`} aria-busy={loading}>
           {!m.traffic.tracking_since && <TrackingNote />}
+          {tab !== 'customers' && (
+            <p class="mt-compare muted"><span aria-hidden="true">▲▼ </span>წინა {period?.label ?? `${days} დღე`}სთან შედარებით</p>
+          )}
           {tab === 'overview' && <Overview m={m} />}
           {tab === 'products' && <ProductsTab m={m} />}
           {tab === 'sales' && <SalesTab m={m} />}

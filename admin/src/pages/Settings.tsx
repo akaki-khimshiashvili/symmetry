@@ -18,6 +18,13 @@ const FIELDS: { key: string; label: string; hint?: string; type?: string }[] = [
   { key: 'tax_id', label: 'საიდენტიფიკაციო კოდი (ქვითრისთვის)' },
 ];
 
+/** Printed on invoices under "payment by bank transfer". */
+const BANK_FIELDS: { key: string; label: string; hint?: string }[] = [
+  { key: 'iban', label: 'ანგარიშის ნომერი (IBAN)', hint: 'მაგ. GE29 TB00 0000 0000 0000 00' },
+  { key: 'bank_name', label: 'ბანკი', hint: 'მაგ. სს „თიბისი ბანკი“' },
+  { key: 'bank_swift', label: 'SWIFT / BIC', hint: 'უცხოელი კლიენტებისთვის. მაგ. TBCBGE22' },
+];
+
 export function SettingsPage() {
   const [s, setS] = useState<Settings | null>(null);
   const [saving, setSaving] = useState(false);
@@ -50,6 +57,22 @@ export function SettingsPage() {
             <label class="fld" key={f.key}>
               <span>{f.label}</span>
               <input type={(f.type || 'text') as any} value={s[f.key] || ''} onInput={(e) => setS({ ...s, [f.key]: e.currentTarget.value })} />
+              {f.hint && <span class="muted small">{f.hint}</span>}
+            </label>
+          ))}
+        </div>
+      </section>
+
+      <section class="card pad-lg">
+        <div>
+          <h2>საბანკო რეკვიზიტები</h2>
+          <p class="muted small">ინვოისზე იბეჭდება. მიმღებად მიეთითება იურიდიული დასახელება და კოდი ზემოდან.</p>
+        </div>
+        <div class="grid2">
+          {BANK_FIELDS.map((f) => (
+            <label class="fld" key={f.key}>
+              <span>{f.label}</span>
+              <input class={f.key === 'iban' ? 'num' : ''} value={s[f.key] || ''} onInput={(e) => setS({ ...s, [f.key]: e.currentTarget.value })} />
               {f.hint && <span class="muted small">{f.hint}</span>}
             </label>
           ))}

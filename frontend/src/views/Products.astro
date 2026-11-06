@@ -1,75 +1,401 @@
 ---
 import Base from '../layouts/Base.astro';
 import SpecimenCard from '../components/SpecimenCard.astro';
+import Icon from '../components/Icon.astro';
 import { type Lang, useT } from '../i18n/ui';
-import { loadData, kindOf } from '../lib/data';
+import { loadData, kindOf, dimensionOf, loc, nowPrice, onSale, priceFmt, type Product } from '../lib/data';
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
 const t = useT(lang);
 const { products } = await loadData();
+
+/* ---------- Everything a filter can match on, worked out once at build time ---------- */
+const matKey = (p: Product) => (p.material.ka || p.material.en || '').trim();
+/** Size buckets by a size's longest side: up to 60 cm, 61–120 cm, over 120 cm. */
+const bucket = (w: number, h: number) => { const m = Math.max(w, h); return m <= 60 ? 's' : m <= 120 ? 'm' : 'l'; };
+const facts = products.map((p, i) => {
+  const prices = p.sizes.map(nowPrice);
+  return {
+    p, i,
+    type: kindOf(p),
+    dim: dimensionOf(p),
+    mat: matKey(p),
+    sizes: [...new Set(p.sizes.map((s) => bucket(s.width, s.height)))],
+    pmin: prices.length ? Math.min(...prices) : 0,
+    pmax: prices.length ? Math.max(...prices) : 0,
+    stock: p.in_stock !== false,
+    sale: onSale(p),
+    disc: onSale(p) ? p.sale!.percent : 0,
+  };
+});
+
+const TYPES = (['portrait', 'landscape', 'shelf', 'wall'] as const).filter((k) => facts.some((f) => f.type === k));
+const STEP = 50;
+const priceLo = facts.length ? Math.floor(Math.min(...facts.map((f) => f.pmin)) / STEP) * STEP : 0;
+const priceHi = facts.length ? Math.ceil(Math.max(...facts.map((f) => f.pmax)) / STEP) * STEP : STEP;
+const anySale = facts.some((f) => f.sale);
+const anyOut = facts.some((f) => !f.stock);
+
+/** The option groups. A group only appears when it can actually split the catalogue (two or more values). */
+type Opt = { value: string; label: string; hint?: string };
+const groups: { key: 'type' | 'dim' | 'mat' | 'size'; label: string; note?: string; options: Opt[] }[] = [
+  {
+    key: 'type', label: t('f.type'),
+    options: TYPES.map((k) => ({ value: k, label: t(`type.${k}` as any) })),
+  },
+  {
+    key: 'dim', label: t('f.dimension'),
+    options: (['portrait', 'landscape', 'wall'] as const).filter((k) => facts.some((f) => f.dim === k)).map((k) => ({ value: k, label: t(`dim.${k}` as any) })),
+  },
+  {
+    key: 'mat', label: t('f.material'),
+    options: [...new Map(facts.filter((f) => f.mat).map((f) => [f.mat, loc(f.p.material, lang)])).entries()]
+      .sort((a, b) => a[1].localeCompare(b[1], lang)).map(([value, label]) => ({ value, label })),
+  },
+  {
+    key: 'size', label: t('f.size'), note: t('f.size.note'),
+    options: (['s', 'm', 'l'] as const).filter((k) => facts.some((f) => f.sizes.includes(k)))
+      .map((k) => ({ value: k, label: t(`f.size.${k}` as any), hint: t(`f.size.${k}.d` as any) })),
+  },
+].filter((g) => g.options.length > 1) as any;
+const hasPrice = priceHi > priceLo;
+/** Phone sheet order: price comes right after the shape choices, above material and size. */
+const sheetSeq: ((typeof groups)[number] | 'price')[] = [
+  ...groups.filter((g) => g.key === 'type' || g.key === 'dim'),
+  ...(hasPrice ? (['price'] as const) : []),
+  ...groups.filter((g) => g.key === 'mat' || g.key === 'size'),
+];
+
+const SORTS = ['rec', 'priceAsc', 'priceDesc', 'newest', 'discount', 'name'] as const;
+const text = {
+  results: t('f.results'), results1: t('f.results1'), show: t('f.show'), remove: t('f.remove'),
+  type: t('f.type'), dim: t('f.dimension'), mat: t('f.material'), size: t('f.size'), price: t('f.price'),
+  stock: t('f.inStock'), sale: t('f.onSale'),
+  labels: {
+    type: Object.fromEntries(TYPES.map((k) => [k, t(`type.${k}` as any)])),
+    ...Object.fromEntries(groups.map((g) => [g.key, Object.fromEntries(g.options.map((o) => [o.value, o.label]))])),
+  },
+};
 ---
 <Base lang={lang} title={t('products.title')} current="products">
   <section class="wrap intro center-stack">
     <h1 class="display t-4xl" data-reveal>{t('products.title')}</h1>
     <p class="lead" data-reveal style="--d:1">{t('products.lead')}</p>
-    <div class="filter" role="group" aria-label={t('type.filter')} data-filter>
-      {(['all', 'portrait', 'landscape', 'shelf', 'wall'] as const).map((k) => {
-        const n = k === 'all' ? products.length : products.filter((p) => kindOf(p) === k).length;
-        if (k !== 'all' && n === 0) return null;
-        return (
-          <button type="button" data-f={k} aria-pressed={k === 'all' ? 'true' : 'false'}>
-            <span class="notch" aria-hidden="true"></span>
-            {k === 'all' ? t('type.all') : t(`type.${k}` as any)}
-            <span class="n num">{n}</span>
-          </button>
-        );
-      })}
-    </div>
   </section>
 
-  <section class="wrap catalogue">
+  <section class="wrap catalogue" data-shop data-lang={lang} data-lo={priceLo} data-hi={priceHi} data-text={JSON.stringify(text)}>
     {products.length === 0 ? (
       <p class="empty lead">{t('products.empty')}</p>
     ) : (
-      <div class="cat" data-cat>
-        {products.map((p, i) => {
-          const r = p.orientation === 'portrait' ? 0.75 : 1.3333;
-          return (
-            <div class="cell" data-type={kindOf(p)} style={`--r:${r}`}>
-              <SpecimenCard product={p} index={i} lang={lang} ratio={r} d={i % 3} heading="h2" />
+      <>
+        {/* ---------- One bar: filter pills, toggles, sort ---------- */}
+        <div class="bar" data-bar>
+          <button class="f-open" type="button" data-f-open aria-haspopup="dialog">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+            <span>{t('f.filters')}</span>
+            <span class="badge num" data-badge hidden></span>
+          </button>
+
+          <div class="pills" role="group" aria-label={t('f.filters')}>
+            {groups.map((g) => (
+              <div class="pill-wrap">
+                <button class="pill" type="button" popovertarget={`fp-${g.key}`} data-pill={g.key} aria-expanded="false">
+                  <span class="pill-k">{g.label}</span>
+                  <span class="pill-v num" data-pill-v hidden></span>
+                  <Icon name="chevron" size={14} />
+                </button>
+                <div class="pop" id={`fp-${g.key}`} popover data-pop={g.key}>
+                  <fieldset class:list={['grp', { cols: g.options.length > 6 }]} data-ctl>
+                    <legend class="sr">{g.label}</legend>
+                    {g.note && <p class="pop-note">{g.note}</p>}
+                    <div class="opts">
+                      {g.options.map((o) => (
+                        <label class="opt"><input type="checkbox" name={g.key} value={o.value} /><span class="box" aria-hidden="true"></span><span class="opt-t">{o.label}{o.hint && <small>{o.hint}</small>}</span><span class="opt-n num" data-n></span></label>
+                      ))}
+                    </div>
+                  </fieldset>
+                  <div class="pop-foot">
+                    <button class="link" type="button" data-clear={g.key}>{t('f.resetShort')}</button>
+                    <span class="num" data-live></span>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {hasPrice && (
+              <div class="pill-wrap">
+                <button class="pill" type="button" popovertarget="fp-price" data-pill="price" aria-expanded="false">
+                  <span class="pill-k">{t('f.price')}</span>
+                  <span class="pill-v num" data-pill-v hidden></span>
+                  <Icon name="chevron" size={14} />
+                </button>
+                <div class="pop pop-price" id="fp-price" popover data-pop="price">
+                  <div class="price" data-ctl>
+                    <p class="price-out num"><span data-plo>₾ {priceFmt(priceLo)}</span><span aria-hidden="true">—</span><span data-phi>₾ {priceFmt(priceHi)}</span></p>
+                    <div class="range" data-range>
+                      <input type="range" name="pmin" min={priceLo} max={priceHi} step={STEP} value={priceLo} aria-label={t('f.priceMin')} />
+                      <input type="range" name="pmax" min={priceLo} max={priceHi} step={STEP} value={priceHi} aria-label={t('f.priceMax')} />
+                    </div>
+                    <p class="range-ends num" aria-hidden="true"><span>₾ {priceFmt(priceLo)}</span><span>₾ {priceFmt(priceHi)}</span></p>
+                  </div>
+                  <div class="pop-foot">
+                    <button class="link" type="button" data-clear="price">{t('f.resetShort')}</button>
+                    <span class="num" data-live></span>
+                  </div>
+                </div>
+              </div>
+            )}
+            {anyOut && <label class="pill toggle" data-ctl><input type="checkbox" name="stock" value="1" /><span class="notch" aria-hidden="true"></span>{t('f.inStockShort')}</label>}
+            {anySale && <label class="pill toggle" data-ctl><input type="checkbox" name="sale" value="1" /><span class="notch" aria-hidden="true"></span>{t('f.onSaleShort')}</label>}
+          </div>
+
+          <div class="sort">
+            <button class="pill sort-btn" type="button" popovertarget="fp-sort" data-pill="sort" aria-haspopup="listbox" aria-expanded="false">
+              <svg class="sort-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3"/></svg>
+              <span class="sr">{t('f.sort')}: </span>
+              <span class="sort-v" data-sort-label>{t('f.sort.rec')}</span>
+              <Icon name="chevron" size={14} />
+            </button>
+            <div class="pop pop-sort" id="fp-sort" popover data-pop="sort" data-align="end">
+              <p class="pop-title" id="fp-sort-t">{t('f.sort')}</p>
+              <ul class="sort-list" role="listbox" aria-labelledby="fp-sort-t" data-sort-list>
+                {SORTS.map((k) => (k === 'discount' && !anySale ? null : (
+                  <li role="option" tabindex="-1" data-sort={k} aria-selected={k === 'rec' ? 'true' : 'false'}>
+                    <span class="notch" aria-hidden="true"></span>{t(`f.sort.${k}` as any)}
+                  </li>
+                )))}
+              </ul>
             </div>
-          );
-        })}
-      </div>
+          </div>
+        </div>
+
+        {/* ---------- Status: count, what is applied, reset ---------- */}
+        <div class="status">
+          <p class="count num" aria-live="polite" data-count></p>
+          <div class="active" data-active hidden>
+            <span class="sr">{t('f.active')}</span>
+            <ul data-chips></ul>
+          </div>
+          <button class="link reset" type="button" data-reset>{t('f.reset')}</button>
+        </div>
+
+        <div class="cat" data-cat>
+          {facts.map((f) => {
+            const r = f.p.orientation === 'portrait' ? 0.75 : 1.3333;
+            return (
+              <div class="cell" style={`--r:${r}`}
+                data-type={f.type} data-dim={f.dim} data-mat={f.mat} data-sizes={f.sizes.join(' ')}
+                data-pmin={f.pmin} data-pmax={f.pmax} data-stock={f.stock ? '1' : '0'} data-sale={f.sale ? '1' : '0'}
+                data-disc={f.disc} data-id={f.p.id} data-order={f.i} data-name={loc(f.p.name, lang)}>
+                <SpecimenCard product={f.p} index={f.i} lang={lang} ratio={r} d={f.i % 3} heading="h2" />
+              </div>
+            );
+          })}
+        </div>
+        <div class="none" data-none hidden>
+          <p class="none-t">{t('f.none')}</p>
+          <p class="none-d">{t('f.noneHint')}</p>
+          <button class="btn btn-solid" type="button" data-reset><span>{t('f.reset')}</span></button>
+        </div>
+
+        {/* ---------- Phones: the same filters, stacked in a sheet ---------- */}
+        <dialog class="sheet" data-sheet aria-labelledby="f-title">
+          <div class="sh-head">
+            <h2 id="f-title" class="sh-title">{t('f.filters')}</h2>
+            <button class="x" type="button" data-sheet-close aria-label={t('nav.close')}><Icon name="close" size={22} /></button>
+          </div>
+          <div class="sh-body">
+            {sheetSeq.map((g) => (g === 'price' ? (
+              <fieldset class="grp" data-ctl>
+                <legend>{t('f.price')}</legend>
+                <div class="price">
+                  <p class="price-out num"><span data-plo>₾ {priceFmt(priceLo)}</span><span aria-hidden="true">—</span><span data-phi>₾ {priceFmt(priceHi)}</span></p>
+                  <div class="range" data-range>
+                    <input type="range" name="pmin" min={priceLo} max={priceHi} step={STEP} value={priceLo} aria-label={t('f.priceMin')} />
+                    <input type="range" name="pmax" min={priceLo} max={priceHi} step={STEP} value={priceHi} aria-label={t('f.priceMax')} />
+                  </div>
+                  <p class="range-ends num" aria-hidden="true"><span>₾ {priceFmt(priceLo)}</span><span>₾ {priceFmt(priceHi)}</span></p>
+                </div>
+              </fieldset>
+            ) : (
+              <fieldset class="grp" data-ctl>
+                <legend>{g.label}{g.note && <span class="legend-note">{g.note}</span>}</legend>
+                <div class="opts">
+                  {g.options.map((o) => (
+                    <label class="opt"><input type="checkbox" name={g.key} value={o.value} /><span class="box" aria-hidden="true"></span><span class="opt-t">{o.label}{o.hint && <small>{o.hint}</small>}</span><span class="opt-n num" data-n></span></label>
+                  ))}
+                </div>
+              </fieldset>
+            )))}
+            {(anyOut || anySale) && (
+              <fieldset class="grp" data-ctl>
+                <legend>{t('f.avail')}</legend>
+                {anyOut && <label class="sw"><input type="checkbox" name="stock" value="1" /><span class="track" aria-hidden="true"></span><span>{t('f.inStock')}</span></label>}
+                {anySale && <label class="sw"><input type="checkbox" name="sale" value="1" /><span class="track" aria-hidden="true"></span><span>{t('f.onSale')}</span></label>}
+              </fieldset>
+            )}
+          </div>
+          <div class="sh-foot">
+            <button class="btn btn-line" type="button" data-reset><span>{t('f.resetShort')}</span></button>
+            <button class="btn btn-solid" type="button" data-sheet-done><span data-show></span></button>
+          </div>
+        </dialog>
+      </>
     )}
   </section>
 </Base>
 
 <style>
-  .intro { padding-block: var(--s-5) var(--s-3); }
-  .filter { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-top: var(--s-2); }
-  .filter button {
-    display: inline-flex; align-items: center; gap: 0.6rem; padding: 0.7rem 1.1rem; cursor: pointer;
-    background: none; border: 1px solid var(--line); border-radius: 999px; color: var(--ink-2); font-size: var(--t-sm);
-    transition: border-color 200ms ease, color 200ms ease, transform 160ms var(--ease-out);
-  }
-  .filter button:active { transform: scale(0.97); }
-  .filter .notch { width: 0.5rem; height: 0.5rem; border: 1px solid var(--ink-3); transform: rotate(45deg); transition: background-color 200ms ease, border-color 200ms ease; }
-  .filter .n { color: var(--ink-3); font-size: var(--t-xs); }
-  .filter button[aria-pressed='true'] { color: var(--ink); border-color: var(--ink-2); }
-  .filter button[aria-pressed='true'] .notch { background: var(--accent); border-color: var(--accent); }
-  @media (hover: hover) and (pointer: fine) { .filter button:hover { color: var(--ink); border-color: var(--ink-3); } }
+  .intro { padding-block: var(--s-5) var(--s-3); grid-template-columns: minmax(0, 1fr); }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  [hidden] { display: none !important; }
+
+  .notch { flex: none; width: 0.5rem; height: 0.5rem; border: 1px solid var(--ink-3); transform: rotate(45deg); transition: background-color 200ms ease, border-color 200ms ease; }
+
   .catalogue { padding-bottom: var(--s-6); }
-  /* Justified rows: every picture in a row shares one height and its width follows its shape
-     (flex-grow and flex-basis ∝ aspect ratio). max-width ∝ ratio too, so a short last row keeps
-     the same height instead of ballooning. Rows are centred. */
+
+  /* ---------- The bar: pinned under the header, between two hairlines ---------- */
+  .bar {
+    position: sticky; top: var(--header-h); z-index: 20;
+    display: flex; align-items: flex-start; gap: 0.75rem;
+    margin-inline: calc(-1 * var(--margin)); padding: 0.7rem var(--margin);
+    background: color-mix(in oklab, var(--ground) 94%, transparent);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    border-block: 1px solid var(--line);
+  }
+  .pills { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; min-width: 0; flex: 1; }
+  .pill-wrap { display: contents; }
+  .pill {
+    position: relative; display: inline-flex; align-items: center; gap: 0.5rem; min-height: 2.75rem; padding: 0 0.95rem 0 1.05rem; cursor: pointer;
+    background: none; color: var(--ink); border: 1px solid var(--line); border-radius: 999px; font: inherit; font-size: var(--t-sm); white-space: nowrap;
+    transition: border-color 200ms ease, background-color 200ms ease, transform 160ms var(--ease-out);
+  }
+  .pill:active { transform: scale(0.97); }
+  .pill :global(svg) { color: var(--ink-3); transition: transform 240ms var(--ease-out); }
+  .pill[aria-expanded='true'] :global(svg) { transform: rotate(180deg); }
+  .pill-k { color: var(--ink-2); }
+  /* Applied: the pill fills with oak paper and states its value. */
+  .pill.is-on { background: var(--ground-2); border-color: var(--ink-2); }
+  .pill.is-on .pill-k { color: var(--ink); }
+  .pill-v { font-weight: 600; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; }
+  .pill[aria-expanded='true'] { border-color: var(--ink-2); }
+  @media (hover: hover) and (pointer: fine) { .pill:hover { border-color: var(--ink-3); } .pill.is-on:hover, .pill[aria-expanded='true']:hover { border-color: var(--ink); } }
+  /* Toggles: the same notch as the type chips. */
+  .toggle { gap: 0.6rem; padding-inline: 1rem; color: var(--ink-2); }
+  .toggle input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+  .toggle:has(input:checked) { color: var(--ink); background: var(--ground-2); border-color: var(--ink-2); }
+  .toggle:has(input:checked) .notch { background: var(--accent); border-color: var(--accent); }
+  .toggle:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .sort { flex: none; margin-left: auto; }
+  .pill:focus-visible, .f-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .sort-btn { font-weight: 600; }
+  .sort-btn .sort-ico { color: var(--ink-3); }
+  .sort-v { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Sort list: one choice, marked with the same notch as every other selection. */
+  .pop-sort { min-width: 17rem; padding-block: 0.4rem; }
+  .pop-title { padding: 0.55rem 1.15rem 0.35rem; font-size: var(--t-xs); color: var(--ink-3); }
+  .sort-list { list-style: none; margin: 0; padding: 0 0.4rem; display: grid; }
+  .sort-list li {
+    display: flex; align-items: center; gap: 0.75rem; min-height: 2.75rem; padding: 0 0.75rem; border-radius: 8px; cursor: pointer;
+    font-size: var(--t-sm); color: var(--ink-2); outline: none; transition: background-color 140ms ease, color 140ms ease;
+  }
+  .sort-list li[aria-selected='true'] { color: var(--ink); font-weight: 600; }
+  .sort-list li[aria-selected='true'] .notch { background: var(--accent); border-color: var(--accent); }
+  .sort-list li:focus-visible { background: var(--ground-2); color: var(--ink); box-shadow: inset 0 0 0 2px var(--accent); }
+  @media (hover: hover) and (pointer: fine) { .sort-list li:hover { background: var(--ground-2); color: var(--ink); } }
+
+  .f-open {
+    display: none; align-items: center; justify-content: center; gap: 0.5rem; min-height: 2.75rem; padding: 0 1.05rem; cursor: pointer;
+    background: none; color: var(--ink); border: 1px solid var(--line); border-radius: 999px; font: inherit; font-size: var(--t-sm); font-weight: 600;
+    transition: transform 160ms var(--ease-out), border-color 200ms ease;
+  }
+  .f-open:active { transform: scale(0.97); }
+  .badge { min-width: 1.35rem; height: 1.35rem; padding: 0 0.35rem; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-size: var(--t-xs); display: inline-grid; place-items: center; }
+
+  /* ---------- Popovers: drop from their pill, sized to their content, never scroll ---------- */
+  .pop {
+    position: fixed; inset: auto; margin: 0; padding: 0; width: max-content; min-width: 15rem; max-width: min(36rem, calc(100vw - 2rem));
+    background: var(--ground); color: var(--ink); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: 0 1px 2px rgb(30 15 5 / 0.08), 0 24px 48px -20px rgb(40 22 10 / 0.35);
+    transform-origin: var(--origin, top left);
+    opacity: 1; transform: none;
+    transition: opacity 180ms var(--ease-out), transform 220ms var(--ease-out), overlay 220ms allow-discrete, display 220ms allow-discrete;
+  }
+  .pop:not(:popover-open) { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  @starting-style { .pop:popover-open { opacity: 0; transform: translateY(-4px) scale(0.98); } }
+  .pop .grp, .pop .price { padding: 1rem 1.15rem 0.75rem; }
+  .pop-note { font-size: var(--t-xs); color: var(--ink-3); margin-bottom: 0.4rem; }
+  .pop .cols .opts { display: grid; grid-template-columns: repeat(2, minmax(12rem, 1fr)); column-gap: 1.5rem; }
+  .pop-price { width: 21rem; }
+  .pop-foot { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.55rem 1.15rem; border-top: 1px solid var(--line); font-size: var(--t-xs); color: var(--ink-3); }
+
+  /* ---------- Options ---------- */
+  .grp { border: 0; margin: 0; padding: 0; min-width: 0; }
+  .opt { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; min-height: 2.75rem; cursor: pointer; font-size: var(--t-sm); color: var(--ink-2); transition: color 160ms ease, opacity 200ms ease; }
+  .opt input, .sw input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+  .box { width: 1.15rem; height: 1.15rem; border: 1px solid var(--ink-3); border-radius: 3px; display: grid; place-items: center; transition: background-color 160ms ease, border-color 160ms ease; }
+  .box::after { content: ''; width: 0.4rem; height: 0.4rem; transform: rotate(45deg) scale(0.4); background: var(--accent-ink); opacity: 0; transition: transform 200ms var(--ease-out), opacity 160ms ease; }
+  .opt input:checked ~ .box { background: var(--accent); border-color: var(--accent); }
+  .opt input:checked ~ .box::after { opacity: 1; transform: rotate(45deg) scale(1); }
+  .opt input:checked ~ .opt-t { color: var(--ink); font-weight: 600; }
+  .opt input:focus-visible ~ .box, .sw input:focus-visible ~ .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .opt-t small { display: block; font-size: var(--t-xs); color: var(--ink-3); font-weight: 400; }
+  .opt-n { font-size: var(--t-xs); color: var(--ink-3); }
+  .opt.is-empty { opacity: 0.4; cursor: default; }
+  @media (hover: hover) and (pointer: fine) { .opt:not(.is-empty):hover { color: var(--ink); } .opt:not(.is-empty):hover .box { border-color: var(--ink-2); } }
+
+  /* Price: two native ranges over one track; the filled part sits between the handles. */
+  .price-out { display: flex; gap: 0.6rem; font-weight: 600; font-size: var(--t-base); color: var(--ink); }
+  .range { position: relative; height: 2.75rem; }
+  .range::before, .range::after { content: ''; position: absolute; top: 50%; height: 4px; margin-top: -2px; border-radius: 4px; pointer-events: none; }
+  .range::before { left: 0; right: 0; background: var(--line); }
+  .range::after { left: var(--lo, 0%); right: calc(100% - var(--hi, 100%)); background: var(--accent); }
+  .range input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; background: none; appearance: none; -webkit-appearance: none; pointer-events: none; z-index: 1; }
+  .range input::-webkit-slider-runnable-track { background: none; height: 100%; }
+  .range input::-moz-range-track { background: none; }
+  .range input::-webkit-slider-thumb {
+    -webkit-appearance: none; pointer-events: auto; width: 1.5rem; height: 1.5rem; margin-top: calc((2.75rem - 1.5rem) / 2); border-radius: 50%; cursor: grab;
+    background: var(--ground); border: 2px solid var(--accent); box-shadow: 0 2px 6px -2px rgb(30 15 5 / 0.4); transition: transform 160ms var(--ease-out);
+  }
+  .range input::-moz-range-thumb { pointer-events: auto; width: 1.25rem; height: 1.25rem; border-radius: 50%; cursor: grab; background: var(--ground); border: 2px solid var(--accent); box-shadow: 0 2px 6px -2px rgb(30 15 5 / 0.4); }
+  .range input:active::-webkit-slider-thumb { transform: scale(1.12); cursor: grabbing; }
+  .range input:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .range input:focus-visible::-moz-range-thumb { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .range-ends { display: flex; justify-content: space-between; font-size: var(--t-xs); color: var(--ink-3); }
+
+  /* ---------- Status line ---------- */
+  /* Count left, reset pinned right, applied chips wrap in the column between: adding filters never moves the reset. */
+  .status {
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: 'count chips reset';
+    align-items: start; gap: 0.6rem 1.25rem; padding-block: 1.1rem var(--s-4);
+  }
+  .count { grid-area: count; min-height: 2.25rem; display: flex; align-items: center; white-space: nowrap; }
+  .active { grid-area: chips; }
+  .reset { grid-area: reset; min-height: 2.25rem; white-space: nowrap; }
+  @media (max-width: 620px) {
+    .status { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'count reset' 'chips chips'; }
+  }
+  .count { color: var(--ink-2); font-size: var(--t-sm); }
+  .active { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; }
+  .active ul { display: contents; list-style: none; }
+  .active :global(.chip) {
+    display: inline-flex; align-items: center; gap: 0.4rem; min-height: 2.25rem; padding: 0 0.45rem 0 0.85rem; cursor: pointer;
+    background: var(--ground-2); color: var(--ink); border: 1px solid transparent; border-radius: 999px; font: inherit; font-size: var(--t-sm);
+    transition: transform 160ms var(--ease-out), border-color 200ms ease;
+  }
+  .active :global(.chip:active) { transform: scale(0.97); }
+  .active :global(.chip-k) { color: var(--ink-3); }
+  .active :global(.chip-x) { width: 1.5rem; height: 1.5rem; display: inline-grid; place-items: center; border-radius: 50%; }
+  @media (hover: hover) and (pointer: fine) { .active :global(.chip:hover) { border-color: var(--ink-3); } .active :global(.chip:hover .chip-x) { background: var(--ground-3); } }
+  .link { background: none; border: 0; padding: 0.4rem 0; cursor: pointer; color: var(--ink); font: inherit; font-size: var(--t-sm); font-weight: 600; text-decoration: underline; text-underline-offset: 4px; text-decoration-color: color-mix(in oklab, var(--ink) 35%, transparent); }
+  .link:disabled { opacity: 0.4; cursor: default; }
+
+  /* ---------- Catalogue: full width again. Justified rows: every picture in a row shares one height and
+     its width follows its shape; short last rows keep the same height. Rows are centred. ---------- */
   .cat { --gap: calc(var(--gutter) * 1.5); container-type: inline-size; display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: var(--s-5) var(--gap); }
   .cell { flex: var(--r) 1 calc(var(--r) * 15rem); max-width: calc(var(--r) * 26rem); min-width: 0; }
-  .cell[hidden] { display: none; }
-  /* Wider screens: one shared picture height for the whole catalogue; widths follow each shape.
-     The height comes from the grid's own width so whole rows fit: 2 landscape pieces per row on
-     tablets, 3 on larger screens (portrait pieces are narrower, so their rows hold more). */
   @media (min-width: 621px) {
     .cell { --h: calc((100cqw - var(--gap) - 1px) / (2 * 1.3333)); flex: 0 0 calc(var(--r) * var(--h)); max-width: none; }
   }
@@ -81,46 +407,357 @@ const { products } = await loadData();
     .cat { gap: var(--s-4) 0.9rem; }
     .cell { flex-basis: calc(var(--r) * 7.5rem); max-width: calc(var(--r) * 15rem); }
   }
+  .none { display: grid; justify-items: center; gap: 0.6rem; text-align: center; padding: var(--s-5) var(--s-2); border: 1px dashed var(--line); border-radius: 14px; }
+  .none-t { font-family: var(--f-display); font-size: var(--t-xl); color: var(--ink); }
+  .none-d { color: var(--ink-2); margin-bottom: 0.5rem; }
+
+  /* ---------- Tablets and phones: "Filters" + sort, half each; the sheet holds every group ---------- */
+  @media (max-width: 1023px) {
+    .pills { display: none; }
+    .f-open { display: inline-flex; flex: 1 1 0; }
+    .sort { flex: 1 1 0; min-width: 0; margin: 0; display: flex; }
+    .sort-btn { width: 100%; min-width: 0; justify-content: center; }
+    .status { padding-block: 0.9rem var(--s-3); }
+  }
+  @media (min-width: 621px) and (max-width: 1023px) {
+    .f-open, .sort { flex: 0 1 16rem; }
+    .sort { margin-left: auto; }
+  }
+  .sheet {
+    margin: 0 0 0 auto; height: 100dvh; max-height: none; width: min(26rem, 100vw); max-width: 100vw;
+    border: 0; border-left: 1px solid var(--line); padding: 0; background: var(--ground); color: var(--ink);
+    display: none; grid-template-rows: auto minmax(0, 1fr) auto;
+    transform: none; transition: transform 460ms var(--ease-drawer), overlay 460ms allow-discrete, display 460ms allow-discrete;
+  }
+  .sheet[open] { display: grid; }
+  .sheet:not([open]) { transform: translateX(100%); }
+  @starting-style { .sheet[open] { transform: translateX(100%); } }
+  .sheet::backdrop { background: rgb(0 0 0 / 0.5); opacity: 1; transition: opacity 400ms ease, overlay 400ms allow-discrete, display 400ms allow-discrete; }
+  .sheet:not([open])::backdrop { opacity: 0; }
+  @starting-style { .sheet[open]::backdrop { opacity: 0; } }
+  .sh-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem clamp(1.25rem, 5vw, 1.75rem); border-bottom: 1px solid var(--line); }
+  .sh-title { font-family: var(--f-display); font-size: var(--t-xl); font-weight: 500; }
+  .sh-body { overflow-y: auto; overscroll-behavior: contain; padding: var(--s-3) clamp(1.25rem, 5vw, 1.75rem); display: grid; gap: var(--s-3); align-content: start; }
+  .sh-body legend { padding: 0; margin-bottom: 0.4rem; font-family: var(--f-display); font-size: var(--t-base); font-weight: 500; color: var(--ink); }
+  .legend-note { display: block; margin-top: 0.1rem; font-family: var(--f-text); font-size: var(--t-xs); color: var(--ink-3); font-weight: 400; }
+  .sh-foot { display: grid; grid-template-columns: auto 1fr; gap: 0.75rem; padding: 0.9rem clamp(1.25rem, 5vw, 1.75rem) calc(0.9rem + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--ground); }
+  .sh-foot .btn { --h: 3.1rem; padding-inline: 1.2rem; }
+  .sw { position: relative; display: flex; align-items: center; gap: 0.75rem; min-height: 2.75rem; cursor: pointer; font-size: var(--t-sm); color: var(--ink-2); }
+  .sw .track { flex: none; position: relative; width: 2.5rem; height: 1.45rem; border-radius: 999px; background: var(--line); transition: background-color 200ms ease; }
+  .sw .track::after { content: ''; position: absolute; top: 3px; left: 3px; width: calc(1.45rem - 6px); height: calc(1.45rem - 6px); border-radius: 50%; background: var(--ground); box-shadow: 0 1px 3px rgb(0 0 0 / 0.25); transition: transform 240ms var(--ease-out); }
+  .sw input:checked ~ .track { background: var(--accent); }
+  .sw input:checked ~ .track::after { transform: translateX(1.05rem); }
+  .sw input:checked ~ span:last-child { color: var(--ink); font-weight: 600; }
+  .x { width: 2.75rem; height: 2.75rem; display: inline-flex; align-items: center; justify-content: center; background: none; color: var(--ink); border: 1px solid var(--line); border-radius: 50%; cursor: pointer; transition: transform 160ms var(--ease-out), border-color 200ms ease; }
+  .x:active { transform: scale(0.94); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pop { transition: opacity 150ms ease, overlay 150ms allow-discrete, display 150ms allow-discrete; }
+    .pop:not(:popover-open) { transform: none; }
+    @starting-style { .pop:popover-open { transform: none; } }
+    .sheet { transition: opacity 200ms ease, overlay 200ms allow-discrete, display 200ms allow-discrete; }
+    .sheet:not([open]) { transform: none; opacity: 0; }
+    @starting-style { .sheet[open] { transform: none; opacity: 0; } }
+    .box::after, .sw .track::after, .pill :global(svg) { transition: none; }
+  }
 </style>
 
 <script>
-  const bar = document.querySelector<HTMLElement>('[data-filter]');
-  const cat = document.querySelector<HTMLElement>('[data-cat]');
-  if (bar && cat) {
-    const cells = [...cat.querySelectorAll<HTMLElement>('.cell')];
+  const shop = document.querySelector<HTMLElement>('[data-shop]');
+  const cat = shop?.querySelector<HTMLElement>('[data-cat]');
+  if (shop && cat) {
+    type Group = 'type' | 'dim' | 'mat' | 'size';
+    const $ = <T extends Element = HTMLElement>(s: string, root: ParentNode = shop) => root.querySelector<T>(s);
+    const $$ = <T extends Element = HTMLElement>(s: string, root: ParentNode = shop) => [...root.querySelectorAll<T>(s)];
+    const lang = shop.dataset.lang || 'ka';
+    const text = JSON.parse(shop.dataset.text || '{}');
+    const LO = Number(shop.dataset.lo), HI = Number(shop.dataset.hi);
+    const sheet = $<HTMLDialogElement>('[data-sheet]')!;
+    const sortBtn = $<HTMLButtonElement>('[data-pill="sort"]')!;
+    const sortPop = $<HTMLElement>('#fp-sort')!;
+    const sortOpts = $$<HTMLElement>('[data-sort-list] [data-sort]');
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const apply = (f: string, animate = false) => {
+    const gel = (n: number) => `₾ ${new Intl.NumberFormat('en-US').format(n).replace(/,/g, ' ')}`;
+
+    const cells = $$<HTMLElement>('.cell', cat).map((el) => ({
+      el,
+      type: el.dataset.type!, dim: el.dataset.dim!, mat: el.dataset.mat!, sizes: (el.dataset.sizes || '').split(' '),
+      pmin: Number(el.dataset.pmin), pmax: Number(el.dataset.pmax), stock: el.dataset.stock === '1', sale: el.dataset.sale === '1',
+      disc: Number(el.dataset.disc), id: Number(el.dataset.id), order: Number(el.dataset.order), name: el.dataset.name || '',
+    }));
+    type Cell = (typeof cells)[number];
+
+    /* ---------- State (mirrors the URL) ---------- */
+    const state = { type: new Set<string>(), dim: new Set<string>(), mat: new Set<string>(), size: new Set<string>(), lo: LO, hi: HI, stock: false, sale: false, sort: 'rec' };
+    const read = () => {
+      const q = new URLSearchParams(location.search);
+      const list = (k: string) => new Set((q.get(k) || '').split(',').filter(Boolean));
+      state.type = list('type');
+      state.dim = list('dim'); state.mat = list('mat'); state.size = list('size');
+      state.lo = Math.max(LO, Math.min(HI, Number(q.get('pmin')) || LO));
+      state.hi = Math.max(state.lo, Math.min(HI, Number(q.get('pmax')) || HI));
+      state.stock = q.get('stock') === '1'; state.sale = q.get('sale') === '1';
+      state.sort = sortOpts.some((o) => o.dataset.sort === q.get('sort')) ? q.get('sort')! : 'rec';
+    };
+    const write = () => {
+      const url = new URL(location.href);
+      const q = url.searchParams;
+      const set = (k: string, v: string | null) => (v ? q.set(k, v) : q.delete(k));
+      set('type', [...state.type].join(',') || null);
+      set('dim', [...state.dim].join(',') || null); set('mat', [...state.mat].join(',') || null); set('size', [...state.size].join(',') || null);
+      set('pmin', state.lo > LO ? String(state.lo) : null); set('pmax', state.hi < HI ? String(state.hi) : null);
+      set('stock', state.stock ? '1' : null); set('sale', state.sale ? '1' : null); set('sort', state.sort !== 'rec' ? state.sort : null);
+      history.replaceState(null, '', url);
+    };
+    const priceOn = () => state.lo > LO || state.hi < HI;
+    const activeCount = () =>
+      state.type.size + state.dim.size + state.mat.size + state.size.size + (priceOn() ? 1 : 0) + (state.stock ? 1 : 0) + (state.sale ? 1 : 0);
+
+    /* ---------- Matching (skip one group to count its options faceted) ---------- */
+    const matches = (c: Cell, skip?: string) =>
+      (skip === 'type' || !state.type.size || state.type.has(c.type)) &&
+      (skip === 'dim' || !state.dim.size || state.dim.has(c.dim)) &&
+      (skip === 'mat' || !state.mat.size || state.mat.has(c.mat)) &&
+      (skip === 'size' || !state.size.size || c.sizes.some((s) => state.size.has(s))) &&
+      (c.pmax >= state.lo && c.pmin <= state.hi) &&
+      (!state.stock || c.stock) && (!state.sale || c.sale);
+
+    const sorters: Record<string, (a: Cell, b: Cell) => number> = {
+      rec: (a, b) => a.order - b.order,
+      priceAsc: (a, b) => a.pmin - b.pmin || a.order - b.order,
+      priceDesc: (a, b) => b.pmin - a.pmin || a.order - b.order,
+      newest: (a, b) => b.id - a.id,
+      discount: (a, b) => b.disc - a.disc || a.pmin - b.pmin,
+      name: (a, b) => a.name.localeCompare(b.name, lang),
+    };
+    const resultsText = (n: number) => (n === 1 ? text.results1 : text.results).replace('{n}', String(n));
+
+    /* ---------- Controls exist twice (bar and phone sheet); both always show the same state ---------- */
+    const syncControls = () => {
+      $$<HTMLInputElement>('[data-ctl] input[type=checkbox]').forEach((i) => {
+        i.checked = i.name === 'stock' ? state.stock : i.name === 'sale' ? state.sale : state[i.name as Group].has(i.value);
+      });
+      $$<HTMLInputElement>('input[name=pmin]').forEach((i) => (i.value = String(state.lo)));
+      $$<HTMLInputElement>('input[name=pmax]').forEach((i) => (i.value = String(state.hi)));
+      sortOpts.forEach((o) => o.setAttribute('aria-selected', String(o.dataset.sort === state.sort)));
+      $('[data-sort-label]')!.textContent = sortOpts.find((o) => o.dataset.sort === state.sort)?.textContent?.trim() ?? '';
+      paintRange();
+    };
+    const paintRange = () => {
+      const pct = (v: number) => `${((v - LO) / (HI - LO || 1)) * 100}%`;
+      $$('[data-range]').forEach((r) => { r.style.setProperty('--lo', pct(state.lo)); r.style.setProperty('--hi', pct(state.hi)); });
+      $$('[data-plo]').forEach((e) => (e.textContent = gel(state.lo)));
+      $$('[data-phi]').forEach((e) => (e.textContent = gel(state.hi)));
+    };
+
+    /* ---------- Render ---------- */
+    const render = (animate = true) => {
+      const visible = cells.filter((c) => matches(c));
+      const shown = new Set(visible);
+      const sorted = [...cells].sort(sorters[state.sort] || sorters.rec);
+      cat.append(...sorted.map((c) => c.el));
       let k = 0;
-      bar.querySelectorAll<HTMLButtonElement>('[data-f]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.f === f)));
-      for (const c of cells) {
-        c.hidden = !(f === 'all' || c.dataset.type === f);
-        c.querySelector('.spec')?.classList.add('is-in');
-        // The cards that remain settle into their new places, a few at a time.
-        if (animate && !c.hidden) {
-          c.getAnimations().forEach((a) => a.cancel());
-          c.animate(
-            reduce
-              ? [{ opacity: 0 }, { opacity: 1 }]
-              : [{ opacity: 0, transform: 'translateY(10px) scale(0.98)' }, { opacity: 1, transform: 'none' }],
+      for (const c of sorted) {
+        const on = shown.has(c);
+        c.el.hidden = !on;
+        c.el.querySelector('.spec')?.classList.add('is-in');
+        if (animate && on) {
+          c.el.getAnimations().forEach((a) => a.cancel());
+          c.el.animate(
+            reduce ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, transform: 'translateY(10px) scale(0.98)' }, { opacity: 1, transform: 'none' }],
             { duration: reduce ? 200 : 320, delay: Math.min(k++, 8) * 35, easing: 'cubic-bezier(0.23, 1, 0.32, 1)', fill: 'backwards' },
           );
         }
       }
-      const url = new URL(location.href);
-      if (f === 'all') url.searchParams.delete('type');
-      else url.searchParams.set('type', f);
-      history.replaceState(null, '', url);
+
+      // Faceted counts: how many results each option would give with the other filters as they are.
+      $$<HTMLInputElement>('.opt input').forEach((i) => {
+        const g = i.name as Group;
+        const n = cells.filter((c) => matches(c, g) && (g === 'size' ? c.sizes.includes(i.value) : (c as any)[g] === i.value)).length;
+        const opt = i.closest('.opt')!;
+        opt.querySelector('[data-n]')!.textContent = String(n);
+        opt.classList.toggle('is-empty', n === 0 && !i.checked);
+        i.disabled = n === 0 && !i.checked;
+      });
+
+      // Pills say what they hold: one value by name, several by count, price as a range.
+      $$<HTMLButtonElement>('[data-pill]').forEach((p) => {
+        const g = p.dataset.pill!;
+        if (g === 'sort') return;
+        const v = p.querySelector<HTMLElement>('[data-pill-v]')!;
+        let val = '';
+        if (g === 'price') val = priceOn() ? `${gel(state.lo)} – ${gel(state.hi)}` : '';
+        else {
+          const set = state[g as Group];
+          val = set.size === 1 ? text.labels[g][[...set][0]] ?? '' : set.size > 1 ? String(set.size) : '';
+        }
+        v.textContent = val;
+        v.hidden = !val;
+        p.classList.toggle('is-on', !!val);
+      });
+
+      const active = activeCount();
+      $('[data-count]')!.textContent = resultsText(visible.length);
+      $$('[data-live]').forEach((e) => (e.textContent = resultsText(visible.length)));
+      const badge = $('[data-badge]')!;
+      badge.hidden = active === 0;
+      badge.textContent = String(active);
+      $('[data-none]')!.hidden = visible.length > 0;
+      cat.hidden = visible.length === 0;
+      $('[data-show]')!.textContent = text.show.replace('{n}', String(visible.length));
+      $$<HTMLButtonElement>('[data-reset]').forEach((b) => (b.disabled = active === 0 && state.sort === 'rec'));
+      $$<HTMLButtonElement>('[data-clear]').forEach((b) => {
+        const g = b.dataset.clear!;
+        b.disabled = g === 'price' ? !priceOn() : !state[g as Group].size;
+      });
+      renderChips(active);
+      write();
     };
+
+    const renderChips = (active: number) => {
+      const chips: { k: string; v: string; drop: () => void }[] = [];
+      for (const g of ['type', 'dim', 'mat', 'size'] as Group[]) {
+        for (const v of state[g]) chips.push({ k: text[g], v: text.labels[g]?.[v] ?? v, drop: () => state[g].delete(v) });
+      }
+      if (priceOn()) chips.push({ k: text.price, v: `${gel(state.lo)} – ${gel(state.hi)}`, drop: () => { state.lo = LO; state.hi = HI; } });
+      if (state.stock) chips.push({ k: '', v: text.stock, drop: () => (state.stock = false) });
+      if (state.sale) chips.push({ k: '', v: text.sale, drop: () => (state.sale = false) });
+      $('[data-active]')!.hidden = active === 0;
+      $('[data-chips]')!.replaceChildren(...chips.map((c) => {
+        const li = document.createElement('li');
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'chip';
+        b.setAttribute('aria-label', `${text.remove}: ${c.k ? c.k + ' — ' : ''}${c.v}`);
+        b.innerHTML = `${c.k ? '<span class="chip-k"></span>' : ''}<span class="chip-v"></span><span class="chip-x" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></span>`;
+        if (c.k) b.querySelector('.chip-k')!.textContent = `${c.k}:`;
+        b.querySelector('.chip-v')!.textContent = c.v;
+        b.addEventListener('click', () => { c.drop(); syncControls(); render(); });
+        li.append(b);
+        return li;
+      }));
+    };
+
+    /* ---------- Inputs ---------- */
+    shop.addEventListener('change', (e) => {
+      const i = e.target as HTMLInputElement;
+      if (i.type !== 'checkbox' || !i.closest('[data-ctl]')) return;
+      if (i.name === 'stock') state.stock = i.checked;
+      else if (i.name === 'sale') state.sale = i.checked;
+      else { const g = state[i.name as Group]; i.checked ? g.add(i.value) : g.delete(i.value); }
+      syncControls();
+      render();
+    });
+    // Price: the readout follows the handle live; results update when it is let go.
+    $$<HTMLElement>('[data-range]').forEach((r) => {
+      const lo = r.querySelector<HTMLInputElement>('[name=pmin]')!, hi = r.querySelector<HTMLInputElement>('[name=pmax]')!;
+      const move = (commit: boolean, from: HTMLInputElement) => {
+        let a = Number(lo.value), b = Number(hi.value);
+        if (a > b) { if (from === lo) a = b; else b = a; }
+        state.lo = a; state.hi = b;
+        lo.value = String(a); hi.value = String(b);
+        // Keep the min handle on top when both sit at the right end, so they can always be pulled apart.
+        lo.style.zIndex = a >= HI - (HI - LO) * 0.05 ? '2' : '1';
+        paintRange();
+        if (commit) { syncControls(); render(); }
+      };
+      for (const el of [lo, hi]) {
+        el.addEventListener('input', () => move(false, el));
+        el.addEventListener('change', () => move(true, el));
+      }
+    });
+    // Custom sort list: click or keyboard (arrows, Home/End, Enter/Space, Escape via the popover).
+    const choose = (k: string) => {
+      sortPop.hidePopover();
+      requestAnimationFrame(() => sortBtn.focus({ preventScroll: true }));
+      if (k === state.sort) return;
+      state.sort = k;
+      syncControls();
+      render();
+    };
+    sortOpts.forEach((o) => o.addEventListener('click', () => choose(o.dataset.sort!)));
+    sortPop.addEventListener('keydown', (e) => {
+      const cur = sortOpts.indexOf(document.activeElement as HTMLElement);
+      // Without focus inside the list yet, arrows start from the current choice.
+      const i = cur >= 0 ? cur : sortOpts.findIndex((o) => o.dataset.sort === state.sort);
+      const go = (n: number) => { e.preventDefault(); sortOpts[(n + sortOpts.length) % sortOpts.length].focus(); };
+      if (e.key === 'ArrowDown') go(i + 1);
+      else if (e.key === 'ArrowUp') go(i - 1);
+      else if (e.key === 'Home') go(0);
+      else if (e.key === 'End') go(sortOpts.length - 1);
+      else if ((e.key === 'Enter' || e.key === ' ') && cur >= 0) { e.preventDefault(); choose(sortOpts[cur].dataset.sort!); }
+    });
+    // Opening the list puts focus on the current choice, so arrows start from there.
+    sortPop.addEventListener('toggle', (e: any) => {
+      if (e.newState === 'open') requestAnimationFrame(() => (sortOpts.find((o) => o.dataset.sort === state.sort) ?? sortOpts[0])?.focus({ preventScroll: true }));
+    });
+    sortBtn.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); sortPop.showPopover(); }
+    });
+    $$<HTMLButtonElement>('[data-clear]').forEach((b) => b.addEventListener('click', () => {
+      const g = b.dataset.clear!;
+      if (g === 'price') { state.lo = LO; state.hi = HI; } else state[g as Group].clear();
+      syncControls();
+      render();
+    }));
+    const reset = () => {
+      state.type.clear(); state.dim.clear(); state.mat.clear(); state.size.clear();
+      state.lo = LO; state.hi = HI; state.stock = false; state.sale = false; state.sort = 'rec';
+      syncControls();
+      render();
+    };
+    $$<HTMLButtonElement>('[data-reset]').forEach((b) => b.addEventListener('click', reset));
+
+    /* ---------- Popovers: anchored under their pill, kept on screen ---------- */
+    const pops = $$<HTMLElement>('[data-pop]');
+    const place = (pop: HTMLElement) => {
+      const vw = document.documentElement.clientWidth;
+      const pill = $<HTMLElement>(`[data-pill="${pop.dataset.pop}"]`)!;
+      const r = pill.getBoundingClientRect();
+      const end = pop.dataset.align === 'end';
+      pop.style.top = `${Math.round(r.bottom + 8)}px`;
+      // No width is known before the popover opens, so anchor one edge and cap the width to the room on that side.
+      if (end) {
+        pop.style.left = 'auto';
+        pop.style.right = `${Math.round(Math.max(12, vw - r.right))}px`;
+        pop.style.maxWidth = `${Math.round(Math.min(r.right, vw) - 12)}px`;
+        pop.style.minWidth = `${Math.round(Math.min(r.width, vw - 24))}px`;
+        pop.style.setProperty('--origin', 'top right');
+      } else {
+        const left = Math.max(12, Math.min(r.left, vw - 252));
+        pop.style.right = 'auto';
+        pop.style.left = `${Math.round(left)}px`;
+        pop.style.maxWidth = `${Math.round(vw - left - 12)}px`;
+        pop.style.setProperty('--origin', 'top left');
+      }
+    };
+    for (const pop of pops) {
+      pop.addEventListener('beforetoggle', (e: any) => { if (e.newState === 'open') place(pop); });
+      pop.addEventListener('toggle', (e: any) => {
+        $(`[data-pill="${pop.dataset.pop}"]`)?.setAttribute('aria-expanded', String(e.newState === 'open'));
+      });
+    }
+    const reposition = () => pops.forEach((p) => { if (p.matches(':popover-open')) place(p); });
+    addEventListener('scroll', reposition, { passive: true });
+    addEventListener('resize', reposition, { passive: true });
+
+    /* ---------- Phone sheet ---------- */
+    const opener = $<HTMLButtonElement>('[data-f-open]')!;
+    opener.addEventListener('click', () => sheet.showModal());
+    sheet.addEventListener('close', () => opener.focus({ preventScroll: true }));
+    $('[data-sheet-close]')!.addEventListener('click', () => sheet.close());
+    $('[data-sheet-done]')!.addEventListener('click', () => { sheet.close(); shop.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }); });
+    sheet.addEventListener('click', (e) => { if (e.target === sheet) sheet.close(); });
+    matchMedia('(min-width: 1024px)').addEventListener('change', (m) => { if (m.matches && sheet.open) sheet.close(); });
+
     // Opening a product remembers where the visitor was in the catalogue (restored in Base.astro).
     cat.addEventListener('click', (e) => {
       if (!(e.target as HTMLElement).closest('a[href]')) return;
       try { sessionStorage.setItem('symmetry:catalogue', JSON.stringify({ url: location.pathname + location.search, y: scrollY, t: Date.now() })); } catch {}
     });
-    bar.addEventListener('click', (e) => {
-      const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-f]');
-      if (b && b.getAttribute('aria-pressed') !== 'true') apply(b.dataset.f!, true);
-    });
-    const initial = new URLSearchParams(location.search).get('type');
-    if (initial === 'portrait' || initial === 'landscape' || initial === 'shelf' || initial === 'wall') apply(initial);
+
+    read();
+    syncControls();
+    render(false);
   }
 </script>

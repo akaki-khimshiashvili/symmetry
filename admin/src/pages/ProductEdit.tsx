@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { api, ApiError, type Product, type Size, type L10n, type OptionSet, PRODUCT_TYPES, typeOf, type ProductType, SITE_URL, fmtPrice, FEATURED_MAX } from '../api';
+import { api, ApiError, type Product, type Size, type L10n, type OptionSet, PRODUCT_TYPES, typeOf, type ProductType, DIMENSIONS, SITE_URL, fmtPrice, FEATURED_MAX } from '../api';
 import { Icon, Loading, toast, confirmAction } from '../ui';
 import { OptionSelect, SizeSelect } from '../options';
 import { CropDialog } from '../crop';
@@ -11,7 +11,7 @@ const fmtDuration = (min: number) => {
 
 const blankL = (): L10n => ({ ka: '', en: '' });
 const blank = (): Product => ({
-  slug: '', pattern: 'wave', orientation: 'landscape', category: 'panel', featured: false, in_stock: true, sale: { ends_at: '' }, published: true, sort: 0,
+  slug: '', pattern: 'wave', orientation: 'landscape', category: 'panel', dimension: 'landscape', featured: false, in_stock: true, sale: { ends_at: '' }, published: true, sort: 0,
   name: blankL(), short: blankL(), description: blankL(), material: blankL(),
   delivery_days: { min: 14, max: 21 }, installation_minutes: 240,
   sizes: [{ width: 120, height: 80, price: 0, sale_percent: 0 }], images: [],
@@ -252,6 +252,19 @@ export function ProductEdit({ id }: { id: string }) {
                 <span class="muted small">ფოტოს ფორმატს (ვერტიკალური 3:4 თუ ჰორიზონტალური 4:3) ატვირთვისას, კადრირების ფანჯარაში აირჩევთ.</span>
               )}
               {(errors.category || errors.orientation) && <span class="err">{errors.category || errors.orientation}</span>}
+            </fieldset>
+            <fieldset class="seg-field">
+              <legend>პროდუქტის განზომილება</legend>
+              <div class="seg type-seg dim-seg">
+                {DIMENSIONS.map((d) => (
+                  <label key={d.key} class={p.dimension === d.key ? 'on' : ''}>
+                    <input type="radio" name="pdim" value={d.key} checked={p.dimension === d.key} onChange={() => set('dimension', d.key)} />
+                    <span class={`type-ico ${d.key}`} aria-hidden="true" />
+                    <span class="type-txt"><b>{d.label}</b><small>{d.hint}</small></span>
+                  </label>
+                ))}
+              </div>
+              {errors.dimension && <span class="err">{errors.dimension}</span>}
             </fieldset>
             <Bilingual label="დასახელება" field="name" value={p.name} onChange={(v) => set('name', v)} errors={errors} />
             <Bilingual label="მოკლე აღწერა" hint="ჩანს კატალოგში" field="short" value={p.short} onChange={(v) => set('short', v)} errors={errors} />

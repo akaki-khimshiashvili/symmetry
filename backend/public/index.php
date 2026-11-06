@@ -24,6 +24,7 @@ require __DIR__ . '/../src/Flitt.php';
 require __DIR__ . '/../src/Receipts.php';
 require __DIR__ . '/../src/Mailer.php';
 require __DIR__ . '/../src/Metrics.php';
+require __DIR__ . '/../src/Invoices.php';
 
 Http::cors($config['allowed_origins'], $config['allow_local_origins']);
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -40,8 +41,8 @@ if ($route === null) {
 const SETTING_KEYS = [
     'phone', 'whatsapp', 'email', 'instagram', 'facebook', 'tiktok',
     'address_ka', 'address_en', 'hours_ka', 'hours_en', 'default_palette',
-    // Seller details printed on receipts.
-    'legal_name', 'tax_id',
+    // Seller details printed on receipts and invoices; bank details for invoices.
+    'legal_name', 'tax_id', 'bank_name', 'bank_swift', 'iban',
 ];
 
 try {
@@ -57,6 +58,13 @@ try {
             throw new HttpError(404, 'შეკვეთა ვერ მოიძებნა');
         }
         return $o;
+    };
+    $invoiceOr404 = function (string $id) use ($pdo): array {
+        $inv = Invoices::row($pdo, (int) $id);
+        if (!$inv) {
+            throw new HttpError(404, 'ინვოისი ვერ მოიძებნა');
+        }
+        return $inv;
     };
     $tokenOr404 = function (string $token) use ($pdo): array {
         $o = Payments::byToken($pdo, $token);
@@ -533,6 +541,83 @@ try {
                 throw new HttpError(409, 'შეკვეთას აქვს დაბლოკილი ან გადახდილი თანხა — ჯერ უარყავით ან დააბრუნეთ თანხა');
             }
             $pdo->prepare('DELETE FROM orders WHERE id = ?')->execute([(int) $id]);
+            return ['ok' => true];
+        }],
+
+        // ---------- Invoices (bank-transfer payment requests; not rs.ge tax invoices) ----------
+        ['GET', '#^/admin/invoices$#', function () use ($pdo, $admin) {
+            $admin();
+            return Invoices::all($pdo);
+        }],
+        ['GET', '#^/admin/invoices/(\d+)$#', function ($id) use ($pdo, $admin, $invoiceOr404) {
+            $admin();
+            return Invoices::view($pdo, $invoiceOr404($id));
+        }],
+        // A blank invoice for the editor: today's date, current seller details, optionally filled from an order.
+        ['GET', '#^/admin/invoices/blank$#', function () use ($pdo, $admin) {
+            $admin();
+            $today = Invoices::today();
+            $due = (new DateTimeImmutable($today))->modify('+5 days')->format('Y-m-d');
+            $blank = [
+                'id' => null, 'number' => null, 'status' => 'draft', 'lang' => 'ka', 'order_id' => null,
+                'issue_date' => $today, 'due_date' => $due,
+                'client_name' => '', 'client_tax_id' => '', 'client_address' => '', 'client_phone' => '', 'client_email' => '',
+                'items' => [['description' => '', 'qty' => 1, 'unit' => 'ც', 'price' => 0]],
+                'vat' => false, 'notes' => '', 'seller' => Invoices::seller($pdo),
+            ];
+            $o = isset($_GET['order']) ? Payments::byId($pdo, (int) $_GET['order']) : null;
+            if ($o) {
+                $blank['order_id'] = (int) $o['id'];
+                $blank['lang'] = $o['lang'] === 'en' ? 'en' : 'ka';
+                $blank['client_name'] = trim($o['first_name'] . ' ' . $o['last_name']);
+                $blank['client_phone'] = $o['phone'];
+                $blank['client_email'] = $o['email'];
+                $name = trim($o['product_name'] . ' · ' . $o['size_label'], ' ·');
+                $blank['items'] = [['description' => $name, 'qty' => 1, 'unit' => $blank['lang'] === 'en' ? 'pc' : 'ც', 'price' => (float) $o['price']]];
+            }
+            return $blank;
+        }],
+        ['POST', '#^/admin/invoices$#', function () use ($pdo, $admin) {
+            $admin();
+            $b = Http::body();
+            if ($errors = Invoices::validate($b)) {
+                throw new HttpError(422, 'შეამოწმეთ ველები', $errors);
+            }
+            return Invoices::view($pdo, Invoices::row($pdo, Invoices::save($pdo, $b)));
+        }],
+        ['PUT', '#^/admin/invoices/(\d+)$#', function ($id) use ($pdo, $admin, $invoiceOr404) {
+            $admin();
+            $inv = $invoiceOr404($id);
+            if (in_array($inv['status'], ['paid', 'cancelled'], true)) {
+                throw new HttpError(409, 'გადახდილი ან გაუქმებული ინვოისი არ რედაქტირდება');
+            }
+            $b = Http::body();
+            if ($errors = Invoices::validate($b)) {
+                throw new HttpError(422, 'შეამოწმეთ ველები', $errors);
+            }
+            // An issued invoice keeps its number, so it can't move to another year.
+            if ($inv['number'] && substr((string) $b['issue_date'], 0, 4) !== (string) $inv['year']) {
+                throw new HttpError(422, 'გაცემული ინვოისის წელი ვერ შეიცვლება', ['issue_date' => 'წელი უნდა იყოს ' . $inv['year']]);
+            }
+            Invoices::save($pdo, $b, (int) $id);
+            return Invoices::view($pdo, Invoices::row($pdo, (int) $id));
+        }],
+        ['POST', '#^/admin/invoices/(\d+)/status$#', function ($id) use ($pdo, $admin, $invoiceOr404) {
+            $admin();
+            $inv = $invoiceOr404($id);
+            $status = (string) (Http::body()['status'] ?? '');
+            if (!in_array($status, Invoices::STATUSES, true)) {
+                throw new HttpError(422, 'არასწორი სტატუსი');
+            }
+            Invoices::setStatus($pdo, $inv, $status);
+            return Invoices::view($pdo, Invoices::row($pdo, (int) $id));
+        }],
+        ['DELETE', '#^/admin/invoices/(\d+)$#', function ($id) use ($pdo, $admin, $invoiceOr404) {
+            $admin();
+            if ($invoiceOr404($id)['number']) {
+                throw new HttpError(409, 'ნომრიანი ინვოისი არ იშლება — გააუქმეთ');
+            }
+            $pdo->prepare('DELETE FROM invoices WHERE id = ?')->execute([(int) $id]);
             return ['ok' => true];
         }],
 

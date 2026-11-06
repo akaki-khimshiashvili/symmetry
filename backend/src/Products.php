@@ -5,6 +5,8 @@ final class Products
     public const PATTERNS = ['wave', 'dune', 'ripple', 'twist', 'prism', 'mosaic'];
     public const ORIENTATIONS = ['portrait', 'landscape'];
     public const CATEGORIES = ['panel', 'shelf', 'wall']; // wall = მთლიანი კედელი (a whole-wall installation)
+    /** პროდუქტის განზომილება: chosen separately from the type, one per product. */
+    public const DIMENSIONS = ['portrait', 'landscape', 'wall'];
     private const I18N = ['name', 'short', 'description', 'material'];
 
     /** @return array<int, array> */
@@ -53,6 +55,7 @@ final class Products
             'pattern' => $r['pattern'],
             'orientation' => $r['orientation'],
             'category' => $r['category'] ?? 'panel',
+            'dimension' => in_array($r['dimension'] ?? '', self::DIMENSIONS, true) ? $r['dimension'] : self::defaultDimension($r),
             'featured' => (bool) $r['featured'],
             'in_stock' => (bool) ($r['in_stock'] ?? 1),
             'published' => (bool) $r['published'],
@@ -160,10 +163,22 @@ final class Products
         if (isset($p['category']) && !in_array($p['category'], self::CATEGORIES, true)) {
             $errors['category'] = 'აირჩიეთ ტიპი: პანელი, თარო ან მთლიანი კედელი';
         }
+        if (isset($p['dimension']) && !in_array($p['dimension'], self::DIMENSIONS, true)) {
+            $errors['dimension'] = 'აირჩიეთ განზომილება: პორტრეტი, ჰორიზონტალური დიზაინი ან მთლიანი კედელი';
+        }
         if (isset($p['pattern']) && !in_array($p['pattern'], self::PATTERNS, true)) {
             $errors['pattern'] = 'უცნობი ნიმუში';
         }
         return $errors;
+    }
+
+    /** Products saved before the dimension existed: follow the type (whole wall, else the panel's shape). */
+    private static function defaultDimension(array $p): string
+    {
+        if (($p['category'] ?? '') === 'wall') {
+            return 'wall';
+        }
+        return ($p['orientation'] ?? '') === 'portrait' ? 'portrait' : 'landscape';
     }
 
     private static function guessOrientation(array $sizes): string
@@ -207,6 +222,9 @@ final class Products
             'pattern' => in_array($p['pattern'] ?? '', self::PATTERNS, true) ? $p['pattern'] : 'wave',
             'orientation' => in_array($p['orientation'] ?? '', self::ORIENTATIONS, true) ? $p['orientation'] : self::guessOrientation($p['sizes'] ?? []),
             'category' => in_array($p['category'] ?? '', self::CATEGORIES, true) ? $p['category'] : 'panel',
+            'dimension' => in_array($p['dimension'] ?? '', self::DIMENSIONS, true) ? $p['dimension'] : self::defaultDimension([
+                'category' => $p['category'] ?? '', 'orientation' => $p['orientation'] ?? self::guessOrientation($p['sizes'] ?? []),
+            ]),
             'featured' => !empty($p['featured']) ? 1 : 0,
             'in_stock' => array_key_exists('in_stock', $p) ? (!empty($p['in_stock']) ? 1 : 0) : 1,
             // Kept as the biggest size discount, for reference; the sizes hold the real values.

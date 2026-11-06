@@ -13,6 +13,8 @@ export interface Product {
   orientation: 'portrait' | 'landscape';
   /** Wall panel, shelf or whole wall (shown as separate sections on the site). */
   category: 'panel' | 'shelf' | 'wall';
+  /** პროდუქტის განზომილება: chosen separately from the type, one per product. */
+  dimension: Dimension;
   featured: boolean;
   /** Out-of-stock products are shown on the site but can't be ordered. */
   in_stock: boolean;
@@ -57,6 +59,26 @@ export interface Message {
   channel: string; intent: string; message: string; lang: string; status: string; created_at: string;
 }
 export type Settings = Record<string, string>;
+
+/** Invoice line: quantities and prices are kept as typed (strings) in the editor, numbers from the API. */
+export interface InvoiceItem { description: string; qty: number | string; unit: string; price: number | string }
+export type InvoiceStatus = 'draft' | 'issued' | 'paid' | 'cancelled';
+export interface InvoiceSeller {
+  legal_name: string; tax_id: string; address_ka: string; address_en: string; phone: string; email: string;
+  bank_name: string; bank_swift: string; iban: string;
+}
+export interface Invoice {
+  id: number | null; number: string | null; status: InvoiceStatus; lang: 'ka' | 'en'; order_id: number | null;
+  /** YYYY-MM-DD */
+  issue_date: string; due_date: string;
+  client_name: string; client_tax_id: string; client_address: string; client_phone: string; client_email: string;
+  items: InvoiceItem[]; vat: boolean; notes: string; seller: InvoiceSeller;
+  totals?: { total: number; vat: number; net: number };
+  issued_at?: string | null; paid_at?: string | null; created_at?: string; updated_at?: string;
+}
+export const INVOICE_STATUS: Record<InvoiceStatus, string> = {
+  draft: 'პროექტი', issued: 'გაცემული', paid: 'გადახდილი', cancelled: 'გაუქმებული',
+};
 
 /** One period's headline figures (GET /admin/metrics). */
 export interface PeriodTotals {
@@ -158,6 +180,12 @@ export const PRODUCT_TYPES: { key: ProductType; label: string; hint: string }[] 
   { key: 'landscape', label: 'ჰორიზონტალური დიზაინი', hint: 'ფართო პანელი' },
   { key: 'shelf', label: 'თარო', hint: 'პარამეტრული თარო' },
   { key: 'wall', label: 'მთლიანი კედელი', hint: 'მთელი კედლის ინსტალაცია' },
+];
+export type Dimension = 'portrait' | 'landscape' | 'wall';
+export const DIMENSIONS: { key: Dimension; label: string; hint: string }[] = [
+  { key: 'portrait', label: 'პორტრეტი', hint: 'ვერტიკალური, მაღალი ფორმა' },
+  { key: 'landscape', label: 'ჰორიზონტალური დიზაინი', hint: 'ფართო, ჰორიზონტალური ფორმა' },
+  { key: 'wall', label: 'მთლიანი კედელი', hint: 'მთელ კედელზე' },
 ];
 export const typeOf = (p: Pick<Product, 'category' | 'orientation'>): ProductType =>
   p.category === 'shelf' || p.category === 'wall' ? p.category : p.orientation;

@@ -14,6 +14,8 @@ export interface Product {
   orientation: 'portrait' | 'landscape';
   /** Wall panel, shelf or whole wall. Missing (older API / seed data) counts as a panel. */
   category?: 'panel' | 'shelf' | 'wall';
+  /** პროდუქტის განზომილება, set in the admin separately from the type. Missing (older data) follows the type. */
+  dimension?: 'portrait' | 'landscape' | 'wall';
   featured: boolean;
   /** Missing (seed data) counts as in stock. */
   in_stock?: boolean;
@@ -96,6 +98,8 @@ export function orientationOf(p: Pick<Product, 'sizes'>): 'portrait' | 'landscap
 
 /** The catalogue section a product belongs to: shelves are one group, panels split by shape. */
 export type Kind = 'portrait' | 'landscape' | 'shelf' | 'wall';
+export const dimensionOf = (p: Pick<Product, 'dimension' | 'category' | 'orientation'>): 'portrait' | 'landscape' | 'wall' =>
+  p.dimension ?? (p.category === 'wall' ? 'wall' : p.orientation === 'portrait' ? 'portrait' : 'landscape');
 export const kindOf = (p: Pick<Product, 'category' | 'orientation'>): Kind =>
   p.category === 'shelf' || p.category === 'wall' ? p.category : p.orientation;
 

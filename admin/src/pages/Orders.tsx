@@ -298,6 +298,7 @@ export function OrdersPage({ onChange }: { onChange: () => void }) {
                         <Icon name="mail" size={15} />ქვითრის ხელახლა გაგზავნა
                       </button>
                     )}
+                    <a class="link-btn" href={`#/invoices/new?order=${o.id}`}><Icon name="doc" size={15} />ინვოისის შექმნა</a>
                     {canSync && <button class="link-btn" type="button" disabled={working} onClick={() => act(o, 'sync')}><Icon name="refresh" size={15} />სტატუსის განახლება</button>}
                     {o.payment_status === 'captured' && <button class="link-btn" type="button" disabled={working} onClick={() => refund(o)}>თანხის დაბრუნება</button>}
                   </div>
