@@ -9,8 +9,9 @@ declare(strict_types=1);
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 
-// Let the PHP dev server serve uploaded images directly.
-if (PHP_SAPI === 'cli-server' && $path !== '/' && is_file(__DIR__ . $path)) {
+// Let PHP's built-in server serve uploaded images directly, and nothing else: it ignores .htaccess and would
+// run any .php file handed back to it, so only image files under /uploads/ pass.
+if (PHP_SAPI === 'cli-server' && preg_match('#^/uploads/[A-Za-z0-9_-]+\.(webp|jpe?g|png|avif)$#i', $path) && is_file(__DIR__ . $path)) {
     return false;
 }
 
@@ -37,6 +38,10 @@ if ($method === 'OPTIONS') {
 $route = preg_match('#/api(/.*)?$#', $path, $m) ? rtrim($m[1] ?? '/', '/') ?: '/' : null;
 if ($route === null) {
     Http::json(['error' => 'Not found'], 404);
+}
+// Admin data and a customer's payment / receipt details must never be kept by browsers or shared caches.
+if (preg_match('#^/(admin|payments|receipts)(/|$)#', $route)) {
+    header('Cache-Control: no-store');
 }
 
 const SETTING_KEYS = [
@@ -147,7 +152,10 @@ try {
         // Product types and dimensions as managed in the admin: the site builds its filters and labels from these.
         ['GET', '#^/taxonomy$#', fn () => Options::taxonomy($pdo)],
 
-        ['POST', '#^/contact$#', function () use ($pdo) {
+        ['POST', '#^/contact$#', function () use ($pdo, $config) {
+            // Generous for people, tight for scripts filling the inbox (counted per address, every request).
+            RateLimit::guard($pdo, $config, 'contact', 20, 3600);
+            RateLimit::fail($pdo, $config, 'contact');
             $b = Http::body();
             if (!empty($b['website'])) {
                 return ['ok' => true]; // honeypot
@@ -167,6 +175,9 @@ try {
         }],
 
         ['POST', '#^/orders$#', function () use ($pdo, $base, $config, $flitt) {
+            // Each order may also open a Flitt checkout: limit how many one address can create.
+            RateLimit::guard($pdo, $config, 'orders', 20, 3600);
+            RateLimit::fail($pdo, $config, 'orders');
             $b = Http::body();
             if (!empty($b['website'])) {
                 return ['ok' => true];
@@ -224,8 +235,11 @@ try {
         }],
 
         // ---------- Analytics (anonymous; the site sends it with navigator.sendBeacon as text/plain) ----------
-        ['POST', '#^/track$#', function () use ($pdo) {
+        ['POST', '#^/track$#', function () use ($pdo, $config) {
             try {
+                // A real visitor sends a few beacons per page; past this an address is just dropped (silently).
+                RateLimit::guard($pdo, $config, 'track', 600, 3600);
+                RateLimit::fail($pdo, $config, 'track');
                 $b = Http::body();
             } catch (HttpError) {
                 return ['ok' => false];
@@ -252,7 +266,9 @@ try {
         ['POST', '#^/payments/return$#', $paymentReturn],
         ['GET', '#^/payments/([a-f0-9]{32})$#', function ($token) use ($pdo, $flitt, $config, $tokenOr404, $notify) {
             $o = $tokenOr404($token);
-            if ($o['payment_status'] === 'pending') {
+            // Ask Flitt at most every 5 seconds per order: reloading the page can't turn into a stream of API calls.
+            $fresh = $o['payment_updated_at'] && strtotime($o['payment_updated_at'] . ' UTC') > time() - 5;
+            if ($o['payment_status'] === 'pending' && !$fresh) {
                 try {
                     $o = $notify(Payments::sync($pdo, $flitt, $o));
                 } catch (FlittError $e) {
@@ -264,9 +280,11 @@ try {
         // ---------- Receipts ----------
         // Anyone holding a receipt (or its QR) can check it is genuine and see the order's live status.
         ['GET', '#^/receipts/verify$#', function () use ($pdo, $config) {
+            // Guessing is limited per address (the code is 64 bits, so this mostly stops scripted noise).
+            RateLimit::guard($pdo, $config, 'verify', 30, 600);
             $o = Receipts::check($pdo, $config, (string) ($_GET['n'] ?? ''), (string) ($_GET['c'] ?? ''));
             if (!$o) {
-                usleep(300000); // slow down guessing
+                RateLimit::fail($pdo, $config, 'verify');
                 return ['valid' => false];
             }
             return Receipts::publicCheck($pdo, $o);

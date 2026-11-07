@@ -245,6 +245,12 @@ SQL);
         if (($data['order_id'] ?? '') !== $order['flitt_order_id']) {
             return $order; // response for an older attempt
         }
+        // A signed answer must still be about this order's money: never accept another amount or currency.
+        if ((isset($data['amount']) && (string) $data['amount'] !== '' && (int) $data['amount'] !== (int) $order['amount'])
+            || (isset($data['currency']) && (string) $data['currency'] !== '' && strtoupper((string) $data['currency']) !== strtoupper((string) $order['currency']))) {
+            error_log('[symmetry] Flitt ' . $source . ' for order ' . $order['id'] . ' ignored: amount/currency mismatch');
+            return $order;
+        }
         $current = $order['payment_status'];
         $flittStatus = (string) ($data['order_status'] ?? '');
         $captured = ($data['capture_status'] ?? '') === 'captured';

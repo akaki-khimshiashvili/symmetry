@@ -21,6 +21,10 @@ $config = [
     'admin_password'      => getenv('SYMMETRY_ADMIN_PASSWORD') ?: 'symmetry-admin',
     'admin_password_hash' => getenv('SYMMETRY_ADMIN_HASH') ?: '',
     'token_ttl' => 60 * 60 * 12,
+    // Behind a reverse proxy (nginx, a load balancer) every request comes from the proxy's address. Set
+    // SYMMETRY_TRUST_PROXY=1 there so the login and receipt-check limits count per visitor (X-Forwarded-For).
+    // Never set it when clients can reach PHP directly: they could then pick their own address.
+    'trust_proxy' => filter_var(getenv('SYMMETRY_TRUST_PROXY') ?: '0', FILTER_VALIDATE_BOOLEAN),
 
     // Shell command that rebuilds the static Astro site after content changes (admin "საიტის განახლება").
     // Example (Linux): 'cd /var/www/symmetry/frontend && npm run build && rsync -a --delete dist/ /var/www/html/'

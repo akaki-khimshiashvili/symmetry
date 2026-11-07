@@ -40,7 +40,7 @@ cd frontend && npm install && npm run dev
 cd admin && npm install && npm run dev
 ```
 
-Default admin login: **`admin`** / **`symmetry-admin`**, unless `backend/config.local.php` overrides it. Change it before going live (see Configuration).
+Default admin login: **`admin`** / **`symmetry-admin`**, unless `backend/config.local.php` overrides it. This password is public, so it only works in development: once `SYMMETRY_ORIGINS` is set (i.e. deployed), the API refuses admin logins until `SYMMETRY_ADMIN_HASH` is set (see Security).
 
 The site builds even when the API is offline. In that case it falls back to `backend/data/seed.json`.
 
@@ -56,9 +56,10 @@ The public site is static, which keeps it fast and SEO-friendly. Products, price
 | Variable | Used by | Purpose |
 |---|---|---|
 | `SYMMETRY_ADMIN_USER` | backend | Admin username (default `admin`) |
-| `SYMMETRY_ADMIN_HASH` | backend | `password_hash()` of the admin password (preferred over `SYMMETRY_ADMIN_PASSWORD`) |
+| `SYMMETRY_ADMIN_HASH` | backend | `password_hash()` of the admin password. **Required in production** (see Security) |
 | `SYMMETRY_ADMIN_PASSWORD` | backend | Plain admin password (development only) |
-| `SYMMETRY_ORIGINS` | backend | Comma-separated front-end origins allowed by CORS. When unset (development), any `http://localhost:<port>` is allowed |
+| `SYMMETRY_ORIGINS` | backend | Comma-separated front-end origins allowed by CORS, e.g. `https://symmetry.ge,https://admin.symmetry.ge`. Setting it also marks the API as deployed. When unset (development), any `http://localhost:<port>` is allowed |
+| `SYMMETRY_TRUST_PROXY` | backend | `1` when the API sits behind a reverse proxy, so rate limits count per visitor (`X-Forwarded-For`). Never set it when PHP is reachable directly |
 | `SYMMETRY_PUBLIC_URL` | backend | Absolute API origin for image URLs (e.g. `https://api.symmetry.ge`) |
 | `SYMMETRY_REBUILD_CMD` | backend | Shell command that rebuilds and deploys `frontend/` |
 | `SYMMETRY_FLITT_ENABLED` | backend | `1` turns on online payment for orders (default off) |
@@ -76,6 +77,26 @@ The public site is static, which keeps it fast and SEO-friendly. Products, price
 1. Serve `backend/public` as the API host. Apache uses the included `.htaccess`; for nginx, route `/api/*` to `index.php`. `backend/data/` and `backend/public/uploads/` must be writable and **must not** be web-browsable (keep `data/` outside the web root as it is now).
 2. `cd frontend && npm run build` and serve `frontend/dist/`.
 3. `cd admin && npm run build` and serve `admin/dist/` on a private path or subdomain.
+
+## Security
+
+What is built in, and what the server operator must still do.
+
+**Before going live**
+- Set `SYMMETRY_ADMIN_HASH` to the output of `php -r "echo password_hash('<long random password>', PASSWORD_DEFAULT);"`. Without it the deployed API refuses admin logins.
+- Set `SYMMETRY_ORIGINS` to the exact site and admin origins, `SYMMETRY_PUBLIC_URL` and `SYMMETRY_API_URL` to the API's HTTPS address, and `SYMMETRY_RECEIPT_SECRET` (once).
+- For live payments set the merchant's own `SYMMETRY_FLITT_MERCHANT_ID` / `SYMMETRY_FLITT_SECRET`. The test secret is public, so anyone can sign test-merchant callbacks; such orders are always marked as test.
+- Serve the API with Apache + PHP-FPM or nginx. `backend/Dockerfile` runs PHP's built-in server, a single process meant for development; in production run it only behind a proxy with `PHP_CLI_SERVER_WORKERS` set.
+- Host the admin over HTTPS on its own subdomain or private path, ideally with `frame-ancestors 'none'` and HSTS headers from the host (the admin also refuses to run inside a frame by itself).
+
+**Built in**
+- Admin login: bearer tokens (random, stored hashed, 12 h). 8 failed logins per address per 15 minutes, then HTTP 429. The published default password is refused once deployed.
+- Public endpoints: per-address limits on orders (20/h), messages (20/h), analytics beacons (600/h) and receipt checks (30 failures per 10 min). Addresses are stored only as keyed hashes, for at most a day.
+- Payments: Flitt callbacks are signature-checked and must match the order's amount and currency. Prices are always computed on the server.
+- Every API response sends `nosniff`, `X-Frame-Options: DENY`, `Content-Security-Policy: default-src 'none'` and no referrer. Admin, payment and receipt responses are `no-store`.
+- Uploads are re-encoded to WebP under random names, and only image files are ever served from `uploads/` (`uploads/.htaccess`, and the router under PHP's built-in server).
+- Public site: a hash-based Content-Security-Policy on every page (only the site's own scripts run; network access only to the site and the API), plus `frame-ancestors 'none'`, HSTS, COOP and a Permissions-Policy (`netlify.toml`).
+- Admin panel: its own Content-Security-Policy in the built `index.html` (only its own scripts; network access only to the API).
 
 ## Placeholders to replace
 

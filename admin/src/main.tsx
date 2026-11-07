@@ -184,4 +184,7 @@ function App() {
   );
 }
 
-render(<App />, document.getElementById('app')!);
+// Never run inside another site's frame (clickjacking): the admin's host may not send frame-ancestors.
+const framed = (() => { try { return window.top !== window.self; } catch { return true; } })();
+if (framed) document.getElementById('app')!.textContent = 'Symmetry admin cannot be shown inside a frame.';
+else render(<App />, document.getElementById('app')!);

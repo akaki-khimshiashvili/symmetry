@@ -8,6 +8,7 @@ backend/data/outbox/
 backend/config.local.php
 backend/public/uploads/*
 !backend/public/uploads/.gitkeep
+!backend/public/uploads/.htaccess
 .impeccable/review/
 
 # Local Netlify folder

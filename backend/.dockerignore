@@ -2,3 +2,7 @@ data/*.sqlite*
 data/rebuild.log
 public/uploads/*
 !public/uploads/.gitkeep
+!public/uploads/.htaccess
+config.local.php
+data/outbox/
+data/*.log

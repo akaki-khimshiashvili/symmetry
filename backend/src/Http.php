@@ -29,6 +29,12 @@ final class Http
     {
         http_response_code($status);
         header('Content-Type: application/json; charset=utf-8');
+        // The API only ever answers with JSON: never sniffed as anything else, never framed, never a document
+        // that could load or run anything.
+        header('X-Content-Type-Options: nosniff');
+        header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
+        header('X-Frame-Options: DENY');
+        header('Referrer-Policy: no-referrer');
         echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
@@ -56,6 +62,23 @@ final class Http
         return ($https ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
     }
 
+    /**
+     * The client's address, for rate limits. REMOTE_ADDR unless the API sits behind a reverse proxy that the
+     * operator vouches for (SYMMETRY_TRUST_PROXY=1): then the last X-Forwarded-For entry, the one that proxy added.
+     */
+    public static function clientIp(array $config): string
+    {
+        $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+        if (!empty($config['trust_proxy']) && !empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            $hops = array_values(array_filter(array_map('trim', explode(',', (string) $_SERVER['HTTP_X_FORWARDED_FOR']))));
+            $last = end($hops);
+            if ($last !== false && filter_var($last, FILTER_VALIDATE_IP)) {
+                $ip = $last;
+            }
+        }
+        return $ip;
+    }
+
     public static function bearer(): string
     {
         $h = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
@@ -70,19 +93,76 @@ final class Http
     }
 }
 
+/**
+ * Failed-attempt limits per client address, kept in SQLite (no extra service). Addresses are stored only as
+ * a keyed hash and only for the length of the window.
+ * Replaces the old sleep-on-failure, which slowed nobody down (requests run in parallel) but held a PHP
+ * worker for every bad attempt, so a few requests a second could stall the whole API.
+ */
+final class RateLimit
+{
+    public static function migrate(PDO $pdo): void
+    {
+        $pdo->exec('CREATE TABLE IF NOT EXISTS rate_limits (bucket TEXT NOT NULL, client TEXT NOT NULL, at INTEGER NOT NULL)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS rate_limits_lookup ON rate_limits(bucket, client, at)');
+    }
+
+    /** Keyed with this install's server-side secret, so stored values can't be turned back into addresses. */
+    private static function client(PDO $pdo, array $config, string $bucket): string
+    {
+        return hash_hmac('sha256', $bucket . '|' . Http::clientIp($config), Receipts::secret($pdo, $config));
+    }
+
+    /** Throws 429 when this client already has $max failures within the last $window seconds. */
+    public static function guard(PDO $pdo, array $config, string $bucket, int $max, int $window): void
+    {
+        $pdo->prepare('DELETE FROM rate_limits WHERE at < ?')->execute([time() - 86400]);
+        $stmt = $pdo->prepare('SELECT COUNT(*), MIN(at) FROM rate_limits WHERE bucket = ? AND client = ? AND at >= ?');
+        $stmt->execute([$bucket, self::client($pdo, $config, $bucket), time() - $window]);
+        [$count, $first] = $stmt->fetch(PDO::FETCH_NUM);
+        if ((int) $count >= $max) {
+            header('Retry-After: ' . max(1, (int) $first + $window - time()));
+            throw new HttpError(429, 'ძალიან ბევრი მცდელობა. სცადეთ მოგვიანებით.');
+        }
+    }
+
+    public static function fail(PDO $pdo, array $config, string $bucket): void
+    {
+        $pdo->prepare('INSERT INTO rate_limits (bucket, client, at) VALUES (?, ?, ?)')->execute([$bucket, self::client($pdo, $config, $bucket), time()]);
+    }
+
+    public static function clear(PDO $pdo, array $config, string $bucket): void
+    {
+        $pdo->prepare('DELETE FROM rate_limits WHERE bucket = ? AND client = ?')->execute([$bucket, self::client($pdo, $config, $bucket)]);
+    }
+}
+
 final class Auth
 {
+    /** The development password from config.php / README. Public, so never accepted once the API is deployed. */
+    public const DEFAULT_PASSWORD = 'symmetry-admin';
+    /** Failed logins allowed per client address in LOGIN_WINDOW seconds. */
+    private const LOGIN_MAX = 8;
+    private const LOGIN_WINDOW = 900;
+
     public static function login(PDO $pdo, array $config, string $username, string $password): string
     {
+        // Deployed (SYMMETRY_ORIGINS set) without a real password: refuse rather than accept the published default.
+        if ($config['admin_password_hash'] === '' && (string) $config['admin_password'] === self::DEFAULT_PASSWORD && empty($config['allow_local_origins'])) {
+            error_log('[symmetry] admin login refused: set SYMMETRY_ADMIN_HASH (the default password is public)');
+            throw new HttpError(503, 'ადმინის პაროლი არ არის დაყენებული (SYMMETRY_ADMIN_HASH). მიმართეთ დეველოპერს.');
+        }
+        RateLimit::guard($pdo, $config, 'login', self::LOGIN_MAX, self::LOGIN_WINDOW);
         // Check both parts every time so a wrong username and a wrong password take the same path.
         $userOk = hash_equals(mb_strtolower((string) $config['admin_username']), mb_strtolower(trim($username)));
         $passOk = $config['admin_password_hash'] !== ''
             ? password_verify($password, $config['admin_password_hash'])
             : hash_equals((string) $config['admin_password'], $password);
         if (!($userOk && $passOk)) {
-            usleep(400000);
+            RateLimit::fail($pdo, $config, 'login');
             throw new HttpError(401, 'მომხმარებელი ან პაროლი არასწორია');
         }
+        RateLimit::clear($pdo, $config, 'login');
         $pdo->prepare('DELETE FROM tokens WHERE expires_at < ?')->execute([time()]);
         $token = bin2hex(random_bytes(32));
         $pdo->prepare('INSERT INTO tokens (token, expires_at) VALUES (?, ?)')
