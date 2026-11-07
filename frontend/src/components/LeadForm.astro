@@ -35,7 +35,7 @@ const intents = [
   { key: 'other', icon: 'dots' },
 ] as const;
 ---
-<form class="lead" id={id} data-lead-form data-email-always={emailAlways ? '' : undefined} data-endpoint={endpoint} data-msgs={JSON.stringify(msgs)} novalidate>
+<form class="lead" id={id} data-lead-form data-kind={kind}data-email-always={emailAlways ? '' : undefined} data-endpoint={endpoint} data-msgs={JSON.stringify(msgs)} novalidate>
   <input type="hidden" name="lang" value={lang} />
   {kind === 'order' && (<><input type="hidden" name="product_id" /><input type="hidden" name="size_id" /><input type="hidden" name="quantity" value="1" /></>)}
   <div class="hp" aria-hidden="true">
@@ -414,6 +414,14 @@ const intents = [
         btn.setAttribute('data-empty', '');
         close();
       });
+      // A restored draft set the hidden value: show it as the chosen option.
+      form.addEventListener('lead:restore', () => {
+        const i = opts.findIndex((o) => o.dataset.value === input.value);
+        if (i < 0) return;
+        opts.forEach((o, j) => o.setAttribute('aria-selected', String(j === i)));
+        label.textContent = opts[i].textContent!.trim();
+        btn.removeAttribute('data-empty');
+      });
       const choose = (i: number) => {
         opts.forEach((o, j) => o.setAttribute('aria-selected', String(j === i)));
         input.value = opts[i].dataset.value || '';
@@ -458,6 +466,51 @@ const intents = [
       });
       document.addEventListener('pointerdown', (e) => { if (isOpen() && !dd.contains(e.target as Node)) close(); });
     });
+
+    // ---------- Draft: what the visitor typed survives a refresh / closed tab (this device only) ----------
+    // Contact details are shared by the contact and order forms (typed once, offered in both); the message
+    // and intent belong to each form. Saved as they type, cleared once the request is sent; 14 days at most.
+    const DRAFT = 'symmetry:lead-draft';
+    const DRAFT_DAYS = 14;
+    const SHARED = ['first_name', 'phone', 'email', 'client_type', 'channel'];
+    const OWN = ['message', 'intent'];
+    const kind = form.dataset.kind || 'contact';
+    type Draft = { t: number; shared: Record<string, string>; own: Record<string, Record<string, string>> };
+    const readDraft = (): Draft | null => {
+      try {
+        const d = JSON.parse(localStorage.getItem(DRAFT) || 'null');
+        return d && Date.now() - d.t < DRAFT_DAYS * 864e5 ? d : null;
+      } catch { return null; }
+    };
+    const setField = (name: string, v: string) => {
+      const el = form.elements.namedItem(name);
+      if (el instanceof RadioNodeList) {
+        for (const r of el as unknown as HTMLInputElement[]) r.checked = r.value === v;
+      } else if (el) (el as HTMLInputElement).value = v;
+    };
+    const draft = readDraft();
+    if (draft) {
+      for (const k of SHARED) if (draft.shared?.[k]) setField(k, draft.shared[k]);
+      for (const k of OWN) if (draft.own?.[kind]?.[k]) setField(k, draft.own[kind][k]);
+      form.dispatchEvent(new Event('lead:restore'));
+      syncChannel();
+    }
+    let saveTimer = 0;
+    const writeDraft = () => {
+      clearTimeout(saveTimer);
+      saveTimer = 0;
+      const d: Draft = readDraft() ?? { t: 0, shared: {}, own: {} };
+      for (const k of SHARED) d.shared[k] = val(k);
+      d.own[kind] = Object.fromEntries(OWN.map((k) => [k, val(k)]));
+      d.t = Date.now();
+      try { localStorage.setItem(DRAFT, JSON.stringify(d)); } catch {}
+    };
+    const saveDraft = () => { clearTimeout(saveTimer); saveTimer = window.setTimeout(writeDraft, 250); };
+    const clearDraft = () => { clearTimeout(saveTimer); saveTimer = 0; try { localStorage.removeItem(DRAFT); } catch {} };
+    form.addEventListener('input', saveDraft);
+    form.addEventListener('change', saveDraft);
+    // Leaving mid-pause (refresh, back, closing the tab) still keeps the last keystrokes.
+    addEventListener('pagehide', () => { if (saveTimer) writeDraft(); });
 
     const validate = (data: Record<string, string>) => {
       const errs: Record<string, string> = {};
@@ -506,6 +559,8 @@ const intents = [
         if (!res.ok) throw new Error(msgs.network);
         const body = await res.json().catch(() => ({}));
         // Online payment: hand the customer to Flitt's hosted checkout.
+        // Sent: the draft has done its job.
+        clearDraft();
         if (typeof body.checkout_url === 'string' && body.checkout_url.startsWith('https://')) {
           leaving = true;
           btnLabel.textContent = msgs.redirecting;
@@ -531,6 +586,7 @@ const intents = [
     // "Send another message": clear the form and bring it back.
     done.querySelector<HTMLButtonElement>('[data-again]')?.addEventListener('click', () => {
       form.reset();
+      clearDraft();
       syncChannel();
       done.hidden = true;
       form.querySelector<HTMLElement>('input:not([type=hidden]):not(.hp input)')?.focus();

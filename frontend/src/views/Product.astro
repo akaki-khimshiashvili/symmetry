@@ -147,7 +147,7 @@ const socials = [
           <div class="price-box">
             <span class="label" data-price-label data-one={t('p.price')} data-many={t('p.total')}>{t('p.price')}</span>
             <s class="was was-lg num" data-was hidden={!firstPct}>{first && firstPct ? `₾ ${priceFmt(first.price)}` : ''}</s>
-            <span class="price display num" data-price aria-live="polite">₾ {first ? priceFmt(nowPrice(first)) : ''}</span>
+            <span class="price display num" data-total aria-live="polite">₾ {first ? priceFmt(nowPrice(first)) : ''}</span>
           </div>
           <button class="btn btn-solid order-btn" type="button" data-order-open>{t(pays ? 'p.buy' : 'p.order')}</button>
         </div>
@@ -218,6 +218,20 @@ const socials = [
           <span class="sum-name">{name}</span>
           <span class="num"><span data-sum-size>{first ? sizeLabel(first.width, first.height) : ''}</span><span data-sum-qty hidden></span></span>
           <span class="num sum-price" data-sum-price>₾ {first ? priceFmt(nowPrice(first)) : ''}</span>
+        </div>
+        {/* The same quantity as on the page: changing it here updates the total (and the page) live. */}
+        <div class="sum-qty">
+          <span class="label">{t('p.qty')}</span>
+          <div class="qty qty-sm">
+            <button class="qty-b" type="button" data-qty-step="-1" aria-label={t('p.qtyLess')} disabled>
+              <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+            </button>
+            <output class="num qty-n" data-qty-out aria-live="polite">1</output>
+            <button class="qty-b" type="button" data-qty-step="1" aria-label={t('p.qtyMore')}>
+              <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M5 12h14M12 5v14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+            </button>
+          </div>
+          <span class="qty-each num" data-sum-each hidden></span>
         </div>
       </div>
       <LeadForm lang={lang} kind="order" />
@@ -428,6 +442,9 @@ const socials = [
   .sum-row { display: grid; grid-template-columns: 1fr auto; gap: 0.3rem 1rem; }
   .sum-name { font-family: var(--f-display); font-size: var(--t-lg); grid-column: 1 / -1; }
   .sum-price { font-weight: 600; }
+  .sum-qty { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.85rem; padding-top: 0.75rem; border-top: 1px solid var(--line); }
+  .qty-sm .qty-b { width: 2.25rem; height: 2.25rem; }
+  .qty-n { min-width: 2.25rem; text-align: center; font-weight: 600; }
 
   @media (max-width: 1000px) {
     .media { grid-column: 1 / -1; position: static; }
@@ -463,7 +480,8 @@ const socials = [
   const root = document.querySelector<HTMLElement>('[data-pdp]');
   if (root) {
     const fmt = (n: number) => new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(n).replace(/,/g, ' ');
-    const priceEl = root.querySelector<HTMLElement>('[data-price]')!;
+    // The big total. (Not [data-price]: every size option carries that attribute with its own price.)
+    const priceEl = root.querySelector<HTMLElement>('[data-total]')!;
     const frame = root.querySelector<HTMLElement>('[data-frame]');
     const dimW = root.querySelector<HTMLElement>('[data-dim-w]');
     const dimH = root.querySelector<HTMLElement>('[data-dim-h]');
@@ -484,12 +502,34 @@ const socials = [
     const sumQty = drawer.querySelector<HTMLElement>('[data-sum-qty]');
     const text = JSON.parse(root.dataset.qtyText || '{}') as { pcs: string; each: string };
     let qty = 1;
+    // The page's stepper and the one in the order summary are the same control: both update everything.
+    const steppers = [...document.querySelectorAll<HTMLButtonElement>('[data-qty-step]')];
+    const qtyOut = drawer.querySelector<HTMLElement>('[data-qty-out]');
+    const sumEach = drawer.querySelector<HTMLElement>('[data-sum-each]');
+    // Totals count to their new value (quick, eased) instead of jumping, so a growing count reads as growing.
+    const reduceTotals = matchMedia('(prefers-reduced-motion: reduce)');
+    const tweens = new WeakMap<HTMLElement, number>();
+    const showMoney = (el: HTMLElement, to: number) => {
+      const from = Number(el.dataset.v ?? to);
+      el.dataset.v = String(to);
+      cancelAnimationFrame(tweens.get(el) ?? 0);
+      if (from === to || reduceTotals.matches) { el.textContent = `₾ ${fmt(to)}`; return; }
+      const t0 = performance.now(), dur = 320;
+      const tick = (now: number) => {
+        const k = Math.min(1, (now - t0) / dur), e = 1 - (1 - k) ** 3;
+        el.textContent = `₾ ${fmt(Math.round(from + (to - from) * e))}`;
+        if (k < 1) tweens.set(el, requestAnimationFrame(tick));
+      };
+      tweens.set(el, requestAnimationFrame(tick));
+    };
     const apply = (input: HTMLInputElement) => {
       const { w, h, price, label, old } = input.dataset;
       const total = Number(price) * qty;
-      priceEl.textContent = `₾ ${fmt(total)}`;
-      if (wasEl) { wasEl.hidden = !old; wasEl.textContent = old ? `₾ ${fmt(Number(old) * qty)}` : ''; }
+      showMoney(priceEl, total);
+      if (wasEl) { wasEl.hidden = !old; if (old) showMoney(wasEl, Number(old) * qty); else wasEl.textContent = ''; }
       if (eachEl) { eachEl.hidden = qty < 2; eachEl.textContent = `₾ ${fmt(Number(price))} · ${text.each}`; }
+      if (sumEach) { sumEach.hidden = qty < 2; sumEach.textContent = `₾ ${fmt(Number(price))} · ${text.each}`; }
+      if (qtyOut) qtyOut.textContent = String(qty);
       if (priceLabel) priceLabel.textContent = (qty > 1 ? priceLabel.dataset.many : priceLabel.dataset.one) || '';
       if (sumQty) { sumQty.hidden = qty < 2; sumQty.textContent = ` × ${qty} ${text.pcs}`; }
       (form.elements.namedItem('quantity') as HTMLInputElement).value = String(qty);
@@ -502,7 +542,7 @@ const socials = [
       if (dimW) dimW.textContent = `${w} ${unit}`;
       if (dimH) dimH.textContent = `${h} ${unit}`;
       sumSize.textContent = label || '';
-      sumPrice.textContent = `₾ ${fmt(total)}`;
+      showMoney(sumPrice, total);
       (form.elements.namedItem('size_id') as HTMLInputElement).value = input.value;
       if (wa && root.dataset.wa) {
         const msg = `${root.dataset.waBase}, ${label}${qty > 1 ? `, ${qty} ${text.pcs}` : ''}`;
@@ -515,21 +555,23 @@ const socials = [
       const changed = next !== qty;
       qty = next;
       if (qtyInput) qtyInput.value = String(qty);
-      root.querySelectorAll<HTMLButtonElement>('[data-qty-step]').forEach((b) => {
+      steppers.forEach((b) => {
         b.disabled = Number(b.dataset.qtyStep) < 0 ? qty <= 1 : qty >= qtyMax;
       });
       const sel = root.querySelector<HTMLInputElement>('input[name="size"]:checked');
       if (sel) apply(sel);
-      if (animate && changed && !matchMedia('(prefers-reduced-motion: reduce)').matches)
-        priceEl.animate([{ opacity: 0.4 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' });
+      if (animate && changed && qtyOut && !reduceTotals.matches)
+        qtyOut.animate([{ transform: 'scale(1.25)' }, { transform: 'none' }], { duration: 220, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
     };
-    root.querySelectorAll<HTMLButtonElement>('[data-qty-step]').forEach((b) =>
-      b.addEventListener('click', () => setQty(qty + Number(b.dataset.qtyStep), true)),
-    );
-    // Typing: totals follow valid numbers as they're typed; leaving the field settles on a valid amount.
+    steppers.forEach((b) => b.addEventListener('click', () => setQty(qty + Number(b.dataset.qtyStep), true)));
+    // Typing: the total follows every keystroke. Above the limit the field shows the limit at once (instead
+    // of keeping an old total until the field is left); an empty field or 0 waits for the next digit, and
+    // leaving the field settles on at least 1.
     qtyInput?.addEventListener('input', () => {
-      const n = Number(qtyInput.value);
-      if (Number.isInteger(n) && n >= 1 && n <= qtyMax) setQty(n);
+      const digits = qtyInput.value.replace(/\D/g, '');
+      const n = Number(digits);
+      if (!digits || n < 1) return;
+      setQty(Math.min(n, qtyMax), n > qtyMax);
     });
     qtyInput?.addEventListener('change', () => setQty(Number(qtyInput.value)));
     qtyInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); setQty(Number(qtyInput.value)); } });
