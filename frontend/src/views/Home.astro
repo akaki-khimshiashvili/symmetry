@@ -50,7 +50,7 @@ const types = collections.map((c, i) => {
             <li class="slide" style={`--d:${Math.min(i, 3)}`}>
               <a class={`tile tile-${ty.key}`} href={ty.items.length ? `${path(lang, '/products/')}?type=${ty.key}` : path(lang, '/contact/')}>
                 <div class="tile-img">
-                  <Leaf product={ty.cover} alt="" ratio={4 / 5} photo={ty.photo} density={ty.photo ? 1 : 1.6} />
+                  <Leaf product={ty.cover} alt="" ratio={4 / 5} photo={ty.photo} density={ty.photo ? 1 : 1.6} sizes="(max-width: 620px) 80vw, (max-width: 960px) 45vw, 390px" />
                   {ty.items.length > 0 && <span class="tile-count num">{ty.items.length} {t('products.count')}</span>}
                 </div>
                 <div class="tile-text">

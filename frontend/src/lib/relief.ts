@@ -124,10 +124,13 @@ export function relief(o: Opts): string {
     for (let i = 0; i < ribs; i++) {
       const u = (i + 0.5) / ribs;
       const id = `${uid}g${i}`;
+      const shades = Array.from({ length: stops }, (_, k) => lvl(shadeAt(f, u, k / (stops - 1), a, o.depth ?? 0.32)));
+      // Inside a run of equal shades only its two ends matter (the gradient is flat between them):
+      // dropping the middle stops draws the same pixels with far fewer DOM nodes.
       let st = '';
       for (let k = 0; k < stops; k++) {
-        const v = k / (stops - 1);
-        st += `<stop offset="${v.toFixed(3)}" class="s${lvl(shadeAt(f, u, v, a, o.depth ?? 0.32))}"/>`;
+        if (k > 0 && k < stops - 1 && shades[k] === shades[k - 1] && shades[k] === shades[k + 1]) continue;
+        st += `<stop offset="${(k / (stops - 1)).toFixed(3)}" class="s${shades[k]}"/>`;
       }
       defs += `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">${st}</linearGradient>`;
       const x = i * pitch + (pitch - ribW) / 2;

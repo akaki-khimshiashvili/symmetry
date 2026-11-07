@@ -6,12 +6,34 @@ import SpecimenCard from '../components/SpecimenCard.astro';
 import LeadForm from '../components/LeadForm.astro';
 import { type Lang, useT, path } from '../i18n/ui';
 import { saleEndText } from '../lib/saleDate';
+import { responsive } from '../lib/img';
 import { type Product, loadData, loc, priceFmt, waLink, telLink, API_URL, nowPrice, onSale, sizeOnSale, dimensionOf, kindOf, typeName, dimensionName } from '../lib/data';
 
 interface Props { lang: Lang; product: Product }
 const { lang, product: p } = Astro.props;
 const t = useT(lang);
 const { products, settings: s } = await loadData();
+// The main photo's frame takes the photo's own shape (fitPhoto below), fitted into the media column (7 of 12
+// on desktop, full width below 960px) and the frame box's height, so a portrait photo is limited by height.
+// Each photo's sizes hint follows that CSS (.frame-box heights below) so the browser fetches the right copy;
+// the gallery script swaps srcset, sizes and src together.
+const sizesFor = (r: number) => [
+  `(max-width: 620px) min(90vw, calc((86vw - 2rem) * ${r}))`,
+  `(max-width: 960px) min(92vw, calc(min(60vh, 34rem) * ${r}))`,
+  `min(55vw, 760px, calc(clamp(18rem, 100vh - 15rem, 42rem) * ${r}))`,
+].join(', ');
+const R0 = p.sizes[0] ? p.sizes[0].width / p.sizes[0].height : 1.5;
+const MAIN_WIDTHS = [400, 520, 640, 800, 960, 1280, 1600, 1920];
+const mainPics = await Promise.all(p.images.map(async (img) => {
+  const pic = await responsive(img.url, MAIN_WIDTHS, '');
+  const r = pic.width && pic.height ? pic.width / pic.height : R0;
+  return { ...pic, sizes: pic.srcset ? sizesFor(+r.toFixed(4)) : undefined };
+}));
+// The frame opens in the photo's own shape (known from the build), so fitPhoto has nothing to move on load.
+const framePhoto = mainPics[0];
+const frameR = framePhoto?.width && framePhoto?.height ? framePhoto.width / framePhoto.height : p.sizes[0] ? p.sizes[0].width / p.sizes[0].height : 1.5;
+// Gallery thumbnails are 4.5rem squares: small resized copies.
+const thumbPics = p.images.length > 1 ? await Promise.all(p.images.map((img) => responsive(img.url, [144, 216], '4.5rem'))) : [];
 // With online payment on, the order flow is a purchase: contact details, then Flitt's checkout.
 const pays = !!s.payments;
 // Out of stock: no buying, only ways to ask when it will be available. Re-checked live in the browser below.
@@ -50,9 +72,9 @@ const socials = [
     <div class="media">
       <figure class="stage" data-stage>
         <div class="frame-box">
-          <div class="piece" data-frame style={`--r:${first ? (first.width / first.height).toFixed(4) : 1.5}`}>
+          <div class="piece" data-frame style={`--r:${frameR.toFixed(4)}`}>
             <div class="frame">
-              <Leaf product={p} alt={name} ratio={first ? first.width / first.height : 1.5} eager />
+              <Leaf product={p} alt={name} ratio={first ? first.width / first.height : 1.5} eager pic={mainPics[0]} />
             </div>
             {p.images.length > 1 && (
               <>
@@ -70,8 +92,8 @@ const socials = [
       {p.images.length > 1 && (
         <div class="thumbs">
           {p.images.map((img, i) => (
-            <button type="button" class="thumb" data-thumb={img.url} aria-label={`${name} ${i + 1}`} aria-pressed={i === 0 ? 'true' : 'false'}>
-              <img src={img.url} alt="" loading="lazy" />
+            <button type="button" class="thumb" data-thumb={mainPics[i]?.src ?? img.url} data-srcset={mainPics[i]?.srcset ?? ''} data-sizes={mainPics[i]?.sizes ?? ''} aria-label={`${name} ${i + 1}`} aria-pressed={i === 0 ? 'true' : 'false'}>
+              <img src={thumbPics[i]?.src ?? img.url} srcset={thumbPics[i]?.srcset} sizes={thumbPics[i]?.sizes} alt="" loading="lazy" decoding="async" />
             </button>
           ))}
         </div>
@@ -287,7 +309,7 @@ const socials = [
 
   .stage { display: grid; gap: 0.9rem; animation: stage-in 800ms var(--ease-out) 80ms both; }
   /* The panel arrives once per visit: a short rise and settle; the dimension callouts follow. */
-  @keyframes stage-in { from { opacity: 0; transform: translateY(14px) scale(0.985); } }
+  @keyframes stage-in { from { opacity: 0.001; transform: translateY(14px) scale(0.985); } }
   .dim-top, .dim-side { animation: dims-in 500ms ease 550ms both; }
   @keyframes dims-in { from { opacity: 0; } }
   /* The panel sits on the page with shop-drawing callouts: width above, height to the right. */
@@ -622,6 +644,8 @@ const socials = [
       i = (i + n) % n;
       if (i === cur) return;
       cur = i;
+      mainImg.sizes = thumbs[i].dataset.sizes ?? '';
+      mainImg.srcset = thumbs[i].dataset.srcset ?? '';
       mainImg.src = thumbs[i].dataset.thumb!;
       mainImg.animate(
         reduceMotion
@@ -634,7 +658,13 @@ const socials = [
       strip.scrollTo({ left: thumbs[i].offsetLeft - strip.clientWidth / 2 + thumbs[i].offsetWidth / 2, behavior: reduceMotion ? 'auto' : 'smooth' });
       if (countEl) countEl.textContent = String(i + 1);
       // Warm up the neighbours so the next step is instant.
-      for (const k of [i + 1, i - 1]) new Image().src = thumbs[(k + n) % n].dataset.thumb!;
+      for (const k of [i + 1, i - 1]) {
+        const t = thumbs[(k + n) % n];
+        const im = new Image();
+        im.sizes = t.dataset.sizes ?? '';
+        im.srcset = t.dataset.srcset ?? '';
+        im.src = t.dataset.thumb!;
+      }
     };
     thumbs.forEach((b, j) => b.addEventListener('click', () => show(j, Math.sign(j - cur))));
     root.querySelectorAll<HTMLButtonElement>('[data-nav]').forEach((b) =>

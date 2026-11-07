@@ -82,6 +82,10 @@ const text = {
     ...Object.fromEntries(groups.map((g) => [g.key, Object.fromEntries(g.options.map((o) => [o.value, o.label]))])),
   },
 };
+// Justified rows: a landscape card is about a third of the row on desktop, half on tablets; a portrait one
+// a little over half of that. These tell the browser which resized copy to fetch.
+const LANDSCAPE_SIZES = '(max-width: 620px) 50vw, (max-width: 960px) 48vw, 380px';
+const PORTRAIT_SIZES = '(max-width: 620px) 30vw, (max-width: 960px) 28vw, 220px';
 ---
 <Base lang={lang} title={t('products.title')} current="products">
   <section class="wrap intro center-stack">
@@ -192,7 +196,7 @@ const text = {
                 data-type={f.type} data-dim={f.dim} data-mat={f.mat} data-sizes={f.sizes.join(' ')}
                 data-pmin={f.pmin} data-pmax={f.pmax} data-stock={f.stock ? '1' : '0'} data-sale={f.sale ? '1' : '0'}
                 data-disc={f.disc} data-id={f.p.id} data-order={f.i} data-name={loc(f.p.name, lang)}>
-                <SpecimenCard product={f.p} index={f.i} lang={lang} ratio={r} d={f.i % 3} heading="h2" />
+                <SpecimenCard product={f.p} index={f.i} lang={lang} ratio={r} d={f.i % 3} heading="h2" sizes={r < 1 ? PORTRAIT_SIZES : LANDSCAPE_SIZES} eager={f.i < 3} />
               </div>
             );
           })}

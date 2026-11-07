@@ -188,21 +188,25 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       addEventListener('pageshow', function () { window.__syncHeader(); });
       addEventListener('load', function () { requestAnimationFrame(window.__syncHeader); });
     </script>
-    <script>
-      const io = new IntersectionObserver(
-        (entries) => {
-          for (const e of entries) {
-            if (e.isIntersecting) {
-              e.target.classList.add('is-in');
-              io.unobserve(e.target);
-            }
-          }
-        },
-        { rootMargin: '0px 0px -8% 0px', threshold: 0.08 },
-      );
-      const watch = () => document.querySelectorAll('[data-reveal]:not(.is-in)').forEach((el) => io.observe(el));
-      watch();
-      document.addEventListener('symmetry:content', watch);
+    <script is:inline>
+      // Reveal on scroll. Inline (not a bundled module) so content in the first screen fades in as soon as the
+      // page is parsed, instead of staying hidden until a script file has downloaded.
+      (function () {
+        var io = new IntersectionObserver(
+          function (entries) {
+            entries.forEach(function (e) {
+              if (e.isIntersecting) {
+                e.target.classList.add('is-in');
+                io.unobserve(e.target);
+              }
+            });
+          },
+          { rootMargin: '0px 0px -8% 0px', threshold: 0.08 },
+        );
+        var watch = function () { document.querySelectorAll('[data-reveal]:not(.is-in)').forEach(function (el) { io.observe(el); }); };
+        watch();
+        document.addEventListener('symmetry:content', watch);
+      })();
     </script>
   </body>
 </html>

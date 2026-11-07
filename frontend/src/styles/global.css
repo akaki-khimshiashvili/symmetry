@@ -238,7 +238,7 @@ em { font-style: normal; font-weight: 600; }
    Reveal on load / scroll. Content is visible by default; JS opts in.
 ------------------------------------------------------------------- */
 html.js [data-reveal] {
-  opacity: 0;
+  opacity: 0.001; /* not 0: Chrome leaves opacity-0 content out of LCP until its fade has finished */
   transform: translateY(14px);
   filter: blur(6px);
   transition:

@@ -18,8 +18,9 @@ const SLATS = 8;
 ---
 <header class="site-header" data-header>
   <div class="wrap bar">
-    <a class="brand" href={path(lang, '/')} aria-label={`Symmetry, ${t('nav.home')}`}>
+    <a class="brand" href={path(lang, '/')}>
       <Wordmark />
+      <span class="sr-only">, {t('nav.home')}</span>
     </a>
     <nav class="nav" aria-label="Main">
       {links.map((l) => (
@@ -27,9 +28,10 @@ const SLATS = 8;
       ))}
     </nav>
     <div class="tools">
-      <a class="lang" href={switchHref} hreflang={other} lang={other} aria-label={t('lang.switch')} data-lang-switch data-on={lang}>
+      <a class="lang" href={switchHref} hreflang={other} lang={other} data-lang-switch data-on={lang}>
         <span class="opt" data-opt="ka">KA</span>
         <span class="opt" data-opt="en">EN</span>
+        <span class="sr-only">{t('lang.switch')}</span>
       </a>
       <button class="menu-btn" type="button" data-menu-btn aria-expanded="false" aria-controls="site-menu"
         data-open-label={t('nav.menu')} data-close-label={t('nav.close')} aria-label={t('nav.menu')}>

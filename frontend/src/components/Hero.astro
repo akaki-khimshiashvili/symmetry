@@ -100,13 +100,13 @@ const slats = Array.from({ length: N }, (_, i) => {
 
   /* Entrance: the title rises word by word, then the lead, then each button and social link in turn. */
   .h-title .w { display: inline-block; }
-  :global(html.js) .hero .h-title .w { opacity: 0; transform: translateY(0.4em); }
+  :global(html.js) .hero .h-title .w { opacity: 0.001; transform: translateY(0.4em); }
   :global(html.js) .hero.play .h-title .w {
     opacity: 1; transform: none;
     transition: opacity 700ms ease, transform 900ms var(--ease-out);
     transition-delay: calc(80ms + var(--w) * 70ms);
   }
-  :global(html.js) .hero .h-lead { opacity: 0; transform: translateY(14px); }
+  :global(html.js) .hero .h-lead { opacity: 0.001; transform: translateY(14px); }
   :global(html.js) .hero.play .h-lead { opacity: 1; transform: none; transition: opacity 800ms ease 320ms, transform 900ms var(--ease-out) 320ms; }
   /* The rows stay put; their buttons rise one after another (backwards fill, so hover still works after). */
   :global(html.js) .hero :is(.h-actions, .h-social) { opacity: 0; }
@@ -170,31 +170,42 @@ const slats = Array.from({ length: N }, (_, i) => {
   }
 </style>
 
-<script>
-  const hero = document.querySelector<HTMLElement>('[data-hero]')!;
-  const scene = hero.querySelector<HTMLElement>('[data-scene]')!;
-  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  const hasGL = (() => {
-    try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); }
-    catch { return false; }
+<script is:inline>
+  // The entrance starts from here, not from the bundled script below, so the headline and lead are on screen
+  // as soon as the web fonts are in (or after 400ms at most): the visible text never waits on JavaScript.
+  (function () {
+    var hero = document.querySelector("[data-hero]");
+    if (!hero) return;
+    var go = function () { requestAnimationFrame(function () { requestAnimationFrame(function () { hero.classList.add("play"); }); }); };
+    if (document.fonts && document.fonts.ready) Promise.race([document.fonts.ready, new Promise(function (r) { setTimeout(r, 400); })]).then(go);
+    else go();
   })();
-  if (!hasGL) scene.classList.add('no-gl');
+</script>
 
-  // The 3D scene is its own chunk: it starts downloading now, in parallel with fonts and paint.
-  const wall = hasGL ? import('../lib/slatwall') : null;
+<script>
+  const scene = document.querySelector<HTMLElement>("[data-hero] [data-scene]")!;
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  const start = () => requestAnimationFrame(() => requestAnimationFrame(async () => {
-    hero.classList.add('play');
-    if (!wall) return;
+  // The 3D wall is decoration: it loads once the page itself has loaded and the main thread is free, so it
+  // never competes with the text and the first paint. Without WebGL, three.js throws and the drawing stays.
+  const mount = async () => {
     try {
-      const { mountSlatWall } = await wall;
-      const wood = getComputedStyle(document.documentElement).getPropertyValue('--wood-hi').trim() || '#d8b98f';
-      mountSlatWall(scene, { reduce, woodColor: wood, onReady: () => scene.classList.add('gl-ready') });
+      const { mountSlatWall } = await import("../lib/slatwall-host");
+      const wood = getComputedStyle(document.documentElement).getPropertyValue("--wood-hi").trim() || "#d8b98f";
+      await mountSlatWall(scene, {
+        reduce,
+        woodColor: wood,
+        onReady: () => {
+          scene.classList.add("gl-ready");
+          // The flat drawing is hidden behind the canvas now: drop its few hundred nodes once it has faded.
+          setTimeout(() => scene.querySelector(".fallback")?.remove(), 700);
+        },
+      });
     } catch {
-      scene.classList.add('no-gl');
+      scene.classList.add("no-gl");
     }
-  }));
-  if (document.fonts?.ready) Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 600))]).then(start);
-  else start();
+  };
+  const idle = (fn: () => void) => ("requestIdleCallback" in window ? requestIdleCallback(fn, { timeout: 1500 }) : setTimeout(fn, 1));
+  if (document.readyState === "complete") idle(mount);
+  else addEventListener("load", () => idle(mount), { once: true });
 </script>
