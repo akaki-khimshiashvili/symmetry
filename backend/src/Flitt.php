@@ -153,7 +153,10 @@ final class Payments
             'captured_at' => 'TEXT',
             'released_at' => 'TEXT',
             'payment_updated_at' => 'TEXT',
-            'list_price' => 'REAL',                              // regular price when ordered on sale
+            'list_price' => 'REAL',                              // regular price (all pieces) when ordered on sale
+            // Several pieces of one design and size: `price` is the order total, `unit_price` one piece.
+            'quantity' => 'INTEGER NOT NULL DEFAULT 1',
+            'unit_price' => 'REAL',
             'sale_percent' => 'INTEGER NOT NULL DEFAULT 0',
             'receipt_emailed' => "TEXT NOT NULL DEFAULT ''",   // payment statuses whose receipt was emailed
             'receipt_emailed_at' => 'TEXT',
@@ -212,7 +215,8 @@ SQL);
 
         $params = [
             'order_id' => $flittOrderId,
-            'order_desc' => mb_substr('Symmetry #' . $order['id'] . ' · ' . $order['product_name'] . ' · ' . $order['size_label'], 0, 1000),
+            'order_desc' => mb_substr('Symmetry #' . $order['id'] . ' · ' . $order['product_name'] . ' · ' . $order['size_label']
+                . ((int) ($order['quantity'] ?? 1) > 1 ? ' × ' . (int) $order['quantity'] : ''), 0, 1000),
             'amount' => $amount,
             'currency' => 'GEL',
             'lang' => $lang,
@@ -332,6 +336,7 @@ SQL);
             'status' => $o['payment_status'],
             'product' => $o['product_name'],
             'size' => $o['size_label'],
+            'quantity' => max(1, (int) ($o['quantity'] ?? 1)),
             'price' => (float) $o['price'],
             'card' => $o['card_mask'],
             'test' => (bool) $o['payment_test'],

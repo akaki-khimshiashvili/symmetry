@@ -1,12 +1,15 @@
 ---
 import Icon from './Icon.astro';
 import { type Lang, useT, path } from '../i18n/ui';
-import { loadData } from '../lib/data';
+import { loadData, homeText } from '../lib/data';
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
 const t = useT(lang);
 const { settings } = await loadData();
+// Title and lead can be changed in the admin (მთავარი გვერდი); otherwise the built-in wording.
+const title = homeText(settings, 'hero_title', lang) || t('hero.title');
+const lead = homeText(settings, 'hero_lead', lang) || t('hero.lead');
 const socials = [
   { key: 'instagram', href: settings.instagram, label: 'Instagram' },
   { key: 'facebook', href: settings.facebook, label: 'Facebook' },
@@ -32,8 +35,8 @@ const slats = Array.from({ length: N }, (_, i) => {
 ---
 <section class="hero" data-hero>
   <div class="wrap center-stack hero-copy">
-    <h1 class="h-title">{t('hero.title').split(' ').map((w, i) => <><span class="w" style={`--w:${i}`}>{w}</span>{' '}</>)}</h1>
-    <p class="lead h-lead">{t('hero.lead')}</p>
+    <h1 class="h-title">{title.split(' ').map((w, i) => <><span class="w" style={`--w:${i}`}>{w}</span>{' '}</>)}</h1>
+    <p class="lead h-lead">{lead}</p>
     <div class="h-actions">
       <a class="btn btn-solid btn-lg" href={path(lang, '/products/')}>{t('hero.cta.products')}</a>
       <a class="btn btn-line btn-lg" href={path(lang, '/contact/')}>{t('hero.cta.contact')}</a>

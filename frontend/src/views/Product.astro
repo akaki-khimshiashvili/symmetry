@@ -6,7 +6,7 @@ import SpecimenCard from '../components/SpecimenCard.astro';
 import LeadForm from '../components/LeadForm.astro';
 import { type Lang, useT, path } from '../i18n/ui';
 import { saleEndText } from '../lib/saleDate';
-import { type Product, loadData, loc, priceFmt, waLink, telLink, API_URL, nowPrice, onSale, sizeOnSale, dimensionOf } from '../lib/data';
+import { type Product, loadData, loc, priceFmt, waLink, telLink, API_URL, nowPrice, onSale, sizeOnSale, dimensionOf, kindOf, typeName, dimensionName } from '../lib/data';
 
 interface Props { lang: Lang; product: Product }
 const { lang, product: p } = Astro.props;
@@ -27,6 +27,8 @@ const firstPct = first && sizeOnSale(first) ? first.sale_percent ?? 0 : 0;
 const others = products.filter((x) => x.slug !== p.slug).slice(0, 3);
 const hasPhoto = p.images.length > 0;
 const sizeLabel = (w: number, h: number) => `${w} × ${h} ${t('p.cm')}`;
+/** Most pieces per order (same limit as the API); bigger runs go through the contact form. */
+const QTY_MAX = 10;
 const days = p.delivery_days.min === p.delivery_days.max ? `${p.delivery_days.min}` : `${p.delivery_days.min}–${p.delivery_days.max}`;
 const waBase = `${t('p.waText')} «${name}»`;
 const waStock = `${t('p.waStock')} «${name}»?`;
@@ -44,7 +46,7 @@ const socials = [
     <a class="back" href={path(lang, '/products/')}><Icon name="arrow-left" size={18} />{t('p.back')}</a>
   </div>
 
-  <section class="wrap grid pdp" data-pdp data-lang={lang} data-product-id={p.id} data-slug={p.slug} data-api={API_URL} data-stock={inStock ? 'in' : 'out'} data-wa={s.whatsapp} data-wa-base={waBase}>
+  <section class="wrap grid pdp" data-pdp data-lang={lang} data-product-id={p.id} data-slug={p.slug} data-api={API_URL} data-stock={inStock ? 'in' : 'out'} data-wa={s.whatsapp} data-wa-base={waBase} data-qty-text={JSON.stringify({ pcs: t('p.pcs'), each: t('p.each') })}>
     <div class="media">
       <figure class="stage" data-stage>
         <div class="frame-box">
@@ -127,9 +129,23 @@ const socials = [
       </div>
 
       <div class="buy" data-when="in" data-reveal style="--d:3">
+        {/* How many pieces of this design and size: the price below is the total. */}
+        <div class="qty-row">
+          <label class="label" for="pdp-qty">{t('p.qty')}</label>
+          <div class="qty">
+            <button class="qty-b" type="button" data-qty-step="-1" aria-label={t('p.qtyLess')} disabled>
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+            </button>
+            <input id="pdp-qty" class="num" type="number" inputmode="numeric" min="1" max={QTY_MAX} step="1" value="1" data-qty />
+            <button class="qty-b" type="button" data-qty-step="1" aria-label={t('p.qtyMore')}>
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12h14M12 5v14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+            </button>
+          </div>
+          <span class="qty-each num" data-each hidden></span>
+        </div>
         <div class="price-row">
           <div class="price-box">
-            <span class="label">{t('p.price')}</span>
+            <span class="label" data-price-label data-one={t('p.price')} data-many={t('p.total')}>{t('p.price')}</span>
             <s class="was was-lg num" data-was hidden={!firstPct}>{first && firstPct ? `₾ ${priceFmt(first.price)}` : ''}</s>
             <span class="price display num" data-price aria-live="polite">₾ {first ? priceFmt(nowPrice(first)) : ''}</span>
           </div>
@@ -147,8 +163,8 @@ const socials = [
       </div>
 
       <dl class="specs" data-reveal style="--d:4">
-        <div><dt><Icon name="shape" size={18} />{t('p.type')}</dt><dd>{t((p.category === 'shelf' || p.category === 'wall' || p.category === 'mirror' ? `type.${p.category}.s` : `type.${p.orientation}`) as any)}</dd></div>
-        <div><dt><Icon name="shape" size={18} />{t('p.dimension')}</dt><dd>{t(`dim.${dimensionOf(p)}` as any)}</dd></div>
+        <div><dt><Icon name="shape" size={18} />{t('p.type')}</dt><dd>{kindOf(p) === 'portrait' || kindOf(p) === 'landscape' ? t(`type.${kindOf(p)}` as any) : typeName(kindOf(p), lang, 'single')}</dd></div>
+        <div><dt><Icon name="shape" size={18} />{t('p.dimension')}</dt><dd>{dimensionName(dimensionOf(p), lang)}</dd></div>
         <div><dt><Icon name="grain" size={18} />{t('p.material')}</dt><dd>{loc(p.material, lang)}</dd></div>
         <div><dt><Icon name="truck" size={18} />{t('p.delivery')}</dt><dd class="num">{days} {t('p.workingDays')}</dd></div>
         <div>
@@ -200,7 +216,7 @@ const socials = [
         <span class="label">{t('order.summary')}</span>
         <div class="sum-row">
           <span class="sum-name">{name}</span>
-          <span class="num" data-sum-size>{first ? sizeLabel(first.width, first.height) : ''}</span>
+          <span class="num"><span data-sum-size>{first ? sizeLabel(first.width, first.height) : ''}</span><span data-sum-qty hidden></span></span>
           <span class="num sum-price" data-sum-price>₾ {first ? priceFmt(nowPrice(first)) : ''}</span>
         </div>
       </div>
@@ -338,6 +354,24 @@ const socials = [
   @media (hover: hover) and (pointer: fine) { .size:hover { background: color-mix(in oklab, var(--ink) 4%, transparent); } }
 
   .buy { display: grid; gap: 0.75rem; }
+  /* Quantity: a compact stepper; the price under it is the total for all pieces. */
+  .qty-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
+  .qty { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; background: var(--ground); }
+  .qty-b {
+    display: grid; place-items: center; width: 2.75rem; height: 2.75rem; padding: 0; border: 0; border-radius: 50%;
+    background: none; color: var(--ink); cursor: pointer; transition: background-color 200ms ease, transform 160ms var(--ease-out);
+  }
+  .qty-b:active:not(:disabled) { transform: scale(0.92); }
+  .qty-b:disabled { color: var(--ink-3); opacity: 0.45; cursor: default; }
+  @media (hover: hover) and (pointer: fine) { .qty-b:not(:disabled):hover { background: color-mix(in oklab, var(--ink) 6%, transparent); } }
+  .qty input {
+    width: 3rem; height: 2.75rem; padding: 0; border: 0; background: none; color: var(--ink);
+    font: inherit; font-size: var(--t-base); font-weight: 600; text-align: center; appearance: textfield; -moz-appearance: textfield;
+  }
+  .qty input::-webkit-inner-spin-button, .qty input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .qty input:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
+  .qty-b:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .qty-each { font-size: var(--t-sm); color: var(--ink-3); }
   /* Price and the main action share one row, so the whole decision sits in one glance. */
   .price-row { display: grid; grid-template-columns: auto 1fr; align-items: end; gap: 1.25rem; }
   .price-box { display: grid; gap: 0.2rem; }
@@ -442,10 +476,23 @@ const socials = [
 
     const wasEl = root.querySelector<HTMLElement>('[data-was]');
     const pill = root.querySelector<HTMLElement>('[data-sale-pill]');
+    // Quantity: the shown price, the order summary and the request are all for this many pieces.
+    const qtyInput = root.querySelector<HTMLInputElement>('[data-qty]');
+    const qtyMax = Number(qtyInput?.max) || 10;
+    const eachEl = root.querySelector<HTMLElement>('[data-each]');
+    const priceLabel = root.querySelector<HTMLElement>('[data-price-label]');
+    const sumQty = drawer.querySelector<HTMLElement>('[data-sum-qty]');
+    const text = JSON.parse(root.dataset.qtyText || '{}') as { pcs: string; each: string };
+    let qty = 1;
     const apply = (input: HTMLInputElement) => {
       const { w, h, price, label, old } = input.dataset;
-      priceEl.textContent = `₾ ${fmt(Number(price))}`;
-      if (wasEl) { wasEl.hidden = !old; wasEl.textContent = old ? `₾ ${fmt(Number(old))}` : ''; }
+      const total = Number(price) * qty;
+      priceEl.textContent = `₾ ${fmt(total)}`;
+      if (wasEl) { wasEl.hidden = !old; wasEl.textContent = old ? `₾ ${fmt(Number(old) * qty)}` : ''; }
+      if (eachEl) { eachEl.hidden = qty < 2; eachEl.textContent = `₾ ${fmt(Number(price))} · ${text.each}`; }
+      if (priceLabel) priceLabel.textContent = (qty > 1 ? priceLabel.dataset.many : priceLabel.dataset.one) || '';
+      if (sumQty) { sumQty.hidden = qty < 2; sumQty.textContent = ` × ${qty} ${text.pcs}`; }
+      (form.elements.namedItem('quantity') as HTMLInputElement).value = String(qty);
       // The sale pill shows the selected size's own discount.
       if (pill) {
         pill.hidden = !input.dataset.pct;
@@ -455,13 +502,37 @@ const socials = [
       if (dimW) dimW.textContent = `${w} ${unit}`;
       if (dimH) dimH.textContent = `${h} ${unit}`;
       sumSize.textContent = label || '';
-      sumPrice.textContent = `₾ ${fmt(Number(price))}`;
+      sumPrice.textContent = `₾ ${fmt(total)}`;
       (form.elements.namedItem('size_id') as HTMLInputElement).value = input.value;
       if (wa && root.dataset.wa) {
-        const text = `${root.dataset.waBase}, ${label}`;
-        wa.href = `https://wa.me/${root.dataset.wa.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`;
+        const msg = `${root.dataset.waBase}, ${label}${qty > 1 ? `, ${qty} ${text.pcs}` : ''}`;
+        wa.href = `https://wa.me/${root.dataset.wa.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`;
       }
     };
+
+    const setQty = (n: number, animate = false) => {
+      const next = Math.min(qtyMax, Math.max(1, Math.round(n) || 1));
+      const changed = next !== qty;
+      qty = next;
+      if (qtyInput) qtyInput.value = String(qty);
+      root.querySelectorAll<HTMLButtonElement>('[data-qty-step]').forEach((b) => {
+        b.disabled = Number(b.dataset.qtyStep) < 0 ? qty <= 1 : qty >= qtyMax;
+      });
+      const sel = root.querySelector<HTMLInputElement>('input[name="size"]:checked');
+      if (sel) apply(sel);
+      if (animate && changed && !matchMedia('(prefers-reduced-motion: reduce)').matches)
+        priceEl.animate([{ opacity: 0.4 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' });
+    };
+    root.querySelectorAll<HTMLButtonElement>('[data-qty-step]').forEach((b) =>
+      b.addEventListener('click', () => setQty(qty + Number(b.dataset.qtyStep), true)),
+    );
+    // Typing: totals follow valid numbers as they're typed; leaving the field settles on a valid amount.
+    qtyInput?.addEventListener('input', () => {
+      const n = Number(qtyInput.value);
+      if (Number.isInteger(n) && n >= 1 && n <= qtyMax) setQty(n);
+    });
+    qtyInput?.addEventListener('change', () => setQty(Number(qtyInput.value)));
+    qtyInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); setQty(Number(qtyInput.value)); } });
 
     const checked = root.querySelector<HTMLInputElement>('input[name="size"]:checked');
     (form.elements.namedItem('product_id') as HTMLInputElement).value = root.dataset.productId || '';

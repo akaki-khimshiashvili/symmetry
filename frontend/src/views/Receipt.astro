@@ -67,7 +67,7 @@ const text = {
           <tr><th>{t('rc.item')}</th><th>{t('rc.size')}</th><th class="r">{t('rc.qty')}</th><th class="r">{t('rc.price')}</th></tr>
         </thead>
         <tbody>
-          <tr><td data-product></td><td class="num" data-size></td><td class="r num">1</td><td class="r num" data-price></td></tr>
+          <tr><td data-product></td><td class="num" data-size></td><td class="r num" data-qty>1</td><td class="r num" data-price></td></tr>
           <tr class="rc-sale" data-sale-row hidden><td colspan="3" data-sale-label></td><td class="r num" data-sale-amount></td></tr>
         </tbody>
         <tfoot>
@@ -195,6 +195,7 @@ const text = {
     set('[data-buyer]', [r.customer.name, r.customer.phone, r.customer.email].filter(Boolean).join('\n'));
     set('[data-product]', r.item.product);
     set('[data-size]', r.item.size);
+    set('[data-qty]', String(r.item.qty || 1));
     // On sale: the line shows the regular price, then the discount, so the total adds up.
     set('[data-price]', fmtGel(r.list_price ?? r.amount));
     $('[data-sale-row]').hidden = !r.list_price;

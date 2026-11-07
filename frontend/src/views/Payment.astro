@@ -74,7 +74,7 @@ const icons: Record<string, string> = {
 </style>
 
 <script>
-  type View = { id: number; status: string; product: string; size: string; price: number; card: string; test: boolean; can_retry: boolean; has_receipt: boolean };
+  type View = { id: number; status: string; product: string; size: string; quantity?: number; price: number; card: string; test: boolean; can_retry: boolean; has_receipt: boolean };
   const root = document.querySelector<HTMLElement>('[data-pay]')!;
   const api = root.dataset.api!;
   const text: Record<string, { t: string; d: string }> = JSON.parse(root.dataset.text || '{}');
@@ -97,7 +97,7 @@ const icons: Record<string, string> = {
     rl.hidden = !v?.has_receipt;
     if (v?.has_receipt) rl.href = `${rl.getAttribute('href')!.split('?')[0]}?t=${token}`;
     if (v) {
-      $('[data-f-order]').textContent = `#${v.id} · ${v.product} · ${v.size}`;
+      $('[data-f-order]').textContent = `#${v.id} · ${v.product} · ${v.size}${(v.quantity ?? 1) > 1 ? ` × ${v.quantity}` : ''}`;
       $('[data-f-amount]').textContent = fmt(v.price);
       $('[data-f-card-row]').hidden = !v.card;
       $('[data-f-card]').textContent = v.card;

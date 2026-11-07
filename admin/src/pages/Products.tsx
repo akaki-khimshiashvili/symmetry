@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'preact/hooks';
-import { api, type Product, type ProductMetric, type Metrics, fmtPrice, fmtNum, typeLabel, SITE_URL, FEATURED_MAX } from '../api';
+import { api, type Product, type ProductMetric, type Metrics, type KeyedOption, type OptionSet, fmtPrice, fmtNum, typeLabel, SITE_URL, FEATURED_MAX } from '../api';
 import { Icon, Loading, Empty, toast, confirmAction } from '../ui';
 import { Preview } from './Preview';
-import { CollectionCovers } from '../collection';
 
 export function ProductsPage() {
   const [items, setItems] = useState<Product[] | null>(null);
   const [stats, setStats] = useState<Record<number, ProductMetric> | null>(null);
+  const [types, setTypes] = useState<KeyedOption[]>();
   const load = () => api<Product[]>('/admin/products').then(setItems).catch((e) => toast.err(e.message));
   useEffect(() => {
     load();
+    api<OptionSet>('/admin/options').then((o) => setTypes(o.type)).catch(() => {});
     // Views and orders over the last 30 days, shown next to each product.
     api<Metrics>('/admin/metrics?days=30').then((m) => setStats(Object.fromEntries(m.products.map((x) => [x.id, x])))).catch(() => {});
   }, []);
@@ -73,7 +74,7 @@ export function ProductsPage() {
                       <a class="strong" href={`#/products/${p.id}`}>{p.name.ka}</a>
                       <div class="muted small">{p.name.en} · /{p.slug}</div>
                     </td>
-                    <td>{typeLabel(p)}</td>
+                    <td>{typeLabel(p, types)}</td>
                     <td class="num">{p.sizes.length}</td>
                     <td class="num nowrap">
                       {prices.length ? `${fmtPrice(Math.min(...prices))}${prices.length > 1 ? ` – ${fmtPrice(Math.max(...prices))}` : ''}` : 'ფასი არ არის'}
@@ -120,7 +121,7 @@ export function ProductsPage() {
         </div>
       )}
 
-      <CollectionCovers />
+      <p class="muted small">მთავარი გვერდის კოლექციები და რჩეული დიზაინები იმართება გვერდზე <a href="#/home">მთავარი გვერდი</a>.</p>
     </section>
   );
 }

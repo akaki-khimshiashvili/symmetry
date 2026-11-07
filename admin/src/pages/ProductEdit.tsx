@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { api, ApiError, type Product, type Size, type L10n, type OptionSet, PRODUCT_TYPES, typeOf, type ProductType, DIMENSIONS, SITE_URL, fmtPrice, FEATURED_MAX } from '../api';
+import { api, ApiError, type Product, type Size, type L10n, type OptionSet, typeOf, isPanelType, TYPE_HINTS, DIMENSION_HINTS, SITE_URL, fmtPrice, FEATURED_MAX } from '../api';
 import { Icon, Loading, toast, confirmAction } from '../ui';
-import { OptionSelect, SizeSelect } from '../options';
+import { OptionSelect, SizeSelect, KeyedChoice } from '../options';
 import { CropDialog } from '../crop';
 
 const fmtDuration = (min: number) => {
@@ -83,8 +83,8 @@ export function ProductEdit({ id }: { id: string }) {
 
   const set = <K extends keyof Product>(k: K, v: Product[K]) => { setP({ ...p, [k]: v }); setDirty(true); };
   /** Panels are split by shape; shelves, whole walls and mirrors keep their photo format (chosen when cropping). */
-  const setType = (ty: ProductType) => {
-    setP(ty === 'portrait' || ty === 'landscape' ? { ...p, category: 'panel', orientation: ty } : { ...p, category: ty });
+  const setType = (ty: string) => {
+    setP(isPanelType(ty) ? { ...p, category: 'panel', orientation: ty as Product['orientation'] } : { ...p, category: ty });
     setDirty(true);
   };
   const setSize = (i: number, patch: Partial<Size>) => set('sizes', p.sizes.map((s, j) => (j === i ? { ...s, ...patch } : s)));
@@ -237,35 +237,14 @@ export function ProductEdit({ id }: { id: string }) {
         <div class="col-main">
           <section class="card pad-lg">
             <h2>ძირითადი ინფორმაცია</h2>
-            <fieldset class="seg-field">
-              <legend>პროდუქტის ტიპი</legend>
-              <div class="seg type-seg">
-                {PRODUCT_TYPES.map((ty) => (
-                  <label key={ty.key} class={typeOf(p) === ty.key ? 'on' : ''}>
-                    <input type="radio" name="ptype" value={ty.key} checked={typeOf(p) === ty.key} onChange={() => setType(ty.key)} />
-                    <span class={`type-ico ${ty.key}`} aria-hidden="true" />
-                    <span class="type-txt"><b>{ty.label}</b><small>{ty.hint}</small></span>
-                  </label>
-                ))}
-              </div>
-              {(typeOf(p) !== 'portrait' && typeOf(p) !== 'landscape') && (
+            <KeyedChoice kind="type" legend="პროდუქტის ტიპი" name="ptype" value={typeOf(p)} onChange={setType}
+              opts={opts} setOpts={setOpts} hints={TYPE_HINTS} error={errors.category || errors.orientation}>
+              {!isPanelType(typeOf(p)) && (
                 <span class="muted small">ფოტოს ფორმატს (ვერტიკალური 3:4 თუ ჰორიზონტალური 4:3) ატვირთვისას, კადრირების ფანჯარაში აირჩევთ.</span>
               )}
-              {(errors.category || errors.orientation) && <span class="err">{errors.category || errors.orientation}</span>}
-            </fieldset>
-            <fieldset class="seg-field">
-              <legend>პროდუქტის განზომილება</legend>
-              <div class="seg type-seg dim-seg">
-                {DIMENSIONS.map((d) => (
-                  <label key={d.key} class={p.dimension === d.key ? 'on' : ''}>
-                    <input type="radio" name="pdim" value={d.key} checked={p.dimension === d.key} onChange={() => set('dimension', d.key)} />
-                    <span class={`type-ico ${d.key}`} aria-hidden="true" />
-                    <span class="type-txt"><b>{d.label}</b><small>{d.hint}</small></span>
-                  </label>
-                ))}
-              </div>
-              {errors.dimension && <span class="err">{errors.dimension}</span>}
-            </fieldset>
+            </KeyedChoice>
+            <KeyedChoice kind="dimension" legend="პროდუქტის განზომილება" name="pdim" value={p.dimension} onChange={(d) => set('dimension', d)}
+              opts={opts} setOpts={setOpts} hints={DIMENSION_HINTS} error={errors.dimension} wide />
             <Bilingual label="დასახელება" field="name" value={p.name} onChange={(v) => set('name', v)} errors={errors} />
             <Bilingual label="მოკლე აღწერა" hint="ჩანს კატალოგში" field="short" value={p.short} onChange={(v) => set('short', v)} errors={errors} />
             <Bilingual label="სრული აღწერა" field="description" value={p.description} onChange={(v) => set('description', v)} errors={errors} multiline />

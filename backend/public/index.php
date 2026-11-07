@@ -25,6 +25,7 @@ require __DIR__ . '/../src/Receipts.php';
 require __DIR__ . '/../src/Mailer.php';
 require __DIR__ . '/../src/Metrics.php';
 require __DIR__ . '/../src/Invoices.php';
+require __DIR__ . '/../src/Collections.php';
 
 Http::cors($config['allowed_origins'], $config['allow_local_origins']);
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -43,9 +44,11 @@ const SETTING_KEYS = [
     'address_ka', 'address_en', 'hours_ka', 'hours_en', 'default_palette',
     // Seller details printed on receipts and invoices; bank details for invoices.
     'legal_name', 'tax_id', 'bank_name', 'bank_swift', 'iban',
+    // Home page texts (admin → მთავარი გვერდი); empty = the site's built-in wording.
+    'home_hero_title_ka', 'home_hero_title_en', 'home_hero_lead_ka', 'home_hero_lead_en',
 ];
-/** Home-page collection tiles whose cover photo is chosen (and cropped to 4:5) in the admin. */
-const COLLECTION_KEYS = ['mirror', 'shelf', 'wall'];
+/** Most pieces one order may have (same limit as the product page). */
+const ORDER_QTY_MAX = 10;
 
 try {
     $pdo = Db::get($config);
@@ -117,15 +120,12 @@ try {
         }
         return $out;
     };
-    /** Cover photo URLs of the home collection tiles ('' = none chosen, the site falls back to a product photo). */
-    $collection = function () use ($pdo, $base): array {
-        $rows = $pdo->query("SELECT key, value FROM settings WHERE key LIKE 'collection_%'")->fetchAll(PDO::FETCH_KEY_PAIR);
-        $out = [];
-        foreach (COLLECTION_KEYS as $k) {
-            $path = $rows['collection_' . $k] ?? '';
-            $out[$k] = $path !== '' ? $base . $path : '';
+    $collectionOr404 = function (string $id) use ($pdo, $base): array {
+        $c = Collections::find($pdo, (int) $id, $base);
+        if (!$c) {
+            throw new HttpError(404, 'კოლექცია ვერ მოიძებნა');
         }
-        return $out;
+        return $c;
     };
 
     $productOr404 = function (string $id, bool $hidden) use ($pdo, $base): array {
@@ -141,8 +141,11 @@ try {
         ['GET', '#^/health$#', fn () => ['ok' => true]],
         ['GET', '#^/products$#', fn () => Products::all($pdo, false, $base)],
         ['GET', '#^/products/([\w-]+)$#', fn ($id) => $productOr404($id, false)],
-        ['GET', '#^/settings$#', fn () => $settings() + ['payments' => (bool) $config['flitt_enabled'], 'collection' => $collection()]],
-        ['GET', '#^/collection$#', fn () => $collection()],
+        ['GET', '#^/settings$#', fn () => $settings() + ['payments' => (bool) $config['flitt_enabled']]],
+        // Home-page collection cards (published ones, in the admin's order).
+        ['GET', '#^/collections$#', fn () => Collections::all($pdo, $base, false)],
+        // Product types and dimensions as managed in the admin: the site builds its filters and labels from these.
+        ['GET', '#^/taxonomy$#', fn () => Options::taxonomy($pdo)],
 
         ['POST', '#^/contact$#', function () use ($pdo) {
             $b = Http::body();
@@ -187,17 +190,23 @@ try {
             } elseif (!$size) {
                 $errors['size_id'] = 'invalid';
             }
+            // How many pieces of this design and size (1–ORDER_QTY_MAX; bigger runs go through the contact form).
+            $qty = filter_var($b['quantity'] ?? 1, FILTER_VALIDATE_INT);
+            if ($qty === false || $qty < 1 || $qty > ORDER_QTY_MAX) {
+                $errors['quantity'] = 'invalid';
+            }
             if ($errors) {
                 throw new HttpError(422, 'Validation failed', $errors);
             }
             $c = Leads::clean($b);
             // The price is always worked out here (sale included), never taken from the browser.
+            // `price` and `list_price` are totals for all pieces; `unit_price` is one piece.
             $onSale = $size['sale_price'] < $size['price'];
-            $pdo->prepare('INSERT INTO orders (product_id, size_id, product_name, size_label, price, list_price, sale_percent, first_name, last_name, phone, email, client_type, channel, message, lang) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            $pdo->prepare('INSERT INTO orders (product_id, size_id, product_name, size_label, quantity, unit_price, price, list_price, sale_percent, first_name, last_name, phone, email, client_type, channel, message, lang) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
                 ->execute([
                     $product['id'], $size['id'], $product['name']['ka'],
-                    $size['width'] . ' × ' . $size['height'] . ' სმ', $size['sale_price'],
-                    $onSale ? $size['price'] : null, $onSale ? (int) $size['sale_percent'] : 0,
+                    $size['width'] . ' × ' . $size['height'] . ' სმ', $qty, $size['sale_price'], round($size['sale_price'] * $qty, 2),
+                    $onSale ? round($size['price'] * $qty, 2) : null, $onSale ? (int) $size['sale_percent'] : 0,
                     $c['first_name'], $c['last_name'], $c['phone'], $c['email'], $c['client_type'], $c['channel'], $c['message'], $c['lang'],
                 ]);
             $id = (int) $pdo->lastInsertId();
@@ -333,6 +342,9 @@ try {
         }],
         ['DELETE', '#^/admin/options/(\d+)$#', function ($id) use ($pdo, $admin) {
             $admin();
+            if ($why = Options::deleteBlocker($pdo, (int) $id)) {
+                throw new HttpError(409, $why);
+            }
             if (!Options::delete($pdo, (int) $id)) {
                 throw new HttpError(404, 'ვარიანტი ვერ მოიძებნა');
             }
@@ -350,7 +362,7 @@ try {
         ['POST', '#^/admin/products$#', function () use ($pdo, $admin, $productOr404) {
             $admin();
             $b = Http::body();
-            if ($errors = Products::validate($b)) {
+            if ($errors = Products::validate($pdo, $b)) {
                 throw new HttpError(422, 'შეამოწმეთ ველები', $errors);
             }
             if ($msg = Products::featuredError($pdo, $b)) {
@@ -365,7 +377,7 @@ try {
             $admin();
             $productOr404($id, true);
             $b = Http::body();
-            if ($errors = Products::validate($b)) {
+            if ($errors = Products::validate($pdo, $b)) {
                 throw new HttpError(422, 'შეამოწმეთ ველები', $errors);
             }
             if ($msg = Products::featuredError($pdo, $b, (int) $id)) {
@@ -455,12 +467,47 @@ try {
             return ['ok' => true];
         }],
 
-        // Home collection cover: one photo per tile, already cropped to 4:5 in the admin. Replaces the previous one.
-        ['POST', '#^/admin/collection/(\w+)/image$#', function ($key) use ($pdo, $admin, $config, $collection) {
+        // ---------- Home collection cards ----------
+        ['GET', '#^/admin/collections$#', function () use ($pdo, $admin, $base) {
             $admin();
-            if (!in_array($key, COLLECTION_KEYS, true)) {
-                throw new HttpError(404, 'კოლექცია ვერ მოიძებნა');
+            return Collections::all($pdo, $base, true);
+        }],
+        ['POST', '#^/admin/collections$#', function () use ($pdo, $admin, $collectionOr404) {
+            $admin();
+            $b = Http::body();
+            if ($errors = Collections::validate($pdo, $b)) {
+                throw new HttpError(422, 'შეამოწმეთ ველები', $errors);
             }
+            return $collectionOr404((string) Collections::save($pdo, $b));
+        }],
+        ['PUT', '#^/admin/collections/order$#', function () use ($pdo, $admin, $base) {
+            $admin();
+            Collections::reorder($pdo, (array) (Http::body()['ids'] ?? []));
+            return Collections::all($pdo, $base, true);
+        }],
+        ['PUT', '#^/admin/collections/(\d+)$#', function ($id) use ($pdo, $admin, $collectionOr404) {
+            $admin();
+            $collectionOr404($id);
+            $b = Http::body();
+            if ($errors = Collections::validate($pdo, $b)) {
+                throw new HttpError(422, 'შეამოწმეთ ველები', $errors);
+            }
+            Collections::save($pdo, $b, (int) $id);
+            return $collectionOr404($id);
+        }],
+        ['DELETE', '#^/admin/collections/(\d+)$#', function ($id) use ($pdo, $admin, $config, $collectionOr404) {
+            $admin();
+            $collectionOr404($id);
+            if ($old = Collections::imagePath($pdo, (int) $id)) {
+                Products::unlinkUpload($config['upload_dir'], $old);
+            }
+            Collections::delete($pdo, (int) $id);
+            return ['ok' => true];
+        }],
+        // Cover photo: one per card, already cropped to 4:5 in the admin. Replaces the previous one.
+        ['POST', '#^/admin/collections/(\d+)/image$#', function ($id) use ($pdo, $admin, $config, $collectionOr404) {
+            $admin();
+            $collectionOr404($id);
             $f = $_FILES['image'] ?? null;
             if (!$f || is_array($f['name'])) {
                 throw new HttpError(400, 'ფაილი არ არის არჩეული');
@@ -479,7 +526,7 @@ try {
             if (!is_dir($config['upload_dir'])) {
                 mkdir($config['upload_dir'], 0775, true);
             }
-            $stem = 'c-' . $key . '-' . bin2hex(random_bytes(8));
+            $stem = 'c-' . (int) $id . '-' . bin2hex(random_bytes(8));
             if (Images::supported()) {
                 $file = $stem . '.webp';
                 try {
@@ -493,25 +540,21 @@ try {
                     throw new HttpError(500, 'ფაილის შენახვა ვერ მოხერხდა');
                 }
             }
-            $old = $pdo->query("SELECT value FROM settings WHERE key = " . $pdo->quote('collection_' . $key))->fetchColumn();
-            $pdo->prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
-                ->execute(['collection_' . $key, $config['upload_url'] . '/' . $file]);
+            $old = Collections::imagePath($pdo, (int) $id);
+            Collections::setImage($pdo, (int) $id, $config['upload_url'] . '/' . $file);
             if ($old) {
-                Products::unlinkUpload($config['upload_dir'], (string) $old);
+                Products::unlinkUpload($config['upload_dir'], $old);
             }
-            return $collection();
+            return $collectionOr404($id);
         }],
-        ['DELETE', '#^/admin/collection/(\w+)/image$#', function ($key) use ($pdo, $admin, $config, $collection) {
+        ['DELETE', '#^/admin/collections/(\d+)/image$#', function ($id) use ($pdo, $admin, $config, $collectionOr404) {
             $admin();
-            if (!in_array($key, COLLECTION_KEYS, true)) {
-                throw new HttpError(404, 'კოლექცია ვერ მოიძებნა');
+            $collectionOr404($id);
+            if ($old = Collections::imagePath($pdo, (int) $id)) {
+                Products::unlinkUpload($config['upload_dir'], $old);
             }
-            $old = $pdo->query("SELECT value FROM settings WHERE key = " . $pdo->quote('collection_' . $key))->fetchColumn();
-            if ($old) {
-                Products::unlinkUpload($config['upload_dir'], (string) $old);
-            }
-            $pdo->prepare('DELETE FROM settings WHERE key = ?')->execute(['collection_' . $key]);
-            return $collection();
+            Collections::setImage($pdo, (int) $id, '');
+            return $collectionOr404($id);
         }],
 
         ['GET', '#^/admin/orders$#', function () use ($pdo, $admin) {
@@ -645,7 +688,9 @@ try {
                 $blank['client_phone'] = $o['phone'];
                 $blank['client_email'] = $o['email'];
                 $name = trim($o['product_name'] . ' · ' . $o['size_label'], ' ·');
-                $blank['items'] = [['description' => $name, 'qty' => 1, 'unit' => $blank['lang'] === 'en' ? 'pc' : 'ც', 'price' => (float) $o['price']]];
+                $qty = max(1, (int) ($o['quantity'] ?? 1));
+                $unitPrice = $o['unit_price'] !== null ? (float) $o['unit_price'] : round((float) $o['price'] / $qty, 2);
+                $blank['items'] = [['description' => $name, 'qty' => $qty, 'unit' => $blank['lang'] === 'en' ? 'pc' : 'ც', 'price' => $unitPrice]];
             }
             return $blank;
         }],

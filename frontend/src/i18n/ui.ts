@@ -25,6 +25,9 @@ export const ui = {
     'collection.featured': 'რჩეული დიზაინები',
     'collection.from': 'დან',
     'collection.custom': 'ინდივიდუალური პროექტი · ფასი შეთანხმებით',
+    'collection.viewAll': 'ყველა კოლექცია',
+    'collection.prev': 'წინა კოლექციები',
+    'collection.next': 'შემდეგი კოლექციები',
 
 
 
@@ -43,6 +46,12 @@ export const ui = {
     'p.size': 'ზომა',
     'p.chooseSize': 'აირჩიეთ ზომა',
     'p.price': 'ფასი',
+    'p.qty': 'რაოდენობა',
+    'p.qtyLess': 'ერთით ნაკლები',
+    'p.qtyMore': 'ერთით მეტი',
+    'p.pcs': 'ც',
+    'p.each': 'ერთი ცალი',
+    'p.total': 'სულ',
     'p.material': 'მასალა',
     'p.delivery': 'მიტანა',
     'p.installation': 'მონტაჟი',
@@ -325,6 +334,9 @@ export const ui = {
     'collection.featured': 'Featured designs',
     'collection.from': 'from',
     'collection.custom': 'Custom project · price on request',
+    'collection.viewAll': 'All collections',
+    'collection.prev': 'Previous collections',
+    'collection.next': 'Next collections',
 
 
 
@@ -343,6 +355,12 @@ export const ui = {
     'p.size': 'Size',
     'p.chooseSize': 'Choose a size',
     'p.price': 'Price',
+    'p.qty': 'Quantity',
+    'p.qtyLess': 'One fewer',
+    'p.qtyMore': 'One more',
+    'p.pcs': 'pcs',
+    'p.each': 'each',
+    'p.total': 'Total',
     'p.material': 'Material',
     'p.delivery': 'Delivery',
     'p.installation': 'Installation',

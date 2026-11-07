@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { useLive } from '../live';
 import {
-  api, type Metrics, type Mix, type ProductMetric, PERIODS, PAYMENT, CLIENT_TYPES, CHANNELS, PRODUCT_TYPES,
+  api, type Metrics, type Mix, type ProductMetric, PERIODS, PAYMENT, CLIENT_TYPES, CHANNELS, type OptionSet, type KeyedOption, labelOf,
   fmtDate, fmtPrice, fmtNum,
 } from '../api';
 import { Icon, Loading, toast } from '../ui';
@@ -23,7 +23,6 @@ const MSG_STATUS: Record<string, string> = { new: 'ახალი (უპას
 const DEVICES: Record<string, string> = { mobile: 'მობილური', desktop: 'კომპიუტერი', tablet: 'პლანშეტი' };
 const LANGS: Record<string, string> = { ka: 'ქართული', en: 'ინგლისური' };
 const CONTACTS: Record<string, string> = { ...CHANNELS, instagram: 'Instagram', facebook: 'Facebook', tiktok: 'TikTok' };
-const TYPE_LABEL = Object.fromEntries(PRODUCT_TYPES.map((t) => [t.key, t.label]));
 
 const pref = {
   get: <T,>(k: string, d: T): T => { try { const v = localStorage.getItem(`symmetry-admin:${k}`); return v ? (JSON.parse(v) as T) : d; } catch { return d; } },
@@ -182,6 +181,9 @@ const sources = (m: Metrics): BarRow[] => {
 type SortKey = 'views' | 'orders' | 'revenue' | 'conversion';
 function ProductsTab({ m }: { m: Metrics }) {
   const [sort, setSort] = useState<SortKey>('views');
+  // Type names come from the database (types can be added in the admin).
+  const [types, setTypes] = useState<KeyedOption[]>();
+  useEffect(() => { api<OptionSet>('/admin/options').then((o) => setTypes(o.type)).catch(() => {}); }, []);
   const list = [...m.products].sort((a, b) => b[sort] - a[sort] || b.views - a.views);
   const unseen = m.products.filter((x) => x.published && x.views === 0).length;
   const viewed = m.products.filter((x) => x.views > 0);
@@ -219,7 +221,7 @@ function ProductsTab({ m }: { m: Metrics }) {
       <p class="muted small">კონვერსია = შეკვეთები ÷ პროდუქტის მნახველები. დაბალი კონვერსია ბევრი ნახვით ნიშნავს, რომ პროდუქტი იზიდავს, მაგრამ ფასი, ფოტო ან აღწერა შესაძლოა გასაუმჯობესებელია.</p>
       <div class="two">
         <BarList title="პოპულარული ზომები" rows={m.sizes.map((s, i) => ({ key: String(i), label: <>{s.product} <span class="muted num">{s.size}</span></>, n: s.orders }))} empty="შეკვეთები ჯერ არ არის" />
-        <BarList title="შეკვეთები ტიპის მიხედვით" rows={m.types.map((t) => ({ key: t.key, label: TYPE_LABEL[t.key] ?? t.key, n: t.orders, note: t.revenue ? `შემოსავალი ${fmtPrice(t.revenue)}` : undefined }))} empty="შეკვეთები ჯერ არ არის" />
+        <BarList title="შეკვეთები ტიპის მიხედვით" rows={m.types.map((t) => ({ key: t.key, label: labelOf(types, t.key), n: t.orders, note: t.revenue ? `შემოსავალი ${fmtPrice(t.revenue)}` : undefined }))} empty="შეკვეთები ჯერ არ არის" />
       </div>
     </>
   );

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { api, ApiError, type L10n, type OptionSet, type TextOption, type SizeOption } from './api';
+import type { ComponentChildren } from 'preact';
+import { api, ApiError, type L10n, type OptionSet, type TextOption, type SizeOption, type KeyedOption } from './api';
 import { Icon, toast, confirmAction } from './ui';
 
 export const sizeLabel = (w: number, h: number) => `${w} × ${h} სმ`;
@@ -7,8 +8,12 @@ const NEW = '__new';
 
 /* ---------- Shared: the inline "add a new option" panels ---------- */
 
+type TextKind = 'material' | 'type' | 'dimension';
+
 /** Georgian + English, both required. Saved to the database so it is offered for every product from now on. */
-function NewTextOption({ kind, onSaved, onCancel }: { kind: 'material'; onSaved: (o: TextOption) => void; onCancel?: () => void }) {
+function NewTextOption<T extends TextOption>({ kind, onSaved, onCancel, note }: {
+  kind: TextKind; onSaved: (o: T) => void; onCancel?: () => void; note?: string;
+}) {
   const [ka, setKa] = useState('');
   const [en, setEn] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -24,7 +29,7 @@ function NewTextOption({ kind, onSaved, onCancel }: { kind: 'material'; onSaved:
     if (Object.keys(errs).length) return;
     setBusy(true);
     try {
-      onSaved(await api<TextOption>('/admin/options', { body: { kind, ka: ka.trim(), en: en.trim() } }));
+      onSaved(await api<T>('/admin/options', { body: { kind, ka: ka.trim(), en: en.trim() } }));
       setKa(''); setEn('');
     } catch (e) {
       if (e instanceof ApiError && e.status === 422) setErrors(e.fields);
@@ -51,7 +56,7 @@ function NewTextOption({ kind, onSaved, onCancel }: { kind: 'material'; onSaved:
         </label>
       </div>
       <div class="opt-actions">
-        <span class="muted small">შეინახება ჩამონათვალში და შემდეგ პროდუქტებზეც გამოჩნდება.</span>
+        <span class="muted small">{note ?? 'შეინახება ჩამონათვალში და შემდეგ პროდუქტებზეც გამოჩნდება.'}</span>
         {onCancel && <button class="btn ghost sm" type="button" onClick={onCancel}>გაუქმება</button>}
         <button class="btn primary sm" type="button" disabled={busy} onClick={save}>{busy ? 'ინახება…' : 'დამატება'}</button>
       </div>
@@ -187,7 +192,10 @@ function Picker({ items, selected, placeholder, addLabel, onSelect, onDelete, on
 
 /** Delete a saved option everywhere it is offered; products that already use it keep their value. */
 async function deleteOption(kind: keyof OptionSet, id: number, name: string, opts: OptionSet, setOpts: (o: OptionSet) => void): Promise<boolean> {
-  if (!(await confirmAction(`წავშალოთ „${name}“ ჩამონათვალიდან? პროდუქტებს, რომლებიც მას უკვე იყენებენ, არ შეეხება.`))) return false;
+  const question = kind === 'type' || kind === 'dimension'
+    ? `წავშალოთ „${name}“? საიტის ფილტრებიდანაც გაქრება (განახლების შემდეგ).`
+    : `წავშალოთ „${name}“ ჩამონათვალიდან? პროდუქტებს, რომლებიც მას უკვე იყენებენ, არ შეეხება.`;
+  if (!(await confirmAction(question))) return false;
   try {
     await api(`/admin/options/${id}`, { method: 'DELETE' });
     setOpts({ ...opts, [kind]: (opts[kind] as { id: number }[]).filter((o) => o.id !== id) } as OptionSet);
@@ -298,6 +306,55 @@ export function SizeSelect({ width, height, onChange, opts, setOpts, invalid }: 
   );
 }
 
+/* ---------- Product editor: product type / dimension cards, from the database ---------- */
+
+const KEYED_NOTE: Record<'type' | 'dimension', string> = {
+  type: 'შეინახება და საიტის ფილტრში გამოჩნდება, როგორც კი მას პროდუქტი ექნება. სახელი მხოლობითში ჩაწერეთ.',
+  dimension: 'შეინახება და საიტის ფილტრში გამოჩნდება, როგორც კი მას პროდუქტი ექნება.',
+};
+
+/** One card per saved entry plus an "add" card: a new entry is saved to the database and chosen for this product. */
+export function KeyedChoice({ kind, legend, name, value, onChange, opts, setOpts, hints, error, wide, children }: {
+  kind: 'type' | 'dimension'; legend: string; name: string; value: string; onChange: (key: string) => void;
+  opts: OptionSet; setOpts: (o: OptionSet) => void; hints: Record<string, string>; error?: string; wide?: boolean; children?: ComponentChildren;
+}) {
+  const [adding, setAdding] = useState(false);
+  const list = opts[kind];
+  return (
+    <fieldset class="seg-field">
+      <legend>{legend}</legend>
+      <div class={`seg type-seg ${wide ? 'dim-seg' : ''}`}>
+        {list.map((o) => (
+          <label key={o.key} class={value === o.key ? 'on' : ''}>
+            <input type="radio" name={name} value={o.key} checked={value === o.key} onChange={() => { setAdding(false); onChange(o.key); }} />
+            <span class={`type-ico ${o.builtin ? o.key : 'custom'}`} aria-hidden="true" />
+            <span class="type-txt"><b>{o.ka}</b><small>{hints[o.key] ?? o.en}</small></span>
+          </label>
+        ))}
+        <button type="button" class={`type-add ${adding ? 'on' : ''}`} aria-expanded={adding} onClick={() => setAdding(!adding)}>
+          <Icon name="plus" size={18} />
+          <span class="type-txt"><b>{kind === 'type' ? 'ახალი ტიპი' : 'ახალი განზომილება'}</b><small>ჩამონათვალში დამატება</small></span>
+        </button>
+      </div>
+      {adding && (
+        <NewTextOption<KeyedOption>
+          kind={kind}
+          note={KEYED_NOTE[kind]}
+          onCancel={() => setAdding(false)}
+          onSaved={(o) => {
+            if (!list.some((x) => x.id === o.id)) setOpts({ ...opts, [kind]: [...list, o] });
+            onChange(o.key);
+            setAdding(false);
+            toast.ok(kind === 'type' ? 'ტიპი დაემატა' : 'განზომილება დაემატა');
+          }}
+        />
+      )}
+      {children}
+      {error && <span class="err">{error}</span>}
+    </fieldset>
+  );
+}
+
 /* ---------- Settings: manage the saved lists ---------- */
 
 export function OptionLists() {
@@ -306,7 +363,7 @@ export function OptionLists() {
   if (!opts) return null;
 
   const remove = (kind: keyof OptionSet, id: number, name: string) => deleteOption(kind, id, name, opts, setOpts);
-  const added = (kind: keyof OptionSet, o: TextOption | SizeOption) => {
+  const added = (kind: keyof OptionSet, o: TextOption | SizeOption | KeyedOption) => {
     const list = opts[kind] as { id: number }[];
     if (!list.some((x) => x.id === o.id)) setOpts({ ...opts, [kind]: [...list, o] } as OptionSet);
     toast.ok('დაემატა');
@@ -327,11 +384,30 @@ export function OptionLists() {
     </div>
   );
 
+  const keyedBlock = (kind: 'type' | 'dimension', title: string) => (
+    <div class="opt-list">
+      <h3>{title} <span class="muted small">{opts[kind].length}</span></h3>
+      <ul>
+        {opts[kind].map((o) => (
+          <li key={o.id}>
+            <span><b>{o.ka}</b><span class="muted small">{o.en}</span></span>
+            {o.builtin
+              ? <span class="muted small" title="საიტის განყოფილებები ამ ვარიანტზეა მიბმული, ამიტომ არ იშლება">ძირითადი</span>
+              : <button class="icon-btn danger" type="button" aria-label={`წაშლა: ${o.ka}`} onClick={() => remove(kind, o.id, o.ka)}><Icon name="trash" size={16} /></button>}
+          </li>
+        ))}
+      </ul>
+      <NewTextOption<KeyedOption> kind={kind} note={KEYED_NOTE[kind]} onSaved={(o) => added(kind, o)} />
+    </div>
+  );
+
   return (
     <section class="card pad-lg">
       <h2>ჩამონათვლები</h2>
-      <p class="muted small">ვარიანტები, რომლებიც პროდუქტის რედაქტირებისას ჩამოსაშლელ სიებში ჩანს. ახალი ვარიანტის დამატება პროდუქტის გვერდიდანაც შეიძლება.</p>
+      <p class="muted small">ვარიანტები, რომლებიც პროდუქტის რედაქტირებისას ჩანს; ტიპები და განზომილებები საიტის ფილტრებშიც გამოიყენება. ახალი ვარიანტის დამატება პროდუქტის გვერდიდანაც შეიძლება. ტიპს ან განზომილებას ვერ წაშლით, სანამ მას რომელიმე პროდუქტი იყენებს.</p>
       <div class="opt-lists">
+        {keyedBlock('type', 'პროდუქტის ტიპი')}
+        {keyedBlock('dimension', 'პროდუქტის განზომილება')}
         {textBlock('material', 'მასალა')}
         <div class="opt-list">
           <h3>ზომები <span class="muted small">{opts.size.length}</span></h3>

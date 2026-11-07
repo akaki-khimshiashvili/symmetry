@@ -303,6 +303,16 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   inset: 0.05rem; border-radius: 1px;
   background: repeating-linear-gradient(90deg, currentColor 0 1.5px, transparent 1.5px 4px);
 }
+/* A type / dimension added in the admin: a plain dashed frame. */
+.type-ico.custom::before { inset: 0.25rem; border-style: dashed; }
+/* The "add a new type / dimension" card. */
+.type-add {
+  display: flex; align-items: center; gap: 0.65rem; min-width: 0; padding: 0.65rem 0.75rem; text-align: left;
+  font: inherit; color: var(--text-3); background: transparent; border: 1px dashed var(--border); border-radius: 8px; cursor: pointer;
+}
+.type-add svg { flex: none; width: 1.6rem; }
+.type-add:hover, .type-add.on { color: var(--brand); border-color: var(--brand); }
+.type-add:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .seg.type-seg.dim-seg { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 760px) { .seg.type-seg.dim-seg { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 520px) { .seg.type-seg, .seg.type-seg.dim-seg { grid-template-columns: minmax(0, 1fr); } }
@@ -591,8 +601,66 @@ select.s-cancelled { color: var(--text-3); }
 
 /* Crop step */
 /* ---------- Home collection covers ---------- */
-.coll-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
-.coll-item { display: grid; gap: 0.6rem; min-width: 0; }
+/* ---------- Home page (მთავარი გვერდი) ---------- */
+/* Section map: one numbered button per block, in the site's order. */
+.home-map {
+  display: flex; flex-wrap: wrap; gap: 0.4rem; position: sticky; top: 0; z-index: 5;
+  padding: 0.6rem 0; margin: -0.6rem 0 0; background: var(--bg, var(--surface-2));
+}
+.home-map button {
+  display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.8rem; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-2); font: inherit; font-size: 13.5px; cursor: pointer;
+  transition: border-color 140ms ease, color 140ms ease;
+}
+.home-map button .num { font-size: 12px; color: var(--text-3); }
+.home-map button:hover { border-color: var(--brand); color: var(--brand); }
+.home-map button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.home-anchor { scroll-margin-top: 4rem; }
+.home-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.home-head > div { display: grid; gap: 0.3rem; }
+.home-head .btn, .home-head .featured-count { flex: none; }
+.home-head h2 { display: flex; align-items: baseline; gap: 0.6rem; }
+.home-n { font-size: 13px; font-weight: 600; color: var(--brand); letter-spacing: 0.04em; }
+
+.feat-slots { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; }
+.feat-slot {
+  display: grid; grid-template-columns: 3.25rem minmax(0, 1fr) auto; align-items: center; gap: 0.65rem;
+  padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); min-width: 0;
+}
+.feat-slot.empty { display: grid; place-items: center; grid-template-columns: 1fr; min-height: 4.3rem; border-style: dashed; background: transparent; }
+.feat-img { width: 3.25rem; aspect-ratio: 1; border-radius: 6px; overflow: hidden; background: var(--surface-2); }
+.feat-img img, .feat-img > * { width: 100%; height: 100%; object-fit: cover; display: block; }
+.feat-meta { display: grid; gap: 0.1rem; min-width: 0; }
+.feat-meta > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feat-add { display: flex; gap: 0.5rem; align-items: center; max-width: 34rem; }
+.feat-add select { flex: 1; min-width: 0; }
+@media (max-width: 960px) { .feat-slots { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) {
+  .feat-slots { grid-template-columns: 1fr; }
+  .home-head { flex-direction: column; }
+}
+
+.coll-form > b { font-size: 15px; }
+.coll-form .count { justify-self: end; font-variant-numeric: tabular-nums; }
+.coll-form .count.near { color: var(--danger); }
+.coll-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr)); gap: 1rem; }
+.coll-item { display: grid; gap: 0.5rem; min-width: 0; align-content: start; }
+.coll-item.is-hidden .coll-frame img { opacity: 0.45; }
+.coll-flag {
+  position: absolute; left: 0.5rem; top: 0.5rem; padding: 0.15rem 0.5rem; border-radius: 999px;
+  font-size: 12px; background: var(--surface); border: 1px solid var(--border); color: var(--text-2);
+}
+.coll-meta { display: grid; gap: 0.1rem; min-width: 0; }
+.coll-meta > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-start { display: flex; align-items: center; gap: 0.15rem; }
+.coll-foot { flex-wrap: nowrap; }
+.coll-foot .row-end { gap: 0.1rem; flex-wrap: nowrap; }
+.coll-foot .icon-btn { width: 2rem; height: 2rem; }
+.coll-pic { position: relative; }
+.coll-unpic {
+  position: absolute; right: 0.45rem; top: 0.45rem; width: 1.9rem; height: 1.9rem;
+  background: color-mix(in oklab, var(--surface) 88%, transparent); box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
+}
 .coll-frame {
   position: relative; display: grid; place-items: center; aspect-ratio: 4 / 5; width: 100%; padding: 0; overflow: hidden;
   border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); cursor: pointer; font: inherit;
@@ -603,7 +671,13 @@ select.s-cancelled { color: var(--text-3); }
 .coll-frame:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .coll-busy { position: absolute; inset: auto 0 0; padding: 0.4rem; font-size: 12px; text-align: center; background: rgb(255 255 255 / 0.85); }
 .coll-foot { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
-@media (max-width: 620px) { .coll-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) {
+  .coll-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* Narrow cards: order arrows on one line, actions under them. */
+  .coll-foot { flex-wrap: wrap; justify-content: flex-start; row-gap: 0.1rem; }
+  .coll-foot .row-end { justify-content: flex-start; margin-left: -0.3rem; }
+  .coll-foot .row-start { margin-left: -0.3rem; }
+}
 
 .crop {
   margin: auto; border: 0; border-radius: 14px; padding: 1.25rem; width: min(52rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem);

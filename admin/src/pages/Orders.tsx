@@ -242,6 +242,7 @@ export function OrdersPage({ onChange }: { onChange: () => void }) {
 
                 <dl class="order-facts">
                   <div><dt>პროდუქტი</dt><dd>{o.product_name} <span class="muted num">{o.size_label}</span></dd></div>
+                  <div><dt>რაოდენობა</dt><dd class="num"><b>{o.quantity ?? 1} ც</b>{(o.quantity ?? 1) > 1 && <span class="muted"> · ცალი {fmtPrice(o.unit_price ?? o.price / (o.quantity || 1))}</span>}</dd></div>
                   <div><dt>მომხმარებელი</dt><dd>{CLIENT_TYPES[o.client_type] ?? o.client_type}</dd></div>
                   <div><dt>ტელეფონი</dt><dd><a class="num" href={`tel:${o.phone.replace(/[^\d+]/g, '')}`}>{o.phone}</a></dd></div>
                   <div><dt>ელ-ფოსტა</dt><dd>{o.email ? <a href={`mailto:${o.email}`}>{o.email}</a> : <span class="muted">—</span>}</dd></div>

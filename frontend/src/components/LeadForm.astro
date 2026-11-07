@@ -37,7 +37,7 @@ const intents = [
 ---
 <form class="lead" id={id} data-lead-form data-email-always={emailAlways ? '' : undefined} data-endpoint={endpoint} data-msgs={JSON.stringify(msgs)} novalidate>
   <input type="hidden" name="lang" value={lang} />
-  {kind === 'order' && (<><input type="hidden" name="product_id" /><input type="hidden" name="size_id" /></>)}
+  {kind === 'order' && (<><input type="hidden" name="product_id" /><input type="hidden" name="size_id" /><input type="hidden" name="quantity" value="1" /></>)}
   <div class="hp" aria-hidden="true">
     <label>Website <input type="text" name="website" tabindex="-1" autocomplete="off" /></label>
   </div>

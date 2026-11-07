@@ -14,6 +14,7 @@ import { ProductEdit } from './pages/ProductEdit';
 import { OrdersPage } from './pages/Orders';
 import { MessagesPage } from './pages/Messages';
 import { SettingsPage } from './pages/Settings';
+import { HomePage } from './pages/Home';
 import { InvoicesPage, InvoiceEdit } from './pages/Invoices';
 
 const useHash = () => {
@@ -71,6 +72,7 @@ function Login({ onDone }: { onDone: () => void }) {
 
 const NAV = [
   { to: '/', label: 'მიმოხილვა', icon: 'grid' },
+  { to: '/home', label: 'მთავარი გვერდი', icon: 'pages' },
   { to: '/products', label: 'პროდუქცია', icon: 'panel' },
   { to: '/orders', label: 'შეკვეთები', icon: 'bag' },
   { to: '/messages', label: 'შეტყობინებები', icon: 'mail' },
@@ -130,6 +132,7 @@ function Shell() {
   if (editMatch) page = <ProductEdit id={editMatch[1]} />;
   else if (invMatch) page = <InvoiceEdit key={invMatch[1]} id={invMatch[1]} orderId={invMatch[2]} />;
   else if (hash.startsWith('/invoices')) page = <InvoicesPage />;
+  else if (hash.startsWith('/home')) page = <HomePage />;
   else if (hash.startsWith('/products')) page = <ProductsPage />;
   else if (hash.startsWith('/orders')) page = <OrdersPage onChange={refreshCounts} />;
   else if (hash.startsWith('/messages')) page = <MessagesPage onChange={refreshCounts} />;

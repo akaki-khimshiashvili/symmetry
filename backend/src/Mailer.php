@@ -236,7 +236,7 @@ final class ReceiptMail
         $hello = str_replace('{name}', $o['first_name'], $t['hello']);
         $rows = [
             [$t['number'], $r['number']],
-            [$t['item'], $r['item']['product'] . ' · ' . $r['item']['size']],
+            [$t['item'], $r['item']['product'] . ' · ' . $r['item']['size'] . ($r['item']['qty'] > 1 ? ' × ' . $r['item']['qty'] : '')],
             [$t['amount'], $money],
         ];
         if (!empty($r['list_price'])) {

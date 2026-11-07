@@ -1,7 +1,7 @@
 ---
 import Leaf from './Leaf.astro';
 import { type Lang, useT, path } from '../i18n/ui';
-import { type Product, kindOf, loc, minPrice, minListPrice, onSale, saleUniform, priceFmt } from '../lib/data';
+import { type Product, kindOf, typeName, loc, minPrice, minListPrice, onSale, saleUniform, priceFmt } from '../lib/data';
 
 interface Props { product: Product; index: number; lang: Lang; ratio?: number; d?: number; class?: string; heading?: 'h2' | 'h3'; compact?: boolean }
 const { product: p, index, lang, ratio = 0.8, d = 0, class: cls = '', heading = 'h3', compact = false } = Astro.props;
@@ -39,7 +39,7 @@ const was = minListPrice(p);
         {lang === 'en' && <span class="from">{t('collection.from')} </span>}{was && <s class="was">₾ {priceFmt(was)}</s>}₾ {priceFmt(minPrice(p))}{lang === 'ka' && <span class="from"> {t('collection.from')}</span>}
       </span>
     </div>
-    <span class="sizes">{t(`type.${kindOf(p)}.s` as any)} · {sizes} {t('products.sizes')}</span>
+    <span class="sizes">{typeName(kindOf(p), lang, 'single')} · {sizes} {t('products.sizes')}</span>
   </div>
   )}
 </a>

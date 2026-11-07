@@ -4,9 +4,20 @@ final class Products
 {
     public const PATTERNS = ['wave', 'dune', 'ripple', 'twist', 'prism', 'mosaic'];
     public const ORIENTATIONS = ['portrait', 'landscape'];
-    public const CATEGORIES = ['panel', 'shelf', 'wall', 'mirror']; // wall = მთლიანი კედელი (a whole-wall installation), mirror = სარკე
-    /** პროდუქტის განზომილება: chosen separately from the type, one per product. */
-    public const DIMENSIONS = ['portrait', 'landscape', 'wall'];
+    /**
+     * Product types and dimensions live in the options table (managed in the admin; see Options).
+     * A product stores its type as `category`: "panel" for the two panel types (their shape is the
+     * orientation), otherwise the type's key. The dimension is stored as its key.
+     */
+    public static function categories(PDO $pdo): array
+    {
+        return ['panel', ...array_values(array_diff(Options::keys($pdo, 'type'), self::ORIENTATIONS))];
+    }
+
+    public static function dimensions(PDO $pdo): array
+    {
+        return Options::keys($pdo, 'dimension');
+    }
     private const I18N = ['name', 'short', 'description', 'material'];
 
     /** @return array<int, array> */
@@ -55,7 +66,7 @@ final class Products
             'pattern' => $r['pattern'],
             'orientation' => $r['orientation'],
             'category' => $r['category'] ?? 'panel',
-            'dimension' => in_array($r['dimension'] ?? '', self::DIMENSIONS, true) ? $r['dimension'] : self::defaultDimension($r),
+            'dimension' => ($r['dimension'] ?? '') !== '' ? $r['dimension'] : self::defaultDimension($r),
             'featured' => (bool) $r['featured'],
             'in_stock' => (bool) ($r['in_stock'] ?? 1),
             'published' => (bool) $r['published'],
@@ -130,7 +141,7 @@ final class Products
         return 'მთავარ გვერდზე მაქსიმუმ ' . self::FEATURED_MAX . ' პროდუქტი ჩანს. ჯერ მოხსენით მონიშვნა სხვა პროდუქტს.';
     }
 
-    public static function validate(array $p): array
+    public static function validate(PDO $pdo, array $p): array
     {
         $errors = [];
         if (trim((string) ($p['name']['ka'] ?? '')) === '') {
@@ -160,11 +171,11 @@ final class Products
         if (isset($p['orientation']) && !in_array($p['orientation'], self::ORIENTATIONS, true)) {
             $errors['orientation'] = 'აირჩიეთ ტიპი: ვერტიკალური ან ჰორიზონტალური';
         }
-        if (isset($p['category']) && !in_array($p['category'], self::CATEGORIES, true)) {
-            $errors['category'] = 'აირჩიეთ ტიპი: პანელი, თარო, მთლიანი კედელი ან სარკე';
+        if (isset($p['category']) && !in_array($p['category'], self::categories($pdo), true)) {
+            $errors['category'] = 'აირჩიეთ პროდუქტის ტიპი ჩამონათვალიდან';
         }
-        if (isset($p['dimension']) && !in_array($p['dimension'], self::DIMENSIONS, true)) {
-            $errors['dimension'] = 'აირჩიეთ განზომილება: პორტრეტი, ჰორიზონტალური დიზაინი ან მთლიანი კედელი';
+        if (isset($p['dimension']) && !in_array($p['dimension'], self::dimensions($pdo), true)) {
+            $errors['dimension'] = 'აირჩიეთ განზომილება ჩამონათვალიდან';
         }
         if (isset($p['pattern']) && !in_array($p['pattern'], self::PATTERNS, true)) {
             $errors['pattern'] = 'უცნობი ნიმუში';
@@ -221,8 +232,8 @@ final class Products
                 ?? (isset($p['installation_days']) ? (int) $p['installation_days'] * 480 : 480)))),
             'pattern' => in_array($p['pattern'] ?? '', self::PATTERNS, true) ? $p['pattern'] : 'wave',
             'orientation' => in_array($p['orientation'] ?? '', self::ORIENTATIONS, true) ? $p['orientation'] : self::guessOrientation($p['sizes'] ?? []),
-            'category' => in_array($p['category'] ?? '', self::CATEGORIES, true) ? $p['category'] : 'panel',
-            'dimension' => in_array($p['dimension'] ?? '', self::DIMENSIONS, true) ? $p['dimension'] : self::defaultDimension([
+            'category' => in_array($p['category'] ?? '', self::categories($pdo), true) ? $p['category'] : 'panel',
+            'dimension' => in_array($p['dimension'] ?? '', self::dimensions($pdo), true) ? $p['dimension'] : self::defaultDimension([
                 'category' => $p['category'] ?? '', 'orientation' => $p['orientation'] ?? self::guessOrientation($p['sizes'] ?? []),
             ]),
             'featured' => !empty($p['featured']) ? 1 : 0,

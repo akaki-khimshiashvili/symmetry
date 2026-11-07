@@ -5,55 +5,76 @@ import Leaf from '../components/Leaf.astro';
 import SpecimenCard from '../components/SpecimenCard.astro';
 import Hero from '../components/Hero.astro';
 import { type Lang, useT, path } from '../i18n/ui';
-import { loadData, kindOf, waLink, telLink, minPrice, priceFmt } from '../lib/data';
+import { loadData, kindOf, waLink, telLink, minPrice, priceFmt, loc } from '../lib/data';
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
 const t = useT(lang);
-const { products, settings } = await loadData();
+const { products, settings, collections } = await loadData();
 
 
 // Up to 4 products marked "მთავარზე" in the admin; if fewer are marked, the rest of the catalogue fills the row.
 const featured = [...products.filter((p) => p.featured), ...products.filter((p) => !p.featured)].slice(0, 4);
-// Collection tiles: mirrors, shelves, whole walls. The cover is the photo chosen (and cropped to 4:5) in the
-// admin; without one, the type's featured / first product photo. A tile with no products yet still shows
-// (a drawn pattern, or the chosen photo) and leads to the contact page as a custom project.
-const covers = settings.collection ?? {};
-const types = (['mirror', 'shelf', 'wall'] as const).map((key) => {
-  const items = products.filter((p) => kindOf(p) === key);
+// Collection cards, as added and ordered in the admin; each one points at a product type. The cover is the
+// photo chosen (and cropped to 4:5) in the admin; without one, the type's featured / first product photo.
+// A card whose type has no products yet still shows (a drawn pattern, or the chosen photo) and leads to
+// the contact page as a custom project.
+const SKETCH: Record<string, string> = { mirror: 'ripple', shelf: 'wave', wall: 'dune' };
+const SKETCH_CYCLE = ['twist', 'prism', 'mosaic', 'wave', 'dune', 'ripple'];
+const types = collections.map((c, i) => {
+  const items = products.filter((p) => kindOf(p) === c.type);
   const product = items.find((p) => p.featured) ?? items[0];
-  const chosen = covers[key];
-  const sketch = { slug: `${key}-sketch`, pattern: key === 'mirror' ? 'ripple' : key === 'shelf' ? 'wave' : 'dune', images: [] } as unknown as (typeof products)[number];
-  const cover = chosen ? { ...(product ?? sketch), images: [{ id: 0, url: chosen }] } : product ?? sketch;
-  return { key, items, cover, photo: !!(chosen || product), from: items.length ? Math.min(...items.map(minPrice)) : 0 };
+  const sketch = { slug: `${c.type}-sketch-${c.id}`, pattern: SKETCH[c.type] ?? SKETCH_CYCLE[i % SKETCH_CYCLE.length], images: [] } as unknown as (typeof products)[number];
+  const cover = c.image ? { ...(product ?? sketch), images: [{ id: 0, url: c.image }] } : product ?? sketch;
+  return {
+    id: c.id, key: c.type, items, cover, photo: !!(c.image || product),
+    title: loc(c.title, lang), text: loc(c.text, lang),
+    from: items.length ? Math.min(...items.map(minPrice)) : 0,
+  };
 });
 
 ---
 <Base lang={lang} current="home">
   <Hero lang={lang} />
 
-  <!-- Collection: pictures with text, on one even grid -->
+  <!-- Collection: pictures with text, in a slider (cards come from the admin) -->
   <section class="section collection">
     <div class="wrap">
-      <h2 class="display t-3xl sec-title" data-reveal>{t('collection.title')}</h2>
+      {types.length > 0 && <h2 class="display t-3xl sec-title" data-reveal>{t('collection.title')}</h2>}
 
-      <div class="types">
-        {types.map((ty, i) => (
-          <a class={`tile tile-${ty.key}`} href={ty.items.length ? `${path(lang, '/products/')}?type=${ty.key}` : path(lang, '/contact/')} data-reveal style={`--d:${i}`}>
-            <div class="tile-img">
-              <Leaf product={ty.cover} alt="" ratio={4 / 5} photo={ty.photo} density={ty.photo ? 1 : 1.6} />
-              {ty.items.length > 0 && <span class="tile-count num">{ty.items.length} {t('products.count')}</span>}
-            </div>
-            <div class="tile-text">
-              <h3>{t(`type.${ty.key}` as any)}<Icon name="arrow" size={18} class="tile-go" /></h3>
-              <p class="tile-d">{t(`type.${ty.key}.d` as any)}</p>
-              <span class="tile-meta num">
-                {ty.items.length ? <>₾ {priceFmt(ty.from)} {t('collection.from')}</> : t('collection.custom')}
-              </span>
-            </div>
+      <!-- A plain scroll-snap row: swipe / trackpad scroll natively; the arrows and the progress line
+           appear only when there are more cards than fit. -->
+      {types.length > 0 && <div class="slider" data-slider data-static data-reveal>
+        <ul class="types" data-track aria-label={t('collection.title')}>
+          {types.map((ty, i) => (
+            <li class="slide" style={`--d:${Math.min(i, 3)}`}>
+              <a class={`tile tile-${ty.key}`} href={ty.items.length ? `${path(lang, '/products/')}?type=${ty.key}` : path(lang, '/contact/')}>
+                <div class="tile-img">
+                  <Leaf product={ty.cover} alt="" ratio={4 / 5} photo={ty.photo} density={ty.photo ? 1 : 1.6} />
+                  {ty.items.length > 0 && <span class="tile-count num">{ty.items.length} {t('products.count')}</span>}
+                </div>
+                <div class="tile-text">
+                  <h3><span class="tile-t">{ty.title}</span><Icon name="arrow" size={18} class="tile-go" /></h3>
+                  {ty.text && <p class="tile-d">{ty.text}</p>}
+                  <span class="tile-meta num">
+                    {ty.items.length ? <>₾ {priceFmt(ty.from)} {t('collection.from')}</> : t('collection.custom')}
+                  </span>
+                </div>
+              </a>
+            </li>
+          ))}
+        </ul>
+        <div class="slider-ctrl">
+          <a class="slider-all" href={path(lang, '/products/')}>
+            <span class="slider-all-t">{t('collection.viewAll')}</span>
+            <span class="slider-all-n num" aria-hidden="true">{types.length}</span>
+            <span class="slider-all-go" aria-hidden="true"><Icon name="arrow" size={16} /></span>
           </a>
-        ))}
-      </div>
+          <span class="slider-bar" aria-hidden="true"><span data-bar></span></span>
+          <button type="button" class="slider-btn prev" data-prev aria-label={t('collection.prev')}><Icon name="arrow" size={18} /></button>
+          <button type="button" class="slider-btn" data-next aria-label={t('collection.next')}><Icon name="arrow" size={18} /></button>
+        </div>
+      </div>}
 
       <h2 class="display t-2xl sec-title sub" data-reveal>{t('collection.featured')}</h2>
       <div class="featured-grid">
@@ -91,16 +112,138 @@ const types = (['mirror', 'shelf', 'wall'] as const).map((key) => {
   </section>
 </Base>
 
+<script>
+  // Collection slider: the track scrolls natively (swipe, trackpad, keyboard focus); this only wires the
+  // arrows, the progress line, and hides both while every card fits.
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+  document.querySelectorAll<HTMLElement>('[data-slider]').forEach((root) => {
+    const track = root.querySelector<HTMLElement>('[data-track]')!;
+    const prev = root.querySelector<HTMLButtonElement>('[data-prev]')!;
+    const next = root.querySelector<HTMLButtonElement>('[data-next]')!;
+    const bar = root.querySelector<HTMLElement>('[data-bar]')!;
+    const slides = [...track.children] as HTMLElement[];
+
+    // Stops: every card's left edge the row can reach, plus the row's end. On phones a spacer after the last
+    // card (CSS --tail) lets every card reach the left edge, so the stops are exactly one card apart. Wider
+    // screens show whole cards (or 2.25), so the end is always a sizeable move. Arrows use the same stops.
+    let stops: number[] = [0];
+    let max = 0;
+    const layout = () => {
+      max = track.scrollWidth - track.clientWidth;
+      stops = slides.map((s) => s.offsetLeft - slides[0].offsetLeft).filter((x) => x < max - 2);
+      stops.push(max);
+    };
+
+    const update = () => {
+      root.toggleAttribute('data-static', max <= 2);
+      if (max <= 2) return;
+      const x = Math.min(Math.max(track.scrollLeft, 0), max);
+      prev.disabled = x <= 2;
+      next.disabled = x >= max - 2;
+      const seen = track.clientWidth / track.scrollWidth;
+      bar.style.width = `${seen * 100}%`;
+      bar.style.transform = `translateX(${(x / max) * ((1 - seen) / seen) * 100}%)`;
+    };
+    const go = (dir: 1 | -1) => {
+      const x = track.scrollLeft;
+      const to = dir > 0 ? stops.find((s) => s > x + 4) : [...stops].reverse().find((s) => s < x - 4);
+      if (to !== undefined) track.scrollTo({ left: to, behavior: reduce.matches ? 'auto' : 'smooth' });
+    };
+
+    prev.addEventListener('click', () => go(-1));
+    next.addEventListener('click', () => go(1));
+    track.addEventListener('scroll', () => requestAnimationFrame(update), { passive: true });
+    new ResizeObserver(() => { layout(); update(); }).observe(track);
+    layout();
+    update();
+  });
+</script>
+
 <style>
   /* ---------- Collection ---------- */
   .sec-title { text-align: center; margin-bottom: var(--s-5); }
   .sec-title.sub { margin-top: var(--s-6); }
-  /* Collections: one even grid. Every picture has the same 4:5 frame, so pictures, titles,
-     descriptions and prices all sit on shared lines; the price row is pinned to the bottom. */
+  /* Collections: a scroll-snap slider, three cards per view on desktop. Every picture has the same
+     4:5 frame, so pictures, titles, descriptions and prices all sit on shared lines; the price row is
+     pinned to the bottom. The track bleeds a little past the column (--bleed) so hover shadows aren't
+     clipped, and pads back in so the first card still lines up with the page. */
+  .slider { --per: 3; --gap: clamp(1rem, 0.5rem + 1.6vw, 2rem); --bleed: 14px; }
   .types {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
-    gap: var(--s-5) clamp(1rem, 0.5rem + 1.6vw, 2rem);
+    display: flex; gap: var(--gap); margin: 0 calc(var(--bleed) * -1); padding: 6px var(--bleed) 2px; list-style: none;
+    overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scroll-padding-inline: var(--bleed);
+    scrollbar-width: none;
   }
+  .types::-webkit-scrollbar { display: none; }
+  .slider { --slide: calc((100% - var(--gap) * (var(--per) - 1)) / var(--per)); }
+  .slide { flex: 0 0 var(--slide); min-width: 0; display: grid; scroll-snap-align: start; }
+  /* Without the spacer the last cards can't reach the left edge: the last one snaps to the end instead. */
+  .slide:last-child { scroll-snap-align: end; }
+  /* Phones (--tail: 1): a spacer after the last card, as wide as the peek, so every card (the last one too)
+     can stop at the left edge: each swipe moves exactly one card, none is skipped, no half moves. */
+  .slider { --tail: 0; }
+  .types::after { content: ''; flex: 0 0 calc((100% - var(--slide) - var(--gap)) * var(--tail)); margin-left: calc(var(--gap) * -1 * (1 - var(--tail))); }
+  /* Reveal: the whole row is observed once (a card off to the side would otherwise only fade in, blurred and
+     shifted, while it is being swiped into view). The slider itself stays put; its cards rise in turn. */
+  :global(html.js) .slider[data-reveal] { opacity: 1; transform: none; filter: none; transition: none; }
+  :global(html.js) .slider[data-reveal] .slide { opacity: 0; transform: translateY(14px); }
+  :global(html.js) .slider[data-reveal]:global(.is-in) .slide {
+    opacity: 1; transform: none;
+    transition: opacity 900ms var(--ease-out), transform 1100ms var(--ease-out);
+    transition-delay: calc(var(--d, 0) * 70ms);
+  }
+  :global(html.js) .slider[data-reveal] .slider-ctrl { opacity: 0; transition: opacity 700ms ease 300ms; }
+  :global(html.js) .slider[data-reveal]:global(.is-in) .slider-ctrl { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) {
+    :global(html.js) .slider[data-reveal] .slide { transform: none; }
+  }
+  /* With fewer cards than fit, the row stays centred instead of hugging the left edge. */
+  .slider[data-static] .types { justify-content: center; }
+
+  .slider-ctrl { display: flex; align-items: center; gap: 0.5rem; margin-top: var(--s-4); }
+  /* All cards fit: only the "view all" link stays, centred under the row. */
+  .slider[data-static] .slider-ctrl { justify-content: center; }
+  .slider[data-static] :is(.slider-bar, .slider-btn) { display: none; }
+  /* "All collections": a pill the same height as the arrows: label, count, and the arrow in a filled disc. */
+  .slider-all {
+    display: inline-flex; align-items: center; gap: 0.6rem; flex: none; height: 2.75rem; margin-right: 1.25rem;
+    padding: 0 0.3rem 0 1.15rem; border-radius: 999px; border: 1px solid var(--line);
+    font-size: var(--t-sm); font-weight: 600; letter-spacing: 0.01em; color: var(--ink); text-decoration: none; white-space: nowrap;
+    transition: border-color 200ms ease, background-color 200ms ease, transform 160ms var(--ease-out);
+  }
+  .slider-all-n {
+    font-size: var(--t-xs); font-weight: 600; color: var(--ink-3);
+    padding-left: 0.6rem; border-left: 1px solid var(--line); line-height: 1.1;
+  }
+  .slider-all-go {
+    display: grid; place-items: center; width: 2.1rem; height: 2.1rem; border-radius: 999px; overflow: hidden;
+    background: var(--ink); color: var(--ground);
+  }
+  .slider-all-go :global(svg) { transition: transform 350ms var(--ease-out); }
+  .slider[data-static] .slider-all { margin-right: 0; }
+  .slider-all:active { transform: scale(0.97); }
+  .slider-all:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  @media (hover: hover) and (pointer: fine) {
+    .slider-all:hover { border-color: var(--ink); }
+    .slider-all:hover .slider-all-go :global(svg) { transform: translateX(3px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .slider-all, .slider-all-go :global(svg) { transition: none; }
+  }
+  .slider-bar { position: relative; flex: 1; height: 1px; margin-right: 1rem; background: var(--line); overflow: hidden; }
+  .slider-bar > span { position: absolute; inset: -0.5px auto -0.5px 0; width: 33%; background: var(--ink); transition: transform 120ms linear; }
+  .slider-btn {
+    display: grid; place-items: center; width: 2.75rem; height: 2.75rem; padding: 0; border-radius: 999px;
+    border: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer;
+    transition: border-color 200ms ease, background-color 200ms ease, opacity 200ms ease, transform 160ms var(--ease-out);
+  }
+  .slider-btn.prev :global(svg) { transform: scaleX(-1); }
+  .slider-btn:disabled { opacity: 0.3; cursor: default; }
+  .slider-btn:active:not(:disabled) { transform: scale(0.94); }
+  .slider-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  @media (hover: hover) and (pointer: fine) {
+    .slider-btn:hover:not(:disabled) { border-color: var(--ink); background: color-mix(in oklab, var(--ink) 5%, transparent); }
+  }
+
   .tile { display: grid; grid-template-rows: auto 1fr; gap: 1.1rem; min-width: 0; text-decoration: none; color: inherit; }
   .tile-img {
     position: relative; overflow: hidden; border-radius: 4px; background: var(--ground-2);
@@ -120,6 +263,8 @@ const types = (['mirror', 'shelf', 'wall'] as const).map((key) => {
     font-size: var(--t-xl); font-weight: 500; letter-spacing: -0.01em; line-height: 1.2;
   }
   .tile-text h3 :global(.tile-go) { flex: none; color: var(--ink-3); transition: transform 300ms var(--ease-out), color 200ms ease; }
+  /* Text from the admin is length-limited there too; these clamps keep the rows even regardless. */
+  .tile-t { min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
   .tile-d {
     margin: 0; font-size: var(--t-sm); line-height: 1.55; color: var(--ink-2); text-wrap: pretty;
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
@@ -134,7 +279,7 @@ const types = (['mirror', 'shelf', 'wall'] as const).map((key) => {
   }
   .tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; border-radius: 6px; }
   @media (prefers-reduced-motion: reduce) {
-    .tile-img, .tile-text h3 :global(.tile-go) { transition: none; }
+    .tile-img, .tile-text h3 :global(.tile-go), .slider-bar > span { transition: none; }
     .tile:hover .tile-img { transform: none; }
   }
   .featured-grid { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
@@ -195,13 +340,20 @@ const types = (['mirror', 'shelf', 'wall'] as const).map((key) => {
   /* ---------- Responsive ---------- */
   /* Tablets: lead and actions stack, everything on one left edge. */
   @media (max-width: 960px) {
+    /* Two cards and a peek of the next one hint that the row scrolls. */
+    .slider { --per: 2.25; }
     .close-foot { grid-template-columns: minmax(0, 1fr); align-items: start; }
     .close-cta { justify-items: start; }
     .actions { justify-content: flex-start; }
   }
   @media (max-width: 620px) {
-    /* Phones: two collections per row, with a shorter description. */
-    .types { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-4) 0.9rem; }
+    /* Phones: one and a half cards per view, the row running to the screen edge, a shorter description. */
+    /* One card with a clear peek of the next; one card per swipe, even on a fast flick. */
+    .slider { --per: 1.25; --gap: 0.9rem; --bleed: var(--gutter); --tail: 1; }
+    .slide, .slide:last-child { scroll-snap-align: start; scroll-snap-stop: always; }
+    /* No room for the progress line next to the pill: it only keeps the arrows on the right. */
+    .slider-bar { visibility: hidden; margin-right: 0; }
+    .slider-all { margin-right: 0.5rem; font-size: var(--t-xs); padding-left: 1rem; gap: 0.5rem; }
     .tile { gap: 0.8rem; }
     .tile-text h3 { font-size: var(--t-base); font-weight: 600; }
     .tile-text h3 :global(.tile-go) { display: none; }

@@ -3,12 +3,12 @@ import Base from '../layouts/Base.astro';
 import SpecimenCard from '../components/SpecimenCard.astro';
 import Icon from '../components/Icon.astro';
 import { type Lang, useT } from '../i18n/ui';
-import { loadData, kindOf, dimensionOf, loc, nowPrice, onSale, priceFmt, type Product } from '../lib/data';
+import { loadData, kindOf, dimensionOf, typeName, dimensionName, loc, nowPrice, onSale, priceFmt, type Product } from '../lib/data';
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
 const t = useT(lang);
-const { products } = await loadData();
+const { products, taxonomy } = await loadData();
 
 /* ---------- Everything a filter can match on, worked out once at build time ---------- */
 const matKey = (p: Product) => (p.material.ka || p.material.en || '').trim();
@@ -30,8 +30,12 @@ const facts = products.map((p, i) => {
   };
 });
 
-// Mirrors are always offered (greyed out until the first one is in the catalogue); other types appear once they have products.
-const TYPES = (['portrait', 'landscape', 'shelf', 'mirror', 'wall'] as const).filter((k) => k === 'mirror' || facts.some((f) => f.type === k));
+/** Keys in the admin's order, plus any a product uses that the list doesn't have (kept filterable). */
+const ordered = (list: { key: string }[], used: string[]) => [...new Set([...list.map((x) => x.key), ...used])];
+// Types and dimensions come from the database: every one the admin has is offered, including ones no product
+// uses yet (those show greyed out with a 0 count until a product gets them).
+const TYPES = ordered(taxonomy.types, facts.map((f) => f.type));
+const DIMS = ordered(taxonomy.dimensions, facts.map((f) => f.dim));
 const STEP = 50;
 const priceLo = facts.length ? Math.floor(Math.min(...facts.map((f) => f.pmin)) / STEP) * STEP : 0;
 const priceHi = facts.length ? Math.ceil(Math.max(...facts.map((f) => f.pmax)) / STEP) * STEP : STEP;
@@ -43,11 +47,11 @@ type Opt = { value: string; label: string; hint?: string };
 const groups: { key: 'type' | 'dim' | 'mat' | 'size'; label: string; note?: string; options: Opt[] }[] = [
   {
     key: 'type', label: t('f.type'),
-    options: TYPES.map((k) => ({ value: k, label: t(`type.${k}` as any) })),
+    options: TYPES.map((k) => ({ value: k, label: typeName(k, lang) })),
   },
   {
     key: 'dim', label: t('f.dimension'),
-    options: (['portrait', 'landscape', 'wall'] as const).filter((k) => facts.some((f) => f.dim === k)).map((k) => ({ value: k, label: t(`dim.${k}` as any) })),
+    options: DIMS.map((k) => ({ value: k, label: dimensionName(k, lang) })),
   },
   {
     key: 'mat', label: t('f.material'),
@@ -74,7 +78,7 @@ const text = {
   type: t('f.type'), dim: t('f.dimension'), mat: t('f.material'), size: t('f.size'), price: t('f.price'),
   stock: t('f.inStock'), sale: t('f.onSale'),
   labels: {
-    type: Object.fromEntries(TYPES.map((k) => [k, t(`type.${k}` as any)])),
+    type: Object.fromEntries(TYPES.map((k) => [k, typeName(k, lang)])),
     ...Object.fromEntries(groups.map((g) => [g.key, Object.fromEntries(g.options.map((o) => [o.value, o.label]))])),
   },
 };

@@ -11,10 +11,10 @@ export interface Product {
   slug: string;
   pattern: string;
   orientation: 'portrait' | 'landscape';
-  /** Wall panel, shelf, whole wall or mirror (shown as separate sections on the site). */
-  category: 'panel' | 'shelf' | 'wall' | 'mirror';
-  /** პროდუქტის განზომილება: chosen separately from the type, one per product. */
-  dimension: Dimension;
+  /** "panel" for the two panel types (their shape is `orientation`), otherwise the product type's key (shelf, wall, mirror or one added in the admin). */
+  category: string;
+  /** პროდუქტის განზომილება: a key from the dimension list (managed in the admin), one per product. */
+  dimension: string;
   featured: boolean;
   /** Out-of-stock products are shown on the site but can't be ordered. */
   in_stock: boolean;
@@ -37,7 +37,10 @@ export interface Order {
   first_name: string; last_name: string; phone: string; email: string; client_type: string;
   channel: string; message: string; lang: string; status: string; payment_status: PaymentStatus; created_at: string;
   /** Amount in tetri (GEL × 100). */
-  amount: number; currency: string; list_price: number | null; sale_percent: number; card_mask: string; card_type: string; payment_error: string; payment_test: number;
+  amount: number; currency: string;
+  /** Pieces of this design and size; `price` / `list_price` are totals, `unit_price` is one piece (null on older orders). */
+  quantity: number; unit_price: number | null;
+  list_price: number | null; sale_percent: number; card_mask: string; card_type: string; payment_error: string; payment_test: number;
   flitt_order_id: string; pay_token: string; held_at: string | null;
   /** Payment statuses whose receipt has been emailed, comma-separated. */
   receipt_emailed: string; receipt_emailed_at: string | null; captured_at: string | null; released_at: string | null;
@@ -117,8 +120,10 @@ export const PERIODS: { days: number; label: string }[] = [
 ];
 export interface TextOption { id: number; ka: string; en: string }
 export interface SizeOption { id: number; width: number; height: number }
+/** A product type or dimension: `key` is what products store and the site filters on. Built-in ones can't be deleted. */
+export interface KeyedOption extends TextOption { key: string; builtin: boolean }
 /** Saved dropdown lists for the product editor. Sizes are in centimetres. */
-export interface OptionSet { material: TextOption[]; size: SizeOption[] }
+export interface OptionSet { material: TextOption[]; size: SizeOption[]; type: KeyedOption[]; dimension: KeyedOption[] }
 
 /** The home page shows this many featured products (same limit as the API). */
 export const FEATURED_MAX = 4;
@@ -172,33 +177,31 @@ export const CLIENT_TYPES: Record<string, string> = {
   other: 'სხვა',
 };
 export const CHANNELS: Record<string, string> = { whatsapp: 'WhatsApp', email: 'ელ-ფოსტა', phone: 'ზარი' };
-export const CATEGORIES: Record<string, string> = { panel: 'კედლის პანელი', shelf: 'თარო', wall: 'მთლიანი კედელი', mirror: 'სარკე' };
-/** The one "type" choice in the admin: panels split by shape, then shelves and whole walls. */
-export type ProductType = 'portrait' | 'landscape' | 'shelf' | 'wall' | 'mirror';
-export const PRODUCT_TYPES: { key: ProductType; label: string; hint: string }[] = [
-  { key: 'portrait', label: 'ვერტიკალური დიზაინი', hint: 'მაღალი, ვიწრო პანელი' },
-  { key: 'landscape', label: 'ჰორიზონტალური დიზაინი', hint: 'ფართო პანელი' },
-  { key: 'shelf', label: 'თარო', hint: 'პარამეტრული თარო' },
-  { key: 'wall', label: 'მთლიანი კედელი', hint: 'მთელი კედლის ინსტალაცია' },
-  { key: 'mirror', label: 'სარკე', hint: 'პარამეტრული ჩარჩოთი' },
-];
-export type Dimension = 'portrait' | 'landscape' | 'wall';
-export const DIMENSIONS: { key: Dimension; label: string; hint: string }[] = [
-  { key: 'portrait', label: 'პორტრეტი', hint: 'ვერტიკალური, მაღალი ფორმა' },
-  { key: 'landscape', label: 'ჰორიზონტალური დიზაინი', hint: 'ფართო, ჰორიზონტალური ფორმა' },
-  { key: 'wall', label: 'მთლიანი კედელი', hint: 'მთელ კედელზე' },
-];
-export const typeOf = (p: Pick<Product, 'category' | 'orientation'>): ProductType =>
+/**
+ * Product types (პროდუქტის ტიპი) and dimensions (პროდუქტის განზომილება) come from the database
+ * (OptionSet.type / .dimension) and can be extended in the admin. The two panel types store
+ * category "panel" plus their shape as the orientation; every other type stores its key as the category.
+ */
+export const PANEL_TYPES = ['portrait', 'landscape'] as const;
+export const isPanelType = (key: string) => (PANEL_TYPES as readonly string[]).includes(key);
+/** Short explanations shown under the built-in choices (added ones show their English name). */
+export const TYPE_HINTS: Record<string, string> = {
+  portrait: 'მაღალი, ვიწრო პანელი', landscape: 'ფართო პანელი', shelf: 'პარამეტრული თარო',
+  wall: 'მთელი კედლის ინსტალაცია', mirror: 'პარამეტრული ჩარჩოთი',
+};
+export const DIMENSION_HINTS: Record<string, string> = {
+  portrait: 'ვერტიკალური, მაღალი ფორმა', landscape: 'ფართო, ჰორიზონტალური ფორმა', wall: 'მთელ კედელზე',
+};
+export const typeOf = (p: Pick<Product, 'category' | 'orientation'>): string =>
   p.category === 'panel' || !p.category ? p.orientation : p.category;
-export const typeLabel = (p: Pick<Product, 'category' | 'orientation'>) => PRODUCT_TYPES.find((t) => t.key === typeOf(p))!.label;
-/** Home-page collection tiles; each can get its own cover photo, cropped to the tile's 4:5 frame. */
-export type CollectionKey = 'mirror' | 'shelf' | 'wall';
-export const COLLECTION: { key: CollectionKey; label: string }[] = [
-  { key: 'mirror', label: 'სარკე' },
-  { key: 'shelf', label: 'თაროები' },
-  { key: 'wall', label: 'მთლიანი კედელი' },
-];
-export type CollectionCovers = Record<CollectionKey, string>;
+/** Georgian name of a type key, or the key itself when the list doesn't have it. */
+export const labelOf = (list: KeyedOption[] | undefined, key: string) => list?.find((o) => o.key === key)?.ka ?? key;
+export const typeLabel = (p: Pick<Product, 'category' | 'orientation'>, types?: KeyedOption[]) => labelOf(types, typeOf(p));
+/**
+ * A home-page collection card (the slider under "კოლექცია"). `type` is a product type key: the card links
+ * to the catalogue filtered by it. `image` is the cover photo (cropped to 4:5), '' = the type's product photo.
+ */
+export interface Collection { id: number; type: string; title: L10n; text: L10n; image: string; published: boolean; sort: number }
 /** Width / height of a collection tile on the home page. */
 export const COLLECTION_RATIO = 4 / 5;
 export const ORIENTATIONS: Record<string, string> = { portrait: 'ვერტიკალური დიზაინი', landscape: 'ჰორიზონტალური დიზაინი' };

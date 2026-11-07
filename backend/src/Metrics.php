@@ -193,7 +193,7 @@ SQL);
             unset($p['tracked_orders']);
         }
         unset($p);
-        $sizes = $all("SELECT product_name AS product, size_label AS size, COUNT(*) AS orders FROM orders WHERE created_at >= $from GROUP BY product_id, size_label ORDER BY orders DESC, product LIMIT 8");
+        $sizes = $all("SELECT product_name AS product, size_label AS size, SUM(COALESCE(quantity, 1)) AS orders FROM orders WHERE created_at >= $from GROUP BY product_id, size_label ORDER BY orders DESC, product LIMIT 8");
         $byType = $all(<<<SQL
 SELECT CASE WHEN p.category IN ('shelf', 'wall', 'mirror') THEN p.category ELSE COALESCE(p.orientation, 'landscape') END AS k,
   COUNT(o.id) AS orders, COALESCE(SUM(CASE WHEN $sold THEN o.price END), 0) AS revenue
