@@ -785,3 +785,184 @@ select.s-cancelled { color: var(--text-3); }
 .search-clear { position: absolute; right: 0.35rem; display: grid; place-items: center; width: 1.6rem; height: 1.6rem; border: 0; border-radius: 50%; background: none; color: var(--text-3); cursor: pointer; }
 .search-clear:hover { background: var(--surface-2); color: var(--text); }
 @media (max-width: 700px) { .search { order: -1; width: 100%; margin: 0 0 0.5rem; } }
+
+/* ---------- "Factory" style, whole admin ----------
+   Monochrome dark ground, Geist + Geist Mono, graphite chart bodies, onefang blue / green only for data and status.
+   Depth comes from contrast and hairlines, never shadows. These tokens override the ones at the top. */
+:root {
+  --obsidian: #101010; --carbon: #1d1a18; --ash: #3d3a39; --graphite: #4d4947;
+  --granite: #8a8380; --stone: #b8b3b0; --bone: #eeeeee; --chalk: #fafafa;
+  --signal: #1be7ff; /* onefang.ge accent */ --metric: #a0ca92; --on-signal: #101010;
+  --shade: rgb(0 0 0 / 0.5); --skel: #262321;
+  --chart: var(--graphite); --chart-track: var(--carbon); /* statistics bodies and bar tracks */
+  --bg: var(--obsidian); --surface: var(--obsidian); --surface-2: var(--carbon);
+  --text: var(--bone); --text-2: var(--granite); --text-3: var(--granite);
+  --border: var(--ash); --brand: var(--bone); --brand-ink: var(--obsidian);
+  --side: var(--obsidian); --side-ink: var(--bone); --side-ink-2: var(--granite);
+  --honey: var(--signal); --ok: var(--metric); --danger: #f2555a;
+  --radius: 10px;
+  --f-text: 'Geist Variable', Geist, Inter, 'Noto Sans Georgian Variable', system-ui, sans-serif;
+  --f-head: var(--f-text);
+  --f-mono: 'Geist Mono Variable', 'Geist Mono', 'JetBrains Mono', ui-monospace, 'Noto Sans Georgian Variable', monospace;
+  --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --spring: cubic-bezier(0.4, 0, 0.2, 1); --spring-dur: 200ms;
+  color-scheme: dark;
+}
+/* Light mode: the same roles with the values turned over (obsidian = page ground, bone = main ink).
+   The onefang blue is taken a step darker so thin strokes and icons stay visible on white. */
+:root[data-theme='light'] {
+  --obsidian: #fafafa; --carbon: #ebe8e6; --ash: #d4d0cd; --graphite: #bcb7b4;
+  --granite: #6b6562; --stone: #4d4947; --bone: #101010; --chalk: #1d1a18;
+  --signal: #0095ad; --metric: #3f8a4a; --on-signal: #101010; --danger: #d4373d;
+  --shade: rgb(0 0 0 / 0.08); --skel: #f3f1ef;
+  --chart: #7cc8d6; --chart-track: #e4f1f4; /* soft onefang-blue tint instead of grey: easier on the eyes on white */
+  color-scheme: light;
+}
+body { font-weight: 400; line-height: 1.5; }
+h2 { font-weight: 500; font-size: 16px; letter-spacing: -0.01em; }
+b, strong, .strong { font-weight: 500; }
+
+/* Shell: obsidian sidebar split from the content by one carbon hairline. */
+.side { border-right: 1px solid var(--carbon); }
+.side .brand .icon, .side nav a.on .icon { color: var(--signal); }
+.side nav a, .side-foot a, .side-foot button { border-radius: 3px; font-size: 14px; }
+.side nav a.on { background: var(--carbon); }
+@media (hover: hover) { .side nav a:hover, .side-foot a:hover, .side-foot button:hover { background: color-mix(in oklab, var(--carbon) 60%, transparent); } }
+.side-foot { border-top-color: var(--carbon); }
+.badge { background: var(--signal); color: var(--on-signal); border-radius: 3px; font-family: var(--f-mono); }
+.nav-toggle { border-radius: 3px; background: var(--obsidian); }
+.login { background: var(--obsidian); }
+.login-card { border: 1px solid var(--carbon); border-radius: 10px; box-shadow: none; }
+
+/* Controls: 3px corners, hairline borders, no glow. */
+.btn.primary { background: var(--chalk); color: var(--obsidian); font-weight: 500; }
+@media (hover: hover) { .btn.primary:hover:not(:disabled) { background: var(--bone); } }
+.btn.danger { color: var(--on-signal); }
+.icon-btn { border-radius: 3px; }
+input:not([type='checkbox']):not([type='radio']), select, textarea, .picker-btn, .search input { border-radius: 3px; background: transparent; }
+select option { background: var(--obsidian); color: var(--bone); }
+.picker-list { background: var(--obsidian); border-color: var(--ash); border-radius: 3px; box-shadow: none; }
+.picker-list li { border-radius: 2px; }
+.seg label, .chip, .type-add, .drop, .opt-new, .opt-list ul, .msg, .pay, .sale-preview li, .home-map button { border-radius: 3px; }
+.seg label { background: transparent; }
+.chip { background: transparent; }
+.chip.on, .seg label.on { background: var(--carbon); border-color: var(--bone); color: var(--bone); }
+.sale-chip { background: var(--signal); border-color: var(--signal); color: var(--on-signal); }
+.track { background: var(--ash); }
+.switch input:checked + .track { background: var(--signal); }
+.track::after { background: var(--bone); box-shadow: none; }
+.fld > span:first-child, .bi-label, .seg-field legend { font-weight: 500; }
+
+/* Tags and status pills: mono, square-ish, light text on dark tints. */
+.tag, .count, .inv-pill, .test-pill, .featured-count, .cover, .coll-flag, .pct-tag { border-radius: 3px; font-family: var(--f-mono); font-weight: 400; letter-spacing: -0.02em; }
+.tag, .featured-count.full, .test-pill, .ip-issued { color: var(--bone); }
+.tag { background: color-mix(in oklab, var(--signal) 22%, var(--obsidian)); }
+.ip-paid { color: var(--metric); }
+.cover { background: var(--obsidian); color: var(--bone); }
+.cover-star { background: color-mix(in oklab, var(--obsidian) 88%, transparent); color: var(--stone); box-shadow: none; border: 1px solid var(--ash); }
+@media (hover: hover) and (pointer: fine) { .cover-star:not(.on):hover, .cover-star:not(.on):focus-visible { background: var(--obsidian); color: var(--bone); } .cover-star:not(.on):hover .icon { color: var(--signal); } }
+.cover-star.on { background: var(--obsidian); color: var(--bone); border-color: var(--bone); }
+.cover-star.on .icon { fill: var(--signal); stroke: var(--signal); }
+.imgs li.is-cover { border-color: var(--bone); box-shadow: 0 0 0 1px var(--bone); }
+.coll-unpic { box-shadow: none; border: 1px solid var(--ash); }
+.coll-busy { background: color-mix(in oklab, var(--obsidian) 85%, transparent); }
+.new-dot, .entry.is-new .entry-top b::after { background: var(--signal); }
+.md-avatar { background: var(--carbon); color: var(--signal); font-weight: 500; }
+
+/* Mono caps for labels and column heads. */
+.md-label, .order-facts dt, .md-grid dt, .sizes-head, .inv-preview-label, .lang-tag, .home-n {
+  font-family: var(--f-mono); font-size: 12px; font-weight: 400; letter-spacing: -0.02em; text-transform: uppercase; color: var(--granite);
+}
+
+/* Cards on lists, orders and messages: carbon hairlines, the "new" / "held" states by colour, not glow. */
+.entry.is-new, .order.is-new { border-color: var(--ash); }
+.order.is-held { border-color: var(--signal); box-shadow: none; }
+.order.is-flash { border-color: var(--bone); box-shadow: none; }
+.order-price { font-weight: 400; letter-spacing: -0.02em; }
+
+/* Overlays: flat panels with a hairline, no shadow. */
+.toast { background: var(--carbon); color: var(--bone); border: 1px solid var(--ash); border-radius: 3px; box-shadow: none; }
+.toast.ok .icon { color: var(--metric); }
+.toast.err { background: var(--danger); color: var(--on-signal); border-color: var(--danger); }
+.confirm, .crop, .msg-dlg { border: 1px solid var(--ash); border-radius: 10px; box-shadow: none; }
+.confirm::backdrop, .crop::backdrop, .msg-dlg::backdrop { background: rgb(0 0 0 / 0.65); }
+.md-foot { background: var(--obsidian); }
+.crop-stage { background: #0d0d0d; }
+.page-head.sticky { background: color-mix(in oklab, var(--obsidian) 88%, transparent); }
+.home-map { background: var(--obsidian); }
+.inv-paper { box-shadow: none; }
+::selection { background: var(--signal); color: var(--on-signal); }
+:focus-visible { outline-color: var(--bone); }
+h1 { font-weight: 400; font-size: 36px; line-height: 1.1; letter-spacing: -1.12px; }
+.page-head .muted { font-size: 14px; }
+.btn { border-radius: 3px; font-weight: 400; transition: background-color 150ms var(--ease-out), border-color 150ms var(--ease-out), color 150ms var(--ease-out); }
+.btn.ghost { background: transparent; border-color: var(--ash); color: var(--bone); }
+@media (hover: hover) { .btn.ghost:hover:not(:disabled) { border-color: var(--chalk); color: var(--chalk); } }
+
+/* Period switch and tabs: mono caps, light chip for the selection. */
+.period { border-color: var(--ash); border-radius: 3px; background: transparent; }
+.period::before { border-radius: 2px; background: var(--bone); }
+.period button { font-family: var(--f-mono); font-size: 12px; letter-spacing: -0.02em; text-transform: uppercase; border-radius: 2px; color: var(--granite); }
+.period button.on { color: var(--obsidian); font-weight: 400; }
+@media (hover: hover) and (pointer: fine) { .period button:not(.on):hover { background: var(--carbon); color: var(--bone); } }
+.tabs { border-bottom-color: var(--carbon); }
+.tabs button { font-family: var(--f-mono); font-size: 12px; letter-spacing: -0.02em; text-transform: uppercase; color: var(--granite); transition: color 150ms var(--ease-out), border-color 150ms var(--ease-out); }
+.tabs button.on { color: var(--bone); border-color: var(--bone); font-weight: 400; }
+@media (hover: hover) { .tabs button:not(.on):hover { color: var(--stone); } }
+@media (min-width: 1101px) {
+  .mt-bar { background: color-mix(in oklab, var(--obsidian) 88%, transparent); }
+  .mt-bar::after { background: linear-gradient(to bottom, var(--shade), transparent); }
+}
+.mt-compare { font-family: var(--f-mono); font-size: 12px; letter-spacing: -0.02em; text-transform: uppercase; color: var(--granite); }
+.note { background: var(--carbon); border-color: var(--ash); border-radius: 10px; color: var(--stone); }
+.note .icon { color: var(--signal); }
+
+/* Metric tiles: no fill, hairline dividers, mono caps label, big light number. */
+.kpis { gap: 0; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); border-top: 1px solid var(--carbon); border-left: 1px solid var(--carbon); border-radius: 10px; overflow: hidden; }
+.kpi { gap: 0.25rem; padding: 20px; background: transparent; border: 0; border-right: 1px solid var(--carbon); border-bottom: 1px solid var(--carbon); border-radius: 0; }
+.kpi-label { font-family: var(--f-mono); font-size: 12px; line-height: 1.2; letter-spacing: -0.02em; text-transform: uppercase; color: var(--stone); }
+.kpi-ico { width: auto; height: auto; background: none; border-radius: 0; color: var(--granite); }
+.kpi-ico .icon { width: 14px; height: 14px; }
+.kpi:has(.kpi-ico) .kpi-n, .kpi-n { margin-top: 0.75rem; }
+.kpi-n { font-size: 36px; font-weight: 400; line-height: 1.1; letter-spacing: -1.12px; color: var(--bone); }
+.kpi-n small { font-size: 16px; letter-spacing: 0; color: var(--granite); }
+.kpi-foot { font-size: 12px; margin-top: 0.25rem; }
+.delta { font-family: var(--f-mono); font-weight: 400; font-size: 12px; letter-spacing: -0.02em; padding: 0; border-radius: 0; background: none; }
+
+/* Cards: transparent with a carbon hairline. */
+.card { background: transparent; border-color: var(--carbon); border-radius: 10px; }
+.chart, .blist, .funnel { padding: 20px; gap: 1rem; }
+.chart-title, .blist-head h3 { font-family: var(--f-mono); font-size: 12px; font-weight: 400; letter-spacing: -0.02em; text-transform: uppercase; color: var(--stone); }
+.chart-readout { font-size: 14px; color: var(--bone); }
+.chart-readout b, .blist-n { font-weight: 500; }
+
+/* Column chart: graphite bodies, a 2px blue stroke on each top, the picked day fully blue. */
+.cols-axis, .cols-x { font-family: var(--f-mono); font-size: 11px; letter-spacing: -0.02em; color: var(--granite); }
+.cols { border-bottom-color: var(--ash); background: linear-gradient(to bottom, var(--carbon) 1px, transparent 1px) 0 0 / 100% 50%; border-radius: 0; }
+.cols:focus-visible { box-shadow: 0 0 0 1px var(--bone); }
+.col { border-radius: 2px 2px 0 0; }
+.col-bar {
+  background: linear-gradient(to bottom, transparent var(--cut, 100%), var(--signal) var(--cut, 100%), var(--signal) calc(var(--cut, 100%) + 2px), var(--chart) calc(var(--cut, 100%) + 2px));
+  clip-path: inset(var(--cut, 100%) 0 0 0 round 2px 2px 0 0);
+}
+.col.on { background: color-mix(in oklab, var(--bone) 5%, transparent); }
+.col.on .col-bar { background: var(--signal); }
+.cols.has-hover .col:not(.on) .col-bar { background: color-mix(in oklab, var(--chart) 60%, var(--obsidian)); }
+
+/* Bar lists and funnel: carbon track, graphite body ending in a blue stroke. */
+.blist ul, .funnel ol { gap: 0.85rem; }
+.blist-row { color: var(--bone); }
+.blist-track { height: 4px; border-radius: 1px; background: var(--chart-track); }
+.blist-bar {
+  background: linear-gradient(to left, transparent var(--cut, 100%), var(--signal) var(--cut, 100%), var(--signal) calc(var(--cut, 100%) + 2px), var(--chart) calc(var(--cut, 100%) + 2px));
+  clip-path: inset(0 var(--cut, 100%) 0 0 round 1px);
+}
+
+/* Product metrics table. */
+.table th { font-family: var(--f-mono); font-size: 12px; font-weight: 400; letter-spacing: -0.02em; text-transform: uppercase; color: var(--granite); border-bottom-color: var(--ash); }
+.table td { border-bottom-color: var(--carbon); font-size: 14px; }
+.table .strong { font-weight: 500; }
+.th-sort.on { color: var(--bone); }
+.thumb-cell img, .preview.sm { border-radius: 3px; }
+.metrics > .muted.small { font-size: 12px; line-height: 1.5; }
+.skeleton { background: linear-gradient(90deg, var(--carbon), var(--skel), var(--carbon)); background-size: 200% 100%; }

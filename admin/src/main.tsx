@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import '@fontsource-variable/noto-sans-georgian';
 import '@fontsource/montserrat/latin-600.css';
 import '@fontsource/montserrat/latin-800.css';
+import '@fontsource-variable/geist';
+import '@fontsource-variable/geist-mono';
 import './styles.css';
 import './invoices.css';
 import { api, auth, setUnauthorizedHandler, SITE_URL, ApiError } from './api';
@@ -16,6 +18,28 @@ import { MessagesPage } from './pages/Messages';
 import { SettingsPage } from './pages/Settings';
 import { HomePage } from './pages/Home';
 import { InvoicesPage, InvoiceEdit } from './pages/Invoices';
+
+/** Colour theme: dark by default, light on request. Saved per browser; applied before the first render so nothing flashes. */
+type Theme = 'dark' | 'light';
+const THEME_KEY = 'symmetry-admin:theme';
+const readTheme = (): Theme => { try { return localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark'; } catch { return 'dark'; } };
+const applyTheme = (t: Theme) => { document.documentElement.dataset.theme = t; };
+applyTheme(readTheme());
+
+function ThemeToggle() {
+  const [theme, setTheme] = useState<Theme>(readTheme);
+  const flip = () => {
+    const next: Theme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    applyTheme(next);
+    try { localStorage.setItem(THEME_KEY, next); } catch { /* private mode: still switches for this visit */ }
+  };
+  return (
+    <button type="button" onClick={flip} aria-pressed={theme === 'light'}>
+      <Icon name={theme === 'dark' ? 'sun' : 'moon'} />{theme === 'dark' ? 'ღია თემა' : 'მუქი თემა'}
+    </button>
+  );
+}
 
 const useHash = () => {
   const [hash, setHash] = useState(location.hash.slice(1) || '/');
@@ -156,6 +180,7 @@ function Shell() {
           ))}
         </nav>
         <div class="side-foot">
+          <ThemeToggle />
           <a href={SITE_URL} target="_blank" rel="noopener"><Icon name="ext" />საიტის ნახვა</a>
           <button type="button" onClick={logout}><Icon name="out" />გასვლა</button>
         </div>
