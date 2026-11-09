@@ -101,7 +101,7 @@ const socials = [
     </div>
 
     <div class="info">
-      <div class="title" data-reveal>
+      <div class="title">
         <h1 class="display t-2xl">{name}</h1>
         <span class="sale-pill num" data-sale-pill hidden={!firstPct}>
           <span class="sale-pct" data-sale-pct>−{firstPct}%</span>
@@ -113,9 +113,9 @@ const socials = [
         <span class="stock-badge in" data-when="in">{t('p.inStock')}</span>
         <span class="stock-badge out" data-when="out">{t('p.outOfStock')}</span>
       </div>
-      <p class="lead" data-reveal style="--d:1">{loc(p.short, lang)}</p>
+      <p class="lead">{loc(p.short, lang)}</p>
 
-      <fieldset class="sizes" data-reveal style="--d:2">
+      <fieldset class="sizes">
         <legend class="label">{t('p.chooseSize')}</legend>
         {p.sizes.map((sz, i) => (
           <label class="size">
@@ -138,7 +138,7 @@ const socials = [
         ))}
       </fieldset>
 
-      <div class="stock-box" data-when="out" data-reveal style="--d:3">
+      <div class="stock-box" data-when="out">
         <p class="stock-t">{t('p.outTitle')}</p>
         <p class="stock-d">{t('p.outText')}</p>
         <div class="quick">
@@ -150,7 +150,7 @@ const socials = [
         </div>
       </div>
 
-      <div class="buy" data-when="in" data-reveal style="--d:3">
+      <div class="buy" data-when="in">
         {/* How many pieces of this design and size: the price below is the total. */}
         <div class="qty-row">
           <label class="label" for="pdp-qty">{t('p.qty')}</label>
@@ -184,7 +184,7 @@ const socials = [
         </div>
       </div>
 
-      <dl class="specs" data-reveal style="--d:4">
+      <dl class="specs">
         <div><dt><Icon name="shape" size={18} />{t('p.type')}</dt><dd>{kindOf(p) === 'portrait' || kindOf(p) === 'landscape' ? t(`type.${kindOf(p)}` as any) : typeName(kindOf(p), lang, 'single')}</dd></div>
         <div><dt><Icon name="shape" size={18} />{t('p.dimension')}</dt><dd>{dimensionName(dimensionOf(p), lang)}</dd></div>
         <div><dt><Icon name="grain" size={18} />{t('p.material')}</dt><dd>{loc(p.material, lang)}</dd></div>
@@ -196,7 +196,7 @@ const socials = [
       </dl>
 
       {socials.length > 0 && (
-        <div class="follow" data-reveal style="--d:5">
+        <div class="follow">
           <span class="label">{t('p.follow')}</span>
           <div class="soc">
             {socials.map((x) => <a href={x.href} target="_blank" rel="noopener" aria-label={x.label}><Icon name={x.key} size={20} /></a>)}
@@ -208,8 +208,8 @@ const socials = [
 
   {loc(p.description, lang) && (
     <section class="wrap grid desc" aria-labelledby="about-piece">
-      <h2 class="desc-k" id="about-piece" data-reveal>{t('p.about')}</h2>
-      <p class="desc-t" data-reveal style="--d:1">{loc(p.description, lang)}</p>
+      <h2 class="desc-k" id="about-piece">{t('p.about')}</h2>
+      <p class="desc-t">{loc(p.description, lang)}</p>
     </section>
   )}
 
@@ -217,11 +217,11 @@ const socials = [
     <section class="section more">
       <div class="wrap">
         <div class="more-head">
-          <h2 class="display t-2xl" data-reveal>{t('p.more')}</h2>
+          <h2 class="display t-2xl">{t('p.more')}</h2>
           <a class="link-arrow" href={path(lang, '/products/')}>{t('collection.all')} <Icon name="arrow" /></a>
         </div>
         <div class="more-grid">
-          {others.map((o, i) => <SpecimenCard product={o} index={products.indexOf(o)} lang={lang} ratio={0.8} d={i} />)}
+          {others.map((o, i) => <SpecimenCard product={o} index={products.indexOf(o)} lang={lang} ratio={0.8} d={i} reveal={false} />)}
         </div>
       </div>
     </section>
@@ -298,20 +298,17 @@ const socials = [
   .stock-t { font-weight: 600; font-size: var(--t-lg); color: var(--ink); margin: 0; }
   .stock-d { color: var(--ink-2); margin: 0; max-width: 46ch; text-wrap: pretty; }
   .stock-box .quick { margin-top: 0.4rem; display: flex; flex-wrap: wrap; gap: 0.6rem; }
-  .stock-box .quick .btn { flex: 1 1 auto; width: auto; white-space: nowrap; }
+  .stock-box .quick .btn { flex: 1 1 auto; width: auto; max-width: 100%; white-space: nowrap; }
   .crumbs { padding-top: var(--s-2); }
   .back { display: inline-flex; align-items: center; gap: 0.5rem; font-size: var(--t-sm); color: var(--ink-2); text-decoration: none; transition: color 200ms ease; }
   @media (hover: hover) and (pointer: fine) { .back:hover { color: var(--ink); } }
 
-  .pdp { padding-block: var(--s-2) var(--s-6); row-gap: var(--s-5); align-items: start; }
+  .pdp { padding-block: var(--s-2) var(--s-4); row-gap: var(--s-5); align-items: start; }
   .media { grid-column: 1 / span 7; position: sticky; top: calc(var(--header-h) + 1rem); }
   .info { grid-column: 8 / -1; display: grid; gap: clamp(0.9rem, 2.2vh, 1.6rem); align-content: start; }
 
-  .stage { display: grid; gap: 0.9rem; animation: stage-in 800ms var(--ease-out) 80ms both; }
-  /* The panel arrives once per visit: a short rise and settle; the dimension callouts follow. */
-  @keyframes stage-in { from { opacity: 0.001; transform: translateY(14px) scale(0.985); } }
-  .dim-top, .dim-side { animation: dims-in 500ms ease 550ms both; }
-  @keyframes dims-in { from { opacity: 0; } }
+  /* Everything on this page is on screen from the first paint: no entrance or scroll-reveal animations. */
+  .stage { display: grid; gap: 0.9rem; }
   /* The panel sits on the page with shop-drawing callouts: width above, height to the right. */
   .frame-box { container-type: size; height: clamp(20rem, calc(100svh - var(--header-h) - 8.5rem), 44rem); display: grid; place-items: center; padding: 2rem 2.25rem 0 0; }
   .piece {
@@ -412,14 +409,15 @@ const socials = [
   .qty-b:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .qty-each { font-size: var(--t-sm); color: var(--ink-3); }
   /* Price and the main action share one row, so the whole decision sits in one glance. */
-  .price-row { display: grid; grid-template-columns: auto 1fr; align-items: end; gap: 1.25rem; }
+  .price-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: end; gap: 1.25rem; }
   .price-box { display: grid; gap: 0.2rem; }
   .price { font-size: var(--t-2xl); line-height: 1; letter-spacing: -0.02em; white-space: nowrap; }
-  .order-btn { width: 100%; --h: 3.4rem; font-size: var(--t-base); }
+  /* Buttons default to nowrap; here a long label (ka) may wrap instead of pushing past the screen edge. */
+  .order-btn { width: 100%; min-width: 0; --h: 3.4rem; font-size: var(--t-base); white-space: normal; text-align: center; line-height: 1.25; padding-block: 0.6rem; }
   .note { font-size: var(--t-xs); color: var(--ink-3); }
   /* Secondary contact: two compact buttons side by side, icon tight to its label. */
-  .quick { display: grid; grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr)); gap: 0.6rem; }
-  .quick .btn { --h: 2.75rem; padding-inline: 1rem; gap: 0.5rem; font-size: var(--t-sm); }
+  .quick { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(12.5rem, 100%), 1fr)); gap: 0.6rem; }
+  .quick .btn { min-width: 0; white-space: normal; text-align: center; --h: 2.75rem; padding-inline: 1rem; gap: 0.5rem; font-size: var(--t-sm); }
   .quick .btn :global(svg) { width: 1.05em; height: 1.05em; }
 
   .specs { display: grid; }
@@ -434,7 +432,8 @@ const socials = [
   @media (hover: hover) and (pointer: fine) { .soc a:hover { color: var(--ink); background: var(--ground-2); } }
 
   /* About the piece: an editorial note on the page grid. Label left (on the photo's edge), text left-aligned on the right. */
-  .desc { padding-block: var(--s-5) var(--s-6); row-gap: var(--s-2); align-items: start; }
+  /* Follows the product block directly: its divider sits one step below the buy box, not a whole section away. */
+  .desc { padding-block: 0 var(--s-5); row-gap: var(--s-2); align-items: start; }
   .desc::before { content: ''; grid-column: 1 / -1; border-top: 1px solid var(--line); margin-bottom: var(--s-3); }
   .desc-k { grid-column: 1 / span 3; font-family: var(--f-text); font-size: var(--t-sm); font-weight: 500; color: var(--ink-3); padding-top: 0.45em; }
   .desc-t {
@@ -485,6 +484,8 @@ const socials = [
   }
   @media (max-width: 760px) {
     .size { gap: 0.75rem; }
+    /* Phones: price on its own line, the order button full width under it. */
+    .price-row { grid-template-columns: minmax(0, 1fr); align-items: start; gap: 0.75rem; }
     .more-grid { grid-template-columns: 1fr 1fr; }
     .more-grid > :global(:nth-child(3)) { display: none; }
   }
@@ -494,7 +495,6 @@ const socials = [
   }
   @media (prefers-reduced-motion: reduce) {
     .piece { transition: none; }
-    .stage { animation: dims-in 300ms ease both; }
     .drawer { transition: opacity 200ms ease, overlay 200ms allow-discrete, display 200ms allow-discrete; }
     .drawer:not([open]) { transform: none; opacity: 0; }
     @starting-style { .drawer[open] { transform: none; opacity: 0; } }

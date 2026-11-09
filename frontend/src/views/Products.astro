@@ -569,7 +569,9 @@ const PORTRAIT_SIZES = '(max-width: 620px) 30vw, (max-width: 960px) 28vw, 220px'
       for (const c of sorted) {
         const on = shown.has(c);
         c.el.hidden = !on;
-        c.el.querySelector('.spec')?.classList.add('is-in');
+        // First render (page load): leave the cards to the scroll reveal, so they rise in as they come
+        // into view. After a filter or sort, the grid animates itself, so the reveal is skipped.
+        if (animate) c.el.querySelector('.spec')?.classList.add('is-in');
         if (animate && on) {
           c.el.getAnimations().forEach((a) => a.cancel());
           c.el.animate(
