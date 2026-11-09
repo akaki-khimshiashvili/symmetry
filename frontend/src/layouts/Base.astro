@@ -75,9 +75,14 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
           var b = Object.assign({}, base, data);
           try { navigator.sendBeacon(url, new Blob([JSON.stringify(b)], { type: 'text/plain' })); } catch (e) {}
         };
-        send({ k: 'page', r: document.referrer });
-        var pdp = document.querySelector('[data-pdp][data-product-id]');
-        if (pdp) send({ k: 'product', pid: Number(pdp.getAttribute('data-product-id')) });
+        // The view is counted once the page has loaded, so the beacon never competes with fonts and images.
+        var views = function () {
+          send({ k: 'page', r: document.referrer });
+          var pdp = document.querySelector('[data-pdp][data-product-id]');
+          if (pdp) send({ k: 'product', pid: Number(pdp.getAttribute('data-product-id')) });
+        };
+        if (document.readyState === 'complete') setTimeout(views, 0);
+        else addEventListener('load', function () { setTimeout(views, 0); }, { once: true });
         var channel = function (href) {
           if (/^https?:\/\/(wa\.me|api\.whatsapp\.com)\//i.test(href)) return 'whatsapp';
           if (/^tel:/i.test(href)) return 'phone';
