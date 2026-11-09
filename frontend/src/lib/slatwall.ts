@@ -34,8 +34,20 @@ const SLAT_H = 3.6;
 const TOTAL = (N - 1) * PITCH + SLAT_W;
 const CENTER = (N - 1) / 2;
 
+/**
+ * Render quality. 0 = full (desktop), 1 = light (phones / tablets), 2 = minimal (struggling devices).
+ * The wall starts at the level the host picks and steps down by itself if frames come in too slowly.
+ */
+export type WallQuality = 0 | 1 | 2;
+const LEVELS = [
+  { dpr: 1.75, shadow: 2048, radius: 12, samples: 16, minDt: 0, budget: 24, breathe: true },
+  { dpr: 1.25, shadow: 1024, radius: 6, samples: 8, minDt: 32, budget: 44, breathe: true },
+  { dpr: 1, shadow: 512, radius: 3, samples: 6, minDt: 32, budget: Infinity, breathe: false },
+] as const;
+
 export interface WallOptions {
   reduce: boolean;
+  quality: WallQuality;
   wood: [number, number, number]; // sRGB 0–255, resolved from the palette by the host
   dpr: number;
   width: number;
@@ -116,8 +128,13 @@ const cancelFrame: (id: number) => void = typeof cancelAnimationFrame === 'funct
 
 /** Builds the wall in `canvas`. Throws (rejects) when WebGL is unavailable. */
 export async function createSlatWall(canvas: HTMLCanvasElement | OffscreenCanvas, opts: WallOptions): Promise<WallController> {
-  const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(opts.dpr, 1.75));
+  let level: WallQuality = opts.quality;
+  let Q: (typeof LEVELS)[number] = LEVELS[level];
+  // MSAA can't be switched later; light levels skip it (the slats are vertical, edges barely alias).
+  const renderer = new WebGLRenderer({
+    canvas, antialias: level === 0, alpha: true, powerPreference: level === 0 ? 'high-performance' : 'default',
+  });
+  renderer.setPixelRatio(Math.min(opts.dpr, Q.dpr));
   renderer.setClearColor(0x000000, 0);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = VSMShadowMap;
@@ -134,11 +151,19 @@ export async function createSlatWall(canvas: HTMLCanvasElement | OffscreenCanvas
   key.castShadow = true;
   // The shadow box must cover the whole visible wall for every light position (intro sweep + scroll);
   // otherwise its edge shows up as a straight line travelling across the wall.
-  key.shadow.mapSize.set(2048, 2048);
   Object.assign(key.shadow.camera, { left: -16, right: 16, top: 9, bottom: -9, near: 1, far: 30 });
   key.shadow.bias = -0.0006;
-  key.shadow.radius = 12;
-  key.shadow.blurSamples = 16;
+  // Shadow resolution and blur scale together, so the shadow stays equally soft at every level.
+  const applyShadow = () => {
+    key.shadow.mapSize.set(Q.shadow, Q.shadow);
+    key.shadow.radius = Q.radius;
+    key.shadow.blurSamples = Q.samples;
+    key.shadow.map?.dispose();
+    key.shadow.map = null; // three.js rebuilds the map (and the VSM blur target) at the new size
+    key.shadow.mapPass?.dispose();
+    key.shadow.mapPass = null;
+  };
+  applyShadow();
   scene.add(key, key.target);
   const fill = new HemisphereLight(0xfff6ea, 0x6b4f36, 0.8);
   const rim = new DirectionalLight(0xfff0dc, 0.45);
@@ -184,16 +209,26 @@ export async function createSlatWall(canvas: HTMLCanvasElement | OffscreenCanvas
   const twistAt = (i: number, ph: number) => 0.42 * Math.sin(i * 0.17 - ph * 0.8 + 0.6);
 
   /* ---------- Sizing ---------- */
+  // The whole wall is always in frame, ends included. A narrow canvas shows a shorter wall (fewer slats)
+  // rather than a cropped one, so the slats keep a good size on phones; wide canvases get all N.
+  const MARGIN_W = 1.18, MARGIN_H = 1.75; // room for the scroll orbit, the depth off the wall and the pointer
+  let n = N, total = TOTAL, center = CENTER;
   let dist = 12;
+  let lastSize = { w: opts.width, h: opts.height, dpr: opts.dpr };
   const resize = (w: number, h: number, dpr: number) => {
     if (!w || !h) return;
-    renderer.setPixelRatio(Math.min(dpr, 1.75));
+    lastSize = { w, h, dpr };
+    renderer.setPixelRatio(Math.min(dpr, Q.dpr));
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
+    // As many slats as fill the canvas width when the wall's height fits the canvas height.
+    const want = Math.round((camera.aspect * SLAT_H * MARGIN_H / MARGIN_W - SLAT_W) / PITCH) + 1;
+    n = Math.max(12, Math.min(N, want));
+    total = (n - 1) * PITCH + SLAT_W;
+    center = (n - 1) / 2;
+    slats.count = n;
     const tanHalf = Math.tan(MathUtils.degToRad(camera.fov / 2));
-    const narrow = camera.aspect < 1.5;
-    const fit = narrow ? TOTAL * 0.72 : TOTAL * 1.32;
-    dist = Math.max(fit / (2 * tanHalf * camera.aspect), (SLAT_H * (narrow ? 1.8 : 1.7)) / (2 * tanHalf));
+    dist = Math.max((total * MARGIN_W) / (2 * tanHalf * camera.aspect), (SLAT_H * MARGIN_H) / (2 * tanHalf));
     camera.updateProjectionMatrix();
   };
 
@@ -221,31 +256,53 @@ export async function createSlatWall(canvas: HTMLCanvasElement | OffscreenCanvas
   let t0 = -1;
   let ready = false;
   let started = false;
+  let lastDraw = -1;
+  let breathe = 0;
+  // Frame-time watch: if the device can't keep up at this level, drop one level (fewer pixels, smaller shadow).
+  let slowAvg = 0, slowN = 0;
+  const watch = (gap: number, t: number) => {
+    if (t < 0.8 || gap > 250 || level >= 2) return; // skip the first-frame hitch and restarts after idling
+    slowAvg = slowN === 0 ? gap : slowAvg * 0.9 + gap * 0.1;
+    if (++slowN < 40 || slowAvg <= Q.budget) return;
+    level = (level + 1) as WallQuality;
+    Q = LEVELS[level];
+    applyShadow();
+    resize(lastSize.w, lastSize.h, lastSize.dpr);
+    slowN = 0;
+  };
 
   const frame = (now: number) => {
+    // Light levels draw at most ~30 frames a second: half the GPU work, still smooth for slow motion.
+    if (Q.minDt && lastDraw >= 0 && now - lastDraw < Q.minDt - 4) { raf = visible ? nextFrame(frame) : 0; return; }
+    const gap = lastDraw < 0 ? 16.7 : now - lastDraw;
+    lastDraw = now;
     if (t0 < 0) t0 = now;
     const t = opts.reduce ? 999 : (now - t0) / 1000;
-    smoothP += (progress - smoothP) * (opts.reduce ? 1 : 0.075);
+    watch(gap, t);
+    // Easing below is written per 60fps frame; scale it by the real frame time so 30fps moves the same.
+    const step = Math.min(gap, 100) / (1000 / 60);
+    const ease = (a: number) => 1 - Math.pow(1 - a, step);
+    smoothP += (progress - smoothP) * (opts.reduce ? 1 : ease(0.075));
 
-    const breathe = opts.reduce ? 0 : Math.max(0, t - INTRO) * 0.07;
+    if (!opts.reduce && Q.breathe && t > INTRO) breathe += (Math.min(gap, 100) / 1000) * 0.07;
     // Pointer: ease hover in/out and follow the pointer; after a drag, the wave coasts and slows.
-    hoverAmt += (hoverTarget - hoverAmt) * 0.08;
-    px += (pxTarget - px) * 0.2;
-    if (!dragging) { dragPhase += dragVel; dragVel *= 0.94; if (Math.abs(dragVel) < 1e-5) dragVel = 0; }
+    hoverAmt += (hoverTarget - hoverAmt) * ease(0.08);
+    px += (pxTarget - px) * ease(0.2);
+    if (!dragging) { dragPhase += dragVel * step; dragVel *= Math.pow(0.94, step); if (Math.abs(dragVel) < 1e-5) dragVel = 0; }
     const nowS = now / 1000;
     for (let r = ripples.length - 1; r >= 0; r--) if (nowS - ripples[r].t > 2.4) ripples.splice(r, 1);
 
     const phase = breathe + smoothP * 3.2 + dragPhase;
     let moving = false;
 
-    for (let i = 0; i < N; i++) {
-      const fromC = Math.abs(i - CENTER) * STEP;
+    for (let i = 0; i < n; i++) {
+      const fromC = Math.abs(i - center) * STEP;
       // Full width and height from the first frame; only the depth off the wall grows.
       const g = easeInOut((t - 0.15 - fromC) / GROW);
-      const x = -TOTAL / 2 + SLAT_W / 2 + i * PITCH;
+      const x = -total / 2 + SLAT_W / 2 + i * PITCH;
       const dx = x - px;
       const target = hoverAmt * Math.exp(-(dx * dx) / (2 * 0.8 * 0.8));
-      infl[i] += (target - infl[i]) * 0.14;
+      infl[i] += (target - infl[i]) * ease(0.14);
       if (Math.abs(target - infl[i]) > 0.001) moving = true;
       let wave = 0;
       for (const rp of ripples) {
@@ -271,7 +328,7 @@ export async function createSlatWall(canvas: HTMLCanvasElement | OffscreenCanvas
     wallMat.opacity = MathUtils.lerp(0.1, 0.24, sweep);
 
     // Camera starts in its resting, centred view; only the scroll moves it.
-    const angle = -0.14 + smoothP * 0.34 + (px / TOTAL) * 0.08 * hoverAmt;
+    const angle = -0.14 + smoothP * 0.34 + (px / total) * 0.08 * hoverAmt;
     camera.position.set(Math.sin(angle) * dist, 0.6 + smoothP * 0.6, Math.cos(angle) * dist);
     camera.lookAt(0, 0.05, 0.35);
 
@@ -280,16 +337,18 @@ export async function createSlatWall(canvas: HTMLCanvasElement | OffscreenCanvas
 
     const settling = Math.abs(progress - smoothP) > 0.0005;
     const busy = moving || dragging || dragVel !== 0 || ripples.length > 0 || Math.abs(hoverTarget - hoverAmt) > 0.001;
-    if (visible && (!opts.reduce || settling || busy)) raf = nextFrame(frame);
+    // Keep drawing while something moves; at the minimal level the wall stops breathing after the opening,
+    // so it goes fully idle (no GPU work) until the page scrolls or a pointer touches it.
+    const animating = !opts.reduce && (Q.breathe || t < INTRO + 0.2);
+    if (visible && (animating || settling || busy)) raf = nextFrame(frame);
     else raf = 0;
   };
   const kick = () => { if (started && !raf && visible) raf = nextFrame(frame); };
-
   /* ---------- Pointer & touch ---------- */
   const aim = (e: WallPointer) => {
     ndc.set(e.ndcX, e.ndcY);
     ray.setFromCamera(ndc, camera);
-    if (ray.ray.intersectPlane(hitPlane, hit)) pxTarget = MathUtils.clamp(hit.x, -TOTAL / 2 - 1, TOTAL / 2 + 1);
+    if (ray.ray.intersectPlane(hitPlane, hit)) pxTarget = MathUtils.clamp(hit.x, -total / 2 - 1, total / 2 + 1);
   };
   const onEnter = (e: WallPointer) => {
     aim(e);

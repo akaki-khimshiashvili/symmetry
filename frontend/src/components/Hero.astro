@@ -142,14 +142,27 @@ const slats = Array.from({ length: N }, (_, i) => {
   .sh { fill: rgb(40 22 10 / 0.26); }
   /* With JS, the drawing only shows if WebGL is missing. */
   :global(html.js) .scene:not(.no-gl) .fallback { opacity: 0; }
+  /* On touch devices the blurred shadow layer is the costly part of the drawing: plain shadows instead. */
+  @media (pointer: coarse) {
+    .fallback g[filter] { filter: none; }
+    .sh { fill: rgb(40 22 10 / 0.12); }
+  }
 
   /* Every screen: the hero is exactly the visible height below the header; the wall takes
      whatever height the copy leaves, so the next section always starts below the fold. */
-  .hero { display: flex; flex-direction: column; height: calc(100svh - var(--header-h)); min-height: 30rem; }
+  /* A minimum, never a fixed height: on short screens (landscape phones, small laptop windows) the copy plus
+     the wall's minimum is taller than the screen, and a fixed height made overflow: clip cut the wall off.
+     Now the hero grows instead, so the wall is always drawn whole. */
+  .hero { display: flex; flex-direction: column; min-height: max(calc(100svh - var(--header-h)), 30rem); }
   .scene { flex: 1 1 auto; height: auto; min-height: 12rem; }
   @media (min-width: 761px) {
-    .hero { min-height: 38rem; padding-top: clamp(3rem, 11vh, 7rem); }
+    .hero { min-height: max(calc(100svh - var(--header-h)), 38rem); padding-top: clamp(3rem, 11vh, 7rem); }
     .scene { min-height: 20rem; }
+  }
+  /* Short and wide (phones on their side, low windows): less space above the copy, a modest wall. */
+  @media (min-width: 761px) and (max-height: 560px) {
+    .hero { min-height: 0; padding-top: 1.5rem; }
+    .scene { flex: 0 0 auto; height: clamp(14rem, 55vh, 20rem); min-height: 0; margin-top: var(--s-2); }
   }
   /* Phones: text and wall sit together as one centred group; spare height goes above and below it. */
   @media (max-width: 760px) {
@@ -190,10 +203,13 @@ const slats = Array.from({ length: N }, (_, i) => {
   // never competes with the text and the first paint. Without WebGL, three.js throws and the drawing stays.
   const mount = async () => {
     try {
-      const { mountSlatWall } = await import("../lib/slatwall-host");
+      const { mountSlatWall, wallQuality } = await import("../lib/slatwall-host");
+      const quality = wallQuality();
+      if (quality === "off") throw new Error("weak device: keep the flat drawing");
       const wood = getComputedStyle(document.documentElement).getPropertyValue("--wood-hi").trim() || "#d8b98f";
       await mountSlatWall(scene, {
         reduce,
+        quality,
         woodColor: wood,
         onReady: () => {
           scene.classList.add("gl-ready");

@@ -7,7 +7,7 @@
  * Otherwise (or if the worker can't get a WebGL context) it runs on the main thread as a lazy chunk.
  * Rejects when WebGL is unavailable altogether; the caller then keeps the flat drawing.
  */
-import type { WallPointer } from './slatwall';
+import type { WallPointer, WallQuality } from './slatwall';
 import type { FromWorker, ToWorker } from './slatwall.worker';
 
 interface Sink {
@@ -31,7 +31,22 @@ function cssColor(value: string): [number, number, number] {
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
-export async function mountSlatWall(host: HTMLElement, opts: { reduce: boolean; woodColor: string; onReady?: () => void }) {
+/**
+ * How much the wall may ask of this device. 'off' keeps the flat drawing (no WebGL at all): very weak
+ * hardware or the user asked to save data. Touch devices start at the light level; the wall then steps
+ * down further by itself if frames come in slowly.
+ */
+export function wallQuality(): WallQuality | 'off' {
+  const nav = navigator as Navigator & { deviceMemory?: number; connection?: { saveData?: boolean } };
+  const cores = nav.hardwareConcurrency || 4;
+  const mem = nav.deviceMemory ?? 8; // not reported by Safari / Firefox
+  if (nav.connection?.saveData || mem <= 2 || cores <= 2) return 'off';
+  const touch = matchMedia('(pointer: coarse)').matches;
+  if (mem <= 4 || cores <= 4) return touch ? 2 : 1;
+  return touch ? 1 : 0;
+}
+
+export async function mountSlatWall(host: HTMLElement, opts: { reduce: boolean; quality: WallQuality; woodColor: string; onReady?: () => void }) {
   const wood = cssColor(opts.woodColor);
   let sink: Sink | null = null;
   let canvas: HTMLCanvasElement | undefined;
@@ -88,7 +103,7 @@ export async function mountSlatWall(host: HTMLElement, opts: { reduce: boolean; 
     const { createSlatWall } = await import('./slatwall');
     const c = (canvas = newCanvas());
     try {
-      sink = await createSlatWall(c, { reduce: opts.reduce, wood, ...size(), onReady: opts.onReady });
+      sink = await createSlatWall(c, { reduce: opts.reduce, quality: opts.quality, wood, ...size(), onReady: opts.onReady });
     } catch (e) {
       c.remove();
       throw e;
@@ -126,7 +141,7 @@ export async function mountSlatWall(host: HTMLElement, opts: { reduce: boolean; 
         } else fallback();
       };
       worker.onerror = fallback; // the worker script failed to load or threw
-      post({ type: 'init', canvas: offscreen, opts: { reduce: opts.reduce, wood, ...size() } }, [offscreen]);
+      post({ type: 'init', canvas: offscreen, opts: { reduce: opts.reduce, quality: opts.quality, wood, ...size() } }, [offscreen]);
       sink = {
         resize: (width, height, dpr) => post({ type: 'resize', width, height, dpr }),
         progress: (value) => post({ type: 'progress', value }),

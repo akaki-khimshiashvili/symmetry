@@ -284,7 +284,7 @@ const socials = [
   .sale-until[hidden] { display: none; }
   /* :global — the live sale refresh redraws the size prices, and redrawn elements don't get scoped styles. */
   .pdp :global(.was) { color: var(--ink-3); font-weight: 400; text-decoration-thickness: 1px; }
-  .size .pr { display: inline-flex; align-items: baseline; gap: 0.5rem; }
+  .size .pr { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; align-items: baseline; gap: 0.15rem 0.5rem; text-align: right; }
   .pdp :global(.sz-pct) { font-size: var(--t-xs); font-weight: 700; padding: 0.05rem 0.45rem; border-radius: 999px; background: var(--accent); color: var(--accent-ink); }
   .was[hidden] { display: none; }
   .was-lg { display: block; font-size: var(--t-base); margin: 0.1rem 0 0.2rem; }
@@ -373,10 +373,13 @@ const socials = [
   .title h1 { line-height: 1.1; }
   .info .lead { font-size: var(--t-base); line-height: 1.55; }
 
-  .sizes { border: 0; padding: 0; display: grid; }
-  .sizes legend { margin-bottom: 0.5rem; }
+  /* A fieldset defaults to min-inline-size: min-content (plus 2px side margins), so on a narrow phone a long
+     size row pushed it past the right edge of the column. Let it shrink to the column like any block. */
+  .sizes { border: 0; padding: 0; margin: 0; min-width: 0; min-inline-size: 0; width: 100%; display: grid; }
+  .sizes legend { margin-bottom: 0.5rem; padding: 0; }
+  .info > * { min-width: 0; }
   .size {
-    position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 1rem;
+    position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 1rem;
     padding: 0.7rem 0.25rem; border-top: 1px solid var(--line); cursor: pointer; transition: background-color 200ms ease;
   }
   .size:last-of-type { border-bottom: 1px solid var(--line); }
@@ -481,6 +484,7 @@ const socials = [
     .quick .btn { --h: 2.5rem; }
   }
   @media (max-width: 760px) {
+    .size { gap: 0.75rem; }
     .more-grid { grid-template-columns: 1fr 1fr; }
     .more-grid > :global(:nth-child(3)) { display: none; }
   }

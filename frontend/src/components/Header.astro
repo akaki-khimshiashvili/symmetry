@@ -70,6 +70,13 @@ const SLATS = 8;
     border-color: color-mix(in oklab, var(--line) 70%, transparent);
   }
   .site-header[data-menu-open] { background: var(--ground); }
+  /* Touch devices: a live blur over the animated hero costs every frame on phone GPUs. A near-solid bar instead. */
+  @media (pointer: coarse) {
+    .site-header[data-scrolled], .site-header[data-menu-open] {
+      backdrop-filter: none; -webkit-backdrop-filter: none;
+      background: color-mix(in oklab, var(--ground) 97%, transparent);
+    }
+  }
   .bar { display: flex; align-items: center; gap: clamp(1rem, 0.5rem + 2vw, 2.5rem); height: var(--header-h); }
   .brand { text-decoration: none; display: inline-flex; }
   .nav { display: flex; align-items: center; gap: clamp(1.25rem, 0.5rem + 2vw, 2.5rem); margin-left: auto; }
@@ -192,6 +199,19 @@ const SLATS = 8;
     .menu-btn { display: inline-flex; }
   }
   @media (min-width: 861px) { .menu { display: none !important; } }
+  /* The menu can always scroll if its links don't fit (the page behind it is locked). */
+  .menu-nav { max-height: 100%; overflow-y: auto; overscroll-behavior: contain; padding-bottom: var(--s-3); }
+  /* Phones on their side: only ~250px under the header. Links go into two compact columns so all of
+     them, and the language switch, fit on one screen. */
+  @media (orientation: landscape) and (max-height: 540px) {
+    .menu-nav {
+      display: grid; grid-template-columns: 1fr 1fr; column-gap: var(--s-4); align-content: start;
+      padding-top: 0.75rem;
+    }
+    .menu-nav a { padding-block: 0.55rem; }
+    .mi-label { font-size: clamp(1.15rem, 0.6rem + 2.4vh, 1.5rem); }
+    .menu-nav .menu-lang { grid-column: 1 / -1; margin-top: 0.5rem; padding-block: 0.6rem; }
+  }
   @media (prefers-reduced-motion: reduce) {
     .menu-slats span, .menu-nav a, .burger i { transition-duration: 1ms !important; transition-delay: 0ms !important; }
     .mi-label, .mi-arrow { transition-duration: 1ms !important; }
