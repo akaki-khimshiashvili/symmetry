@@ -46,21 +46,23 @@ const was = minListPrice(p);
 
 <style>
   .spec { min-width: 0; display: flex; flex-direction: column; gap: 1.1rem; text-decoration: none; color: inherit; }
-  .frame { position: relative; overflow: hidden; }
+  /* The frame is a size container: the badges on it scale with the card, so a small card gets small badges. */
+  .frame { position: relative; overflow: hidden; container-type: inline-size; }
   /* Sale tag: the site's own accent (wood) colours, sitting on the corner of the piece. */
   .sale-tag {
-    position: absolute; right: 0.75rem; top: 0.75rem; z-index: 1;
+    position: absolute; right: clamp(0.35rem, 4cqi, 0.75rem); top: clamp(0.35rem, 4cqi, 0.75rem); z-index: 1;
     display: grid; justify-items: end; gap: 0.3rem;
   }
   .sale-tag .sale-pct {
-    padding: 0.45rem 0.85rem; border-radius: 12px; font-size: var(--t-lg); font-weight: 800; line-height: 1; letter-spacing: -0.01em;
+    padding: 0.4em 0.75em; border-radius: clamp(6px, 4cqi, 12px); font-size: clamp(0.68rem, 0.45rem + 4cqi, 1.2rem); font-weight: 800; line-height: 1; letter-spacing: -0.01em;
     background: var(--accent); color: var(--accent-ink);
     box-shadow: 0 10px 22px -10px color-mix(in oklab, var(--accent) 85%, transparent);
   }
   .was { color: var(--ink-3); font-weight: 400; margin-right: 0.4rem; text-decoration-thickness: 1px; }
   .stock-out {
-    position: absolute; left: 0.75rem; top: 0.75rem; z-index: 1;
-    padding: 0.3rem 0.7rem; border-radius: 999px; font-size: var(--t-xs); font-weight: 600; letter-spacing: 0.02em;
+    position: absolute; left: clamp(0.35rem, 4cqi, 0.75rem); top: clamp(0.35rem, 4cqi, 0.75rem); z-index: 1;
+    max-width: calc(100% - 2 * clamp(0.35rem, 4cqi, 0.75rem)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    padding: 0.3em 0.65em; border-radius: 999px; font-size: clamp(0.6rem, 0.4rem + 3.2cqi, 0.8rem); font-weight: 600; letter-spacing: 0.01em; line-height: 1.3;
     background: color-mix(in oklab, var(--ground) 92%, transparent); color: var(--ink); border: 1px solid var(--line);
     backdrop-filter: blur(6px);
   }

@@ -403,18 +403,17 @@ const PORTRAIT_SIZES = '(max-width: 620px) 30vw, (max-width: 960px) 28vw, 220px'
 
   /* ---------- Catalogue: full width again. Justified rows: every picture in a row shares one height and
      its width follows its shape; short last rows keep the same height. Rows are centred. ---------- */
+  /* Every screen size uses one fixed picture height (--h) and never lets a card grow to fill its row, so a
+     card left alone in a row (a portrait after two landscapes, say) keeps its neighbours' size, centred,
+     instead of blowing up to fill the screen. --h fits two landscape cards per row; three on wide containers. */
   .cat { --gap: calc(var(--gutter) * 1.5); container-type: inline-size; display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: var(--s-5) var(--gap); }
-  .cell { flex: var(--r) 1 calc(var(--r) * 15rem); max-width: calc(var(--r) * 26rem); min-width: 0; }
-  @media (min-width: 621px) {
-    .cell { --h: calc((100cqw - var(--gap) - 1px) / (2 * 1.3333)); flex: 0 0 calc(var(--r) * var(--h)); max-width: none; }
-  }
+  .cell { --h: min(calc((100cqw - var(--gap) - 1px) / (2 * 1.3333)), 20rem); flex: 0 0 calc(var(--r) * var(--h)); max-width: 100%; min-width: 0; }
   @container (min-width: 900px) {
-    .cell { --h: calc((100cqw - 2 * var(--gap) - 1px) / (3 * 1.3333)); }
+    .cell { --h: min(calc((100cqw - 2 * var(--gap) - 1px) / (3 * 1.3333)), 20rem); }
   }
   .empty { padding-block: var(--s-6); }
   @media (max-width: 620px) {
-    .cat { gap: var(--s-4) 0.9rem; }
-    .cell { flex-basis: calc(var(--r) * 7.5rem); max-width: calc(var(--r) * 15rem); }
+    .cat { --gap: 0.9rem; gap: var(--s-4) var(--gap); }
   }
   .none { display: grid; justify-items: center; gap: 0.6rem; text-align: center; padding: var(--s-5) var(--s-2); border: 1px dashed var(--line); border-radius: 14px; }
   .none-t { font-family: var(--f-display); font-size: var(--t-xl); color: var(--ink); }

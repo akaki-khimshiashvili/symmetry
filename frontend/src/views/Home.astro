@@ -14,7 +14,13 @@ const { products, settings, collections } = await loadData();
 
 
 // Up to 4 products marked "მთავარზე" in the admin; if fewer are marked, the rest of the catalogue fills the row.
-const featured = [...products.filter((p) => p.featured), ...products.filter((p) => !p.featured)].slice(0, 4);
+const ranked = [...products.filter((p) => p.featured), ...products.filter((p) => !p.featured)];
+// Ordered landscape, portrait, portrait, landscape where the catalogue allows, so when the cards wrap two
+// to a row every row pairs one of each shape. A shape that runs short is filled by the other.
+const pools = { land: ranked.filter((p) => p.orientation !== 'portrait'), port: ranked.filter((p) => p.orientation === 'portrait') };
+const featured = (['land', 'port', 'port', 'land'] as const)
+  .map((k) => (pools[k].shift() ?? pools[k === 'land' ? 'port' : 'land'].shift()))
+  .filter((p) => p !== undefined);
 // Collection cards, as added and ordered in the admin; each one points at a product type. The cover is the
 // photo chosen (and cropped to 4:5) in the admin; without one, the type's featured / first product photo.
 // A card whose type has no products yet still shows (a drawn pattern, or the chosen photo) and leads to
@@ -284,7 +290,9 @@ const types = collections.map((c, i) => {
   }
   .featured-grid { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
   .featured-grid { gap: var(--s-4) calc(var(--gutter) * 1.25); }
-  .cell { flex: var(--r) 1 calc(var(--r) * 10rem); min-width: 0; }
+  /* Cards grow to fill their row, but a picture is never taller than --hmax (and never wider than the row):
+     a card that wraps onto a row of its own stays in proportion instead of filling the screen. */
+  .cell { --hmax: min(19rem, 46svh); flex: var(--r) 1 calc(var(--r) * 10rem); max-width: min(100%, calc(var(--r) * var(--hmax))); min-width: 0; }
   .all { display: flex; justify-content: center; margin-top: var(--s-5); }
 
   /* ---------- Close ---------- */
@@ -361,7 +369,7 @@ const types = collections.map((c, i) => {
     .tile-meta { font-size: var(--t-xs); padding-top: 0.6rem; }
     .tile-count { left: 0.5rem; top: 0.5rem; padding: 0.2rem 0.55rem; }
     .featured-grid { gap: var(--s-4) 0.9rem; }
-    .cell { flex-basis: calc(var(--r) * 7rem); }
+    .cell { --hmax: 15rem; flex-basis: calc(var(--r) * 7rem); }
     .close-cta { width: 100%; justify-items: stretch; }
     .close-link { justify-self: start; }
     .actions { width: 100%; flex-direction: column; gap: 0.6rem; }
