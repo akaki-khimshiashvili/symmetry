@@ -41,9 +41,10 @@ export function wallQuality(): WallQuality | 'off' {
   const cores = nav.hardwareConcurrency || 4;
   const mem = nav.deviceMemory ?? 8; // not reported by Safari / Firefox
   if (nav.connection?.saveData || mem <= 2 || cores <= 2) return 'off';
-  const touch = matchMedia('(pointer: coarse)').matches;
-  if (mem <= 4 || cores <= 4) return touch ? 2 : 1;
-  return touch ? 1 : 0;
+  // Browsers report 4–6GB phones as "4", so that's a normal mid-range phone: start it sharp (level 1) and let
+  // the wall's frame-time watch drop to the minimal level if it really can't keep up.
+  if (cores <= 4 || mem <= 4) return 1;
+  return matchMedia('(pointer: coarse)').matches ? 1 : 0;
 }
 
 export async function mountSlatWall(host: HTMLElement, opts: { reduce: boolean; quality: WallQuality; woodColor: string; onReady?: () => void }) {

@@ -39,11 +39,16 @@ const CENTER = (N - 1) / 2;
  * The wall starts at the level the host picks and steps down by itself if frames come in too slowly.
  */
 export type WallQuality = 0 | 1 | 2;
+// `px` is a pixel budget for the canvas, not a DPR: a phone's small canvas still renders at full
+// sharpness (DPR 2), while a big desktop canvas is held back. Shadow size and blur scale together.
 const LEVELS = [
-  { dpr: 1.75, shadow: 2048, radius: 12, samples: 16, minDt: 0, budget: 24, breathe: true },
-  { dpr: 1.25, shadow: 1024, radius: 6, samples: 8, minDt: 32, budget: 44, breathe: true },
-  { dpr: 1, shadow: 512, radius: 3, samples: 6, minDt: 32, budget: Infinity, breathe: false },
+  { px: 3_200_000, shadow: 2048, radius: 12, samples: 16, minDt: 0, budget: 24, breathe: true },
+  { px: 1_100_000, shadow: 1024, radius: 6, samples: 8, minDt: 0, budget: 28, breathe: true },
+  { px: 500_000, shadow: 512, radius: 3, samples: 6, minDt: 32, budget: Infinity, breathe: false },
 ] as const;
+const MAX_DPR = 2;
+const pixelRatio = (w: number, h: number, dpr: number, px: number) =>
+  Math.max(1, Math.min(dpr, MAX_DPR, Math.sqrt(px / Math.max(1, w * h))));
 
 export interface WallOptions {
   reduce: boolean;
@@ -130,11 +135,12 @@ const cancelFrame: (id: number) => void = typeof cancelAnimationFrame === 'funct
 export async function createSlatWall(canvas: HTMLCanvasElement | OffscreenCanvas, opts: WallOptions): Promise<WallController> {
   let level: WallQuality = opts.quality;
   let Q: (typeof LEVELS)[number] = LEVELS[level];
-  // MSAA can't be switched later; light levels skip it (the slats are vertical, edges barely alias).
+  // MSAA can't be switched later. Mobile GPUs resolve it on-chip almost for free, so only devices that
+  // start at the minimal level go without it.
   const renderer = new WebGLRenderer({
-    canvas, antialias: level === 0, alpha: true, powerPreference: level === 0 ? 'high-performance' : 'default',
+    canvas, antialias: level < 2, alpha: true, powerPreference: level === 0 ? 'high-performance' : 'default',
   });
-  renderer.setPixelRatio(Math.min(opts.dpr, Q.dpr));
+  renderer.setPixelRatio(pixelRatio(opts.width, opts.height, opts.dpr, Q.px));
   renderer.setClearColor(0x000000, 0);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = VSMShadowMap;
@@ -218,7 +224,7 @@ export async function createSlatWall(canvas: HTMLCanvasElement | OffscreenCanvas
   const resize = (w: number, h: number, dpr: number) => {
     if (!w || !h) return;
     lastSize = { w, h, dpr };
-    renderer.setPixelRatio(Math.min(dpr, Q.dpr));
+    renderer.setPixelRatio(pixelRatio(w, h, dpr, Q.px));
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     // As many slats as fill the canvas width when the wall's height fits the canvas height.
@@ -272,7 +278,7 @@ export async function createSlatWall(canvas: HTMLCanvasElement | OffscreenCanvas
   };
 
   const frame = (now: number) => {
-    // Light levels draw at most ~30 frames a second: half the GPU work, still smooth for slow motion.
+    // The minimal level draws at most ~30 frames a second: half the GPU work, still smooth for slow motion.
     if (Q.minDt && lastDraw >= 0 && now - lastDraw < Q.minDt - 4) { raf = visible ? nextFrame(frame) : 0; return; }
     const gap = lastDraw < 0 ? 16.7 : now - lastDraw;
     lastDraw = now;
