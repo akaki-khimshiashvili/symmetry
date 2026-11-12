@@ -39,7 +39,7 @@ const slats = Array.from({ length: N }, (_, i) => {
     <p class="lead h-lead">{lead}</p>
     <div class="h-actions">
       <a class="btn btn-solid btn-lg" href={path(lang, '/products/')}>{t('hero.cta.products')}</a>
-      <a class="btn btn-line btn-lg" href={path(lang, '/contact/')}>{t('hero.cta.contact')}</a>
+      <a class="btn btn-line btn-lg h-contact" href={path(lang, '/contact/')}><Icon name="wood" class="h-wood" />{t('hero.cta.contact')}</a>
     </div>
     {socials.length > 0 && (
       <ul class="h-social" aria-label={t('contact.social')}>
@@ -78,12 +78,22 @@ const slats = Array.from({ length: N }, (_, i) => {
 <style>
   .hero { position: relative; padding-top: clamp(1.5rem, 5vh, 3.5rem); overflow: clip; }
   .hero-copy { position: relative; z-index: 1; }
-  .h-title { font-size: clamp(2.5rem, 1rem + 4vw, 4.6rem); font-weight: 600; line-height: 1.05; letter-spacing: -0.035em; text-wrap: balance; max-width: 18ch; }
-  :lang(ka) .h-title { font-size: clamp(2.2rem, 0.9rem + 3.4vw, 4rem); line-height: 1.14; letter-spacing: -0.02em; max-width: 20ch; }
+  .h-title { font-size: clamp(2.9rem, 1rem + 5.2vw, 6rem); font-weight: 600; line-height: 1.05; letter-spacing: -0.035em; text-wrap: balance; max-width: 16ch; }
+  :lang(ka) .h-title { font-size: clamp(2.45rem, 0.9rem + 4.4vw, 5.2rem); line-height: 1.14; letter-spacing: -0.02em; max-width: 20ch; }
   .hero-copy { gap: 1.1rem; }
   .h-lead { font-size: clamp(1.1rem, 1rem + 0.45vw, 1.35rem); max-width: 44rem !important; }
+  /* Description opacity: change --lead-opacity here, it is the only place (the entrance animation fades up to it too). */
+  .hero { --lead-opacity: 0.72; }
+  .h-lead { opacity: var(--lead-opacity); }
   .h-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.85rem; }
   .btn-lg { --h: 3.75rem; padding: 0 1.9rem; font-size: var(--t-base); }
+  /* Contact: a log end-grain mark. On hover the log tips back and its rings swell. */
+  .h-contact :global(.h-wood) { width: 1.3em; height: 1.3em; margin-left: -0.2em; transition: transform 520ms var(--ease-out); }
+  .h-contact :global(.h-wood .ring) { transform-box: view-box; transform-origin: 9.5px 12px; transition: transform 520ms var(--ease-out); }
+  @media (hover: hover) and (pointer: fine) {
+    .h-contact:hover :global(.h-wood) { transform: rotate(-12deg) translateX(-1px); }
+    .h-contact:hover :global(.h-wood .ring) { transform: scale(1.18); }
+  }
 
   /* Socials: a centred row of round outline buttons under the actions. */
   .h-social { display: flex; justify-content: center; gap: 0.5rem; margin: 0.25rem 0 0; padding: 0; list-style: none; }
@@ -107,7 +117,7 @@ const slats = Array.from({ length: N }, (_, i) => {
     transition-delay: calc(80ms + var(--w) * 70ms);
   }
   :global(html.js) .hero .h-lead { opacity: 0.001; transform: translateY(14px); }
-  :global(html.js) .hero.play .h-lead { opacity: 1; transform: none; transition: opacity 800ms ease 320ms, transform 900ms var(--ease-out) 320ms; }
+  :global(html.js) .hero.play .h-lead { opacity: var(--lead-opacity); transform: none; transition: opacity 800ms ease 320ms, transform 900ms var(--ease-out) 320ms; }
   /* The rows stay put; their buttons rise one after another (backwards fill, so hover still works after). */
   :global(html.js) .hero :is(.h-actions, .h-social) { opacity: 0; }
   :global(html.js) .hero.play :is(.h-actions, .h-social) { opacity: 1; }
